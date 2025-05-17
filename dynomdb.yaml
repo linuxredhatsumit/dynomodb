@@ -1,0 +1,98 @@
+trigger: none
+
+pool:
+  name: aws
+
+parameters:
+  - name: action
+    displayName: 'Action'
+    type: string
+    default: fetch
+    values:
+      - fetch
+      - update
+
+  - name: TableName
+    displayName: 'Table Name'
+    type: string
+    default: ''
+
+  - name: PartitionKey
+    displayName: 'Partition Key'
+    type: string
+    default: ''
+
+  - name: PartitionKeyValue
+    displayName: 'Partition Key Value'
+    type: string
+    default: ''
+
+  - name: UpdateAttribute
+    displayName: 'Update Attribute (key=value)'
+    type: string
+    default: null
+
+stages:
+  - stage: DynamoDBOperation
+    jobs:
+      - job: ExecuteDynamoDBOperation
+        displayName: "Execute DynamoDB Operation"
+        steps:
+          - checkout: self
+            displayName: 'Checkout repository'
+
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '3.8'
+            displayName: 'Set up Python 3.8'
+
+          - script: |
+              pip install boto3
+            displayName: 'Install boto3'
+
+          - script: |
+              echo "Current directory: $(pwd)"
+              echo "Listing files in current directory:"
+              ls -la
+              echo "Listing files in dynomodb directory:"
+              ls -la dynomodb
+            displayName: 'Debug: List files in working directory'
+
+          - script: |
+              echo "Action: ${{ parameters.action }}"
+              echo "Table Name: ${{ parameters.TableName }}"
+              echo "Partition Key: ${{ parameters.PartitionKey }}"
+              echo "Partition Key Value: ${{ parameters.PartitionKeyValue }}"
+              echo "Update Attribute: ${{ parameters.UpdateAttribute }}"
+
+              # Validate input parameters
+              if [ -z "${{ parameters.TableName }}" ] || [ -z "${{ parameters.PartitionKey }}" ] || [ -z "${{ parameters.PartitionKeyValue }}" ]; then
+                echo "Error: TableName, PartitionKey, and PartitionKeyValue are mandatory."
+                exit 1
+              fi
+
+              # Change to the dynomodb directory
+              cd dynomodb
+
+              # Run the appropriate Python script based on action
+              if [ "${{ parameters.action }}" == "fetch" ]; then
+                python fetch_attributes.py \
+                  --table "${{ parameters.TableName }}" \
+                  --partition-key "${{ parameters.PartitionKey }}" \
+                  --partition-value "${{ parameters.PartitionKeyValue }}"
+              elif [ "${{ parameters.action }}" == "update" ]; then
+                if [ -z "${{ parameters.UpdateAttribute }}" ]; then
+                  echo "Error: UpdateAttribute is required for update action."
+                  exit 1
+                fi
+                python update_dynamodb.py \
+                  --action "${{ parameters.action }}" \
+                  --table "${{ parameters.TableName }}" \
+                  --partition-key "${{ parameters.PartitionKey }}" \
+                  --partition-value "${{ parameters.PartitionKeyValue }}" \
+                  --update "${{ parameters.UpdateAttribute }}"
+              else
+                echo "Error: Invalid action. Use 'fetch' or 'update'."
+                exit 1
+              fi
+            displayName: 'Execute Python Script for DynamoDB Operation'
