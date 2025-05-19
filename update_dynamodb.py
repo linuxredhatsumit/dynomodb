@@ -4,13 +4,22 @@ import json
 import sys
 import logging
 from botocore.exceptions import ClientError
+from decimal import Decimal
 
 # Set up logging for pipeline
 logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
 logger = logging.getLogger()
 
-# Suppress botocore INFO logs to remove credential messages
+# Suppress botocore and boto3 INFO logs to remove credential messages
 logging.getLogger('botocore').setLevel(logging.WARNING)
+logging.getLogger('boto3').setLevel(logging.WARNING)
+
+# Custom JSON encoder to handle Decimal types
+class DecimalEncoder(json.JSONEncoder):
+    def default(self, obj):
+        if isinstance(obj, Decimal):
+            return str(obj)  # Convert Decimal to string for logging
+        return super(DecimalEncoder, self).default(obj)
 
 def fetch_item(table_name, partition_key, partition_value):
     dynamodb = boto3.resource('dynamodb', region_name='ap-south-1')
@@ -22,7 +31,7 @@ def fetch_item(table_name, partition_key, partition_value):
         if not item:
             logger.error("No item found for the given key.")
             sys.exit(1)
-        logger.info("Fetched item: %s", json.dumps(item, indent=4))
+        logger.info("Fetched item: %s", json.dumps(item, indent=4, cls=DecimalEncoder))
         return item
     except ClientError as e:
         logger.error(f"Error fetching item: {e.response['Error']['Message']}")
@@ -58,7 +67,7 @@ def update_item(table_name, partition_key, partition_value, update_attribute):
             ReturnValues="ALL_NEW"
         )
         logger.info("Attribute updated successfully!")
-        logger.info("Updated item: %s", json.dumps(response.get('Attributes', {}), indent=4))
+        logger.info("Updated item: %s", json.dumps(response.get('Attributes', {}), indent=4, cls=DecimalEncoder))
     except ValueError:
         logger.error("Invalid update attribute format. Use key=value.")
         sys.exit(1)
