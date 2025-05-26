@@ -1,0 +1,147 @@
+trigger: none
+#pool and agent details.
+variables:
+# Agent pool details
+  - name: POOL_NAME
+    value: test-devops
+    #value: test-prod
+  - name: AGENT_IN_AGENTPOOL
+    value: 'Linux-Agent1'
+# python version to use from _tool
+  - name: PYTHON_VERSION
+    value: '3.10'
+  - name: ROLE_NAME
+    value: EKS_Setup_Role
+  - name: SOURCE_ACCOUNT_NAME
+    value: NON_PROD
+  - name: AWS_ACCOUNT_ID
+    value: "483584640083"
+
+
+pool:
+  name: $(POOL_NAME)
+  demands:
+  - agent.name -equals $(AGENT_IN_AGENTPOOL)
+
+parameters:
+  - name: action
+    displayName: 'Action'
+    type: string
+    default: fetch
+    values:
+      - fetch
+      - update
+      - delete
+
+  - name: TableName
+    displayName: 'Table Name (Required for all actions)'
+    type: string
+    default: ''
+
+  - name: PartitionKey
+    displayName: 'Partition Key (Required for all actions)'
+    type: string
+    default: ''
+
+  - name: PartitionKeyValue
+    displayName: 'Partition Key Value (Required for all actions)'
+    type: string
+    default: ''
+
+  - name: UpdateAttribute
+    displayName: 'Update Attribute (Required for update action only, format: key=value)'
+    type: string
+    default: null
+
+stages:
+  - stage: DynamoDBOperation
+    jobs:
+      - job: ExecuteDynamoDBOperation
+        displayName: "Execute DynamoDB Operation"
+        steps:
+          - checkout: self
+            displayName: 'Checkout repository'
+
+          # - task: UsePythonVersion@0
+          #   inputs:
+          #     versionSpec: '3.8'
+          #   displayName: 'Set up Python 3.8'
+
+          # - script: |
+          #     pip install boto3
+          #   displayName: 'Install boto3'
+
+          - script: |
+              echo "Current directory: $(pwd)"
+              echo "Listing files in current directory:"
+              ls -la
+            displayName: 'Debug: List files in working directory'
+
+          - script: |
+              unset AWS_SESSION_TOKEN
+              unset AWS_SECRET_ACCESS_KEY
+              unset AWS_ACCESS_KEY_ID
+              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+              echo "************************************"
+              echo "Action: ${{ parameters.action }}"
+              echo "Table Name: ${{ parameters.TableName }}"
+              echo "Partition Key: ${{ parameters.PartitionKey }}"
+              echo "Partition Key Value: ${{ parameters.PartitionKeyValue }}"
+              echo "Update Attribute: ${{ parameters.UpdateAttribute }}"
+
+              # Validate input parameters
+              if [ -z "${{ parameters.TableName }}" ] || [ -z "${{ parameters.PartitionKey }}" ] || [ -z "${{ parameters.PartitionKeyValue }}" ]; then
+                echo "Error: TableName, PartitionKey, and PartitionKeyValue are mandatory for all actions."
+                exit 1
+              fi
+
+              # Change to the dynomodb directory
+              cd others/dynamodb-update
+              echo "Setting up Python Environment"
+              python3 -m venv dynomoenv
+              source dynomoenv/bin/activate
+              pip3 install boto3 --upgrade
+            displayName: 'Execute Python Script for DynamoDB Operation'
+          - script: |
+              unset AWS_SESSION_TOKEN
+              unset AWS_SECRET_ACCESS_KEY
+              unset AWS_ACCESS_KEY_ID
+              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+              echo "************************************"
+              cd others/dynamodb-update
+              echo "************************************"
+              echo "************************************"
+              echo "************** Table Output ********"
+              # Run the appropriate Python script based on action
+              if [ "${{ parameters.action }}" == "fetch" ]; then
+                python3 fetch_attributes.py \
+                  --table "${{ parameters.TableName }}" \
+                  --partition-key "${{ parameters.PartitionKey }}" \
+                  --partition-value "${{ parameters.PartitionKeyValue }}"
+              elif [ "${{ parameters.action }}" == "update" ]; then
+                if [ -z "${{ parameters.UpdateAttribute }}" ]; then
+                  echo "Error: UpdateAttribute is required for update action."
+                  exit 1
+                fi
+                python3 update_dynamodb.py \
+                  --action "${{ parameters.action }}" \
+                  --table "${{ parameters.TableName }}" \
+                  --partition-key "${{ parameters.PartitionKey }}" \
+                  --partition-value "${{ parameters.PartitionKeyValue }}" \
+                  --update "${{ parameters.UpdateAttribute }}"
+              elif [ "${{ parameters.action }}"" == "delete" ]; then
+                python3 delete.py \
+                  --table "${{ parameters.TableName }}" \
+                  --partition-key "${{ parameters.PartitionKey }}" \
+                  --partition-value "${{ parameters.PartitionKeyValue }}"
+              else
+                echo "Error: Invalid action. Use 'fetch', 'update', or 'delete'."
+                exit 1
+              fi
+            displayName: 'DynamoDB Operation Result'
