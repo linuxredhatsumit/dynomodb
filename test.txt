@@ -2473,3 +2473,7 @@ Script Update: update_dynamodb.py has been updated to handle all use cases (deep
 Parameters Update: dynomdb.yaml parameter description updated to reflect new features. Commit and push the change.
 Documentation Update: Confluence page updated with new examples and feature descriptions. Apply these changes to keep your team informed.
 Pipeline Execution: No structural changes, but you should test the new features by running the pipeline with various inputs.
+
+
+message.aggregatedAlerts{}.message
+Audit #1: /usr/bin/dpkg wrote a suspicious packed/encrypted binary to /usr/lib/x86_64-linux-gnu/libX11.so.6.4.0.dpkg-new. Packing/encryption can conceal malicious executables. MD5: e144d3b30932cf693a5d58daa22c61bf. Command: /usr/bin/dpkg --status-fd 26 --no-triggers --unpack --auto-deconfigure --recursive /tmp/apt-dpkg-install-GHnPuR
