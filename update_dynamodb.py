@@ -46,16 +46,24 @@ def get_nested_item(item, keys):
         current = current[key]
     return current
 
-def infer_dynamodb_type(value, key_parts):
-    """Infer the DynamoDB type for the value, especially for the last key part."""
-    # If the last key is 'N', treat the value as a Number
-    if key_parts[-1] == 'N':
+def infer_value_type(value, existing_value):
+    """Infer the type of the new value based on the existing value's type."""
+    if isinstance(existing_value, Decimal):
         try:
-            return int(value) if value.isdigit() else float(value)
-        except ValueError:
-            logger.warning(f"Value '{value}' for key 'N' could not be converted to a number; treating as string.")
+            return Decimal(value)
+        except (ValueError, TypeError):
+            logger.warning(f"Value '{value}' could not be converted to a Decimal; keeping as string.")
             return value
-    # Default to string if no specific type is inferred
+    elif isinstance(existing_value, (list, dict)):
+        # If the existing value is a List or Map, try to parse the new value as JSON
+        if isinstance(value, str) and (value.startswith('{') or value.startswith('[')):
+            try:
+                return json.loads(value)
+            except json.JSONDecodeError:
+                logger.warning(f"Value '{value}' looks like JSON but failed to parse; keeping as string.")
+                return value
+        return value
+    # Default to string or whatever the value already is
     return value
 
 def update_item(table_name, partition_key, partition_value, update_attribute):
@@ -75,7 +83,7 @@ def update_item(table_name, partition_key, partition_value, update_attribute):
         if '.' in key:
             # Split the key into parts for nested update
             key_parts = key.split('.')
-            attr = key_parts[0]  # e.g., state or globalJourney
+            attr = key_parts[0]  # e.g., globalJourney
 
             # Validate that the top-level attribute exists
             if attr not in item:
@@ -88,10 +96,14 @@ def update_item(table_name, partition_key, partition_value, update_attribute):
                 logger.error(f"Nested attribute '{key}' does not exist in the item. Update aborted.")
                 sys.exit(1)
 
-            logger.info(f"Validated: Nested attribute '{key}' exists in the item. Proceeding with update.")
+            # Get the existing value to infer its type
+            existing_value = nested_item[key_parts[-1]]
+            logger.info(f"Existing value for '{key}' is of type {type(existing_value)}: {existing_value}")
 
-            # Infer the DynamoDB type for the value
-            final_value = infer_dynamodb_type(value, key_parts)
+            # Infer the type of the new value based on the existing value
+            final_value = infer_value_type(value, existing_value)
+
+            logger.info(f"Validated: Nested attribute '{key}' exists in the item. Proceeding with update.")
 
             # Build the UpdateExpression dynamically for nested update
             update_expression = "SET " + ".".join([f"#k{i}" for i in range(len(key_parts))]) + " = :val"
@@ -113,16 +125,14 @@ def update_item(table_name, partition_key, partition_value, update_attribute):
                 logger.error(f"Attribute '{key}' does not exist in the item. Update aborted.")
                 sys.exit(1)
 
-            logger.info(f"Validated: Attribute '{key}' exists in the item. Proceeding with update.")
+            # Get the existing value to infer its type
+            existing_value = item[key]
+            logger.info(f"Existing value for '{key}' is of type {type(existing_value)}: {existing_value}")
 
-            # Try to parse the value as JSON if it looks like a JSON object
-            final_value = value
-            if value.startswith('{') and value.endswith('}'):
-                try:
-                    final_value = json.loads(value)
-                    logger.info(f"Parsed value as JSON: {final_value}")
-                except json.JSONDecodeError:
-                    logger.warning(f"Value '{value}' looks like JSON but failed to parse; treating as string.")
+            # Infer the type of the new value based on the existing value
+            final_value = infer_value_type(value, existing_value)
+
+            logger.info(f"Validated: Attribute '{key}' exists in the item. Proceeding with update.")
 
             response = table.update_item(
                 Key={partition_key: partition_value},
