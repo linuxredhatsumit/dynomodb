@@ -2388,3 +2388,88 @@
     "N": "1746184905870"
   }
 }
+#########################
+Supported Actions:
+fetch: Retrieve an item from a DynamoDB table.
+update: Update an attribute of an item in a DynamoDB table. Supports nested JSON as a Map (e.g., details={"city": "Delhi", "zip": "110001"}) and updating specific fields within a Map, including any level of nesting (e.g., globalJourney.globalFeatureAggregates.FIRST_UPI PAYMENT.N=5 or globalJourney.level1.level2.level3.level4.level5=new_value). Automatically corrects typos in nested attribute paths (e.g., corrects globalFeatureAggrgates to globalFeatureAggregates), creates nested paths if they don’t exist, and handles DynamoDB types (e.g., stores N as a Number).
+delete: Delete an item from a DynamoDB table.
+Approval Gate: All operations require manual approval via the DynamoDBApproval environment.
+AWS Access: Uses the EKS_Setup_Role IAM role (arn:aws:iam::483584640083:role/EKS_Setup_Role) with permissions for dynamodb:GetItem, dynamodb:UpdateItem, and dynamodb:DeleteItem.
+Step 2: Enter Parameters
+Step 2: Enter Parameters
+You’ll be prompted to input the following parameters:
+
+
+Parameter	Description	Required
+Action	fetch, update, or delete	Yes
+Table Name	DynamoDB table name (e.g., test-check)	Yes
+Partition Key	Partition key name (e.g., id)	Yes
+Partition Key Value	Partition key value (e.g., 33)	Yes
+Update Attribute	Attribute to update (e.g., name=Anvi, details={"city": "Delhi", "zip": "110001"}, details.city=Delhi, globalJourney.globalFeatureAggregates.FIRST_UPI PAYMENT.N=5, or globalJourney.newPath.nestedField.value=42). Supports deep nesting, auto-corrects typos, creates paths if they don’t exist, and handles DynamoDB types like Numbers for N.	Yes for update only
+Example Inputs:
+
+Delete an Item:
+Action: delete
+Table Name: test-check
+Partition Key: id
+Partition Key Value: 33
+Update Attribute: null
+Fetch an Item:
+Action: fetch
+Table Name: test-check
+Partition Key: id
+Partition Key Value: 33
+Update Attribute: null
+Update an Item (Simple Attribute):
+Action: update
+Table Name: test-check
+Partition Key: id
+Partition Key Value: 33
+Update Attribute: name=Anvi
+Update an Item (Nested JSON - Full Map):
+Action: update
+Table Name: test-check
+Partition Key: id
+Partition Key Value: 33
+Update Attribute: details={"city": "Delhi", "zip": "110001"}
+Update an Item (Nested JSON - Specific Field):
+Action: update
+Table Name: test-check
+Partition Key: id
+Partition Key Value: 33
+Update Attribute: details.city=Delhi
+Update an Item (Deeply Nested Field):
+Action: update
+Table Name: test-check
+Partition Key: id
+Partition Key Value: 33
+Update Attribute: globalJourney.globalFeatureAggregates.FIRST_UPI PAYMENT.N=5
+Update an Item (Create New Nested Path):
+Action: update
+Table Name: test-check
+Partition Key: id
+Partition Key Value: 33
+Update Attribute: globalJourney.newPath.nestedField.value=42
+Update an Item (With Typo Correction):
+Action: update
+Table Name: test-check
+Partition Key: id
+Partition Key Value: 33
+Update Attribute: globalJourney.globalFeatureAggrgates.FIRST_UPI PAYMENT.N=5
+Changes Made:
+
+Pipeline Features: Added details about typo correction, path creation, and type handling.
+Step 2: Enter Parameters: Updated the Update Attribute description to include all features and added new example inputs for creating nested paths and handling typos.
+Pipeline Impact:
+
+The Confluence page is documentation, not part of the pipeline configuration itself, but updating it ensures your team is aware of the new capabilities when running the pipeline.
+No direct changes to the pipeline’s execution are required, but you should update the Confluence page with the content above to keep documentation in sync.
+4. Pipeline Execution Changes
+No Structural Changes: The pipeline’s structure (e.g., jobs, stages, or triggers) hasn’t been modified based on our conversation, as we’ve focused on enhancing the script and its parameters.
+Testing New Features: To test the new script features, you should run the pipeline with the example inputs provided in the Confluence documentation (e.g., with typos, new paths, deep nesting). This ensures the pipeline can handle the updated script correctly.
+Approval Gate: The DynamoDBApproval environment for manual approval remains unchanged, so you’ll still need to approve each run.
+Summary of Changes
+Script Update: update_dynamodb.py has been updated to handle all use cases (deep nesting, typos, type handling, path creation). Deploy it to /others/dynamodb-update.
+Parameters Update: dynomdb.yaml parameter description updated to reflect new features. Commit and push the change.
+Documentation Update: Confluence page updated with new examples and feature descriptions. Apply these changes to keep your team informed.
+Pipeline Execution: No structural changes, but you should test the new features by running the pipeline with various inputs.
