@@ -1,1 +1,3 @@
-
+arn:aws:logs:ap-south-1:483584640083:log-group:API-Gateway-Execution-Logs_erxj8za31j/811-onb-transactions
+arn:aws:logs:ap-south-1:483584640083:log-group:API-Gateway-Execution-Logs_hlj8ppp5de/811-onb-ddlm
+arn:aws:logs:ap-south-1:483584640083:log-group:API-Gateway-Execution-Logs_wcqrzcfm84/811-onb-facade
