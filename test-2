@@ -1,3 +1,629 @@
-arn:aws:logs:ap-south-1:483584640083:log-group:API-Gateway-Execution-Logs_erxj8za31j/811-onb-transactions
-arn:aws:logs:ap-south-1:483584640083:log-group:API-Gateway-Execution-Logs_hlj8ppp5de/811-onb-ddlm
-arn:aws:logs:ap-south-1:483584640083:log-group:API-Gateway-Execution-Logs_wcqrzcfm84/811-onb-facade
+trigger: none
+
+variables:
+  - name: ENV
+    value: uat
+  - name: SERVICE_NAME
+    value: k811-ms-cc-limit-correct-cronjob
+  #pool details
+  - name: POOL_NAME
+    value: "K811-DevOps"
+  # For AWS Role Access
+  - name: AWS_ACCOUNT_ID
+    value: "483584640083"
+  - name: ROLE_NAME
+    value: EKS_Setup_Role
+  # helm related variables
+  - name: HELM_CHARTS_PATH
+    value: helm-charts/k811-ms-cc-limit-correct-cronjob/charts
+  - name: HELM_S3BUCKET_URL
+    value: s3://kotak811-helmcharts/uat/k811-ms-cc-limit-correct-cronjob/
+  - name: KUBE_CONFIG_PATH
+    value: /home/app_user/.kube/config-uat
+  - name: NAMESPACE
+    value: 811-uat
+  - group: UAT-Static-Variables
+  - name: DR_HELM_S3BUCKET_URL
+    value: s3://kotak811-helmcharts-dr/uat/k811-ms-cc-limit-correct-cronjob/
+
+# parameters:
+#   - name: CRONJOB
+#     displayName: "CRONJOB, x24 will replace as single quote"
+#     type: string
+#     default: \x27  \*\/5 \* \* \* \*  \x27
+
+pool:
+  name: $(POOL_NAME)
+
+stages:
+  - stage: UAT
+    displayName: "Build in UAT Environment"
+    jobs:
+      - job: UpdateHelmCharts
+        displayName: "cronjob update"
+        steps:
+          - script: |
+              pwd
+              sed -i -e 's/name:.*/name: $(SERVICE_NAME)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+              sed -i -e 's/appVersion:.*/appVersion: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+              sed -i -e 's/version:.*/version: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+            displayName: "Updating Chart Values"
+
+          - script: |
+              pwd
+              unset AWS_SESSION_TOKEN
+              unset AWS_SECRET_ACCESS_KEY
+              unset AWS_ACCESS_KEY_ID
+              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+              helm s3 init $(HELM_S3BUCKET_URL)
+              helm repo add $(ENV)-$(SERVICE_NAME) $(HELM_S3BUCKET_URL) 
+              helm package $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/
+              helm s3 push --force $(System.DefaultWorkingDirectory)/$(SERVICE_NAME)-1.$(Build.BuildNumber).tgz $(ENV)-$(SERVICE_NAME)
+              aws s3 ls $(HELM_S3BUCKET_URL) 
+              helm repo update 
+              helm search repo $(ENV)-$(SERVICE_NAME)
+            displayName: "Charts Push To S3"
+
+          - script: |
+              pwd
+              unset AWS_SESSION_TOKEN
+              unset AWS_SECRET_ACCESS_KEY
+              unset AWS_ACCESS_KEY_ID
+              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+              rm -rf $(System.DefaultWorkingDirectory)/*.tgz
+              helm repo update
+              helm fetch $(ENV)-$(SERVICE_NAME)/$(SERVICE_NAME)
+              tar -xvf $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
+              echo "Starting the deployment in the namespace $(NAMESPACE)"
+              helm upgrade --install $(ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ -f $(SERVICE_NAME)/$(ENV)-values.yaml --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH)
+            displayName: "Helm Charts Deployment"
+
+      - job: UpdateHelmChartsDR
+        displayName: "Application Build and deploy for DR"
+        condition: succeededOrFailed()
+        steps:
+          - script: |
+              pwd
+              sed -i -e 's/name:.*/name: $(SERVICE_NAME)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+              sed -i -e 's/appVersion:.*/appVersion: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+              sed -i -e 's/version:.*/version: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+            displayName: "Updating Chart Values for DR"
+
+          - script: |
+              pwd
+              unset AWS_SESSION_TOKEN
+              unset AWS_SECRET_ACCESS_KEY
+              unset AWS_ACCESS_KEY_ID
+              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+              helm s3 init $(DR_HELM_S3BUCKET_URL)
+              helm repo add $(DR_ENV)-$(SERVICE_NAME) $(DR_HELM_S3BUCKET_URL) 
+              helm package $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/
+              helm s3 push --force $(System.DefaultWorkingDirectory)/$(SERVICE_NAME)-1.$(Build.BuildNumber).tgz $(DR_ENV)-$(SERVICE_NAME)
+              aws s3 ls $(DR_HELM_S3BUCKET_URL) 
+              helm repo update 
+              helm search repo $(DR_ENV)-$(SERVICE_NAME)
+            displayName: "Charts Push To S3 DR"
+
+          - script: |
+              pwd
+              unset AWS_SESSION_TOKEN
+              unset AWS_SECRET_ACCESS_KEY
+              unset AWS_ACCESS_KEY_ID
+              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+              rm -rf $(System.DefaultWorkingDirectory)/*.tgz
+              helm repo update
+              helm fetch $(DR_ENV)-$(SERVICE_NAME)/$(SERVICE_NAME)
+              tar -xvf $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
+              echo "Starting the deployment in the namespace $(DR_NAMESPACE)"
+              helm upgrade --install $(DR_ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ -f $(SERVICE_NAME)/$(DR_ENV)-values.yaml --namespace $(DR_NAMESPACE) --kubeconfig $(DR_KUBE_CONFIG_PATH)
+            displayName: "Helm Charts Deployment DR"
+      
+      - job: SecondaryScaleDown
+        displayName: "Disable CronJob in Secondary Region"
+        dependsOn: 
+          - UpdateHelmCharts
+          - UpdateHelmChartsDR
+        condition: |
+          and
+          (
+            eq(dependencies.UpdateHelmCharts.result, 'Succeeded'),
+            eq(dependencies.UpdateHelmChartsDR.result, 'Succeeded')
+          )
+        steps:
+          - script: |
+              pwd
+              unset AWS_SESSION_TOKEN
+              unset AWS_SECRET_ACCESS_KEY
+              unset AWS_ACCESS_KEY_ID
+              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+              kubectl patch cronjob $(SERVICE_NAME) -p '{"spec": {"suspend": true}}' --namespace $(DR_NAMESPACE) --kubeconfig $(DR_KUBE_CONFIG_PATH)  
+            displayName: "Disable CronJob in Secondary Region"
+
+
+
+
+#####################################
+parameters:
+  - name: ENABLE_ISTIO
+    type: boolean
+    default: false
+  - name: ServiceBuild
+    type: boolean
+    default: false
+  - name: service
+    type: string
+
+stages:
+  - ${{ if eq( parameters['ServiceBuild'], true) }}:
+      - stage: UAT
+        displayName: "Build in UAT Environment"
+        jobs:
+          - job: Service_deployment_in_UAT
+            displayName: "Dev Docker Image Pull + Vaca Scan"
+            steps:
+              - bash: |
+                  echo "##vso[task.setvariable variable=AgentName;isoutput=true]$(Agent.Name)"
+                name: passOutput
+              - script: |
+                  pwd
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  version=$(kubectl get deployment $(SOURCE_SERVICE_NAME) -o jsonpath=''{$.spec.template.spec.containers[:1].image}'' -n $(SOURCE_NAMESPACE) --kubeconfig $(SOURCE_KUBE_CONFIG_PATH) | cut -d ':' -f 2)
+                  echo "##vso[task.setvariable variable=version]$version"
+                displayName: "$(SOURCE_SERVICE_NAME) Tag value in dev environment ."
+              - script: |
+                  echo $(version)
+                displayName: Dev Environment Docker image of $(SERVICE_NAME)
+              - script: |
+                  pwd
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+                  docker pull $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version)
+                  # docker tag $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version) $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_FOLDER_NAME)/$(ECR_REPO_NAME):$(version)
+                  # docker push $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_FOLDER_NAME)/$(ECR_REPO_NAME):$(version)
+                  # docker rmi $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version)
+                  # docker rmi $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_FOLDER_NAME)/$(ECR_REPO_NAME):$(version)
+                displayName: "Dev Docker Image Pull"
+
+              - task: prisma-cloud-compute-scan@3
+                displayName: "VACA Image Scan"
+                continueOnError: true
+                inputs:
+                  scanType: "images"
+                  twistlockService: "prisma-onb"
+                  artifact: "$(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version)"
+
+          - job: ManualValidationJob
+            condition: eq(dependencies.Service_deployment_in_UAT.result, 'SucceededWithIssues')
+            dependsOn: Service_deployment_in_UAT
+            pool: server
+            displayName: "Approval for VACA Bypass"
+            steps:
+              - task: ManualValidation@0
+                inputs:
+                  instructions: "Disclaimer!!! You are responsible for your own actions :) "
+                  emailRecipients: "devops.kotak811@kotak.com"
+                  onTimeout: "reject"
+
+          - job: Continue_deployment_in_UAT_Fail
+            dependsOn:
+              - Service_deployment_in_UAT
+              - ManualValidationJob
+            pool:
+              name: $(POOL_NAME)
+              demands:
+                - agent.name -equals $(Agent_Name)
+            variables:
+              Agent_Name: $[ dependencies.Service_deployment_in_UAT.outputs['passOutput.AgentName'] ]
+            condition: |
+              and
+              (
+                eq(dependencies.Service_deployment_in_UAT.result, 'SucceededWithIssues'),
+                eq(dependencies.ManualValidationJob.result, 'Succeeded')
+              )
+            displayName: "Continue Deployment in UAT when VACA Fails"
+            steps:
+              - script: |
+                  pwd
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  version=$(kubectl get deployment $(SOURCE_SERVICE_NAME) -o jsonpath=''{$.spec.template.spec.containers[:1].image}'' -n $(SOURCE_NAMESPACE) --kubeconfig $(SOURCE_KUBE_CONFIG_PATH) | cut -d ':' -f 2)
+                  istio_image=$(kubectl get deployment $(SOURCE_SERVICE_NAME) -o jsonpath='{.spec.template.metadata.annotations.sidecar\.istio\.io/proxyImage}' -n $(SOURCE_NAMESPACE) --kubeconfig $(SOURCE_KUBE_CONFIG_PATH) | awk -F':' '{print $2}')                
+                  echo "Service $(SOURCE_SERVICE_NAME) Image in UAT ENV is $version"
+                  echo "Service $(SOURCE_SERVICE_NAME) Istio Image in UAT ENV is $istio_image"                  
+                  echo "##vso[task.setvariable variable=version]$version"
+                  echo "##vso[task.setvariable variable=istio_image]$istio_image"                  
+                displayName: "$(SOURCE_SERVICE_NAME) Tag value in dev environment ."
+
+              - script: |
+                  pwd
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+                  # docker pull $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version)
+                  docker tag $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version) $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_FOLDER_NAME)/$(ECR_REPO_NAME):$(version)
+                  docker push $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_FOLDER_NAME)/$(ECR_REPO_NAME):$(version)
+                  docker rmi $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version)
+                  docker rmi $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_FOLDER_NAME)/$(ECR_REPO_NAME):$(version)
+                displayName: "UAT Docker Image Push"
+
+              - script: |
+                  pwd
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  image=$(kubectl get deployment $(SERVICE_NAME) -o jsonpath=''{$.spec.template.spec.containers[:1].image}'' -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH))
+                  echo "Below Image is for reference the Existing Docker Image:"
+                  echo $image
+                displayName: "Existing Docker image of $(SERVICE_NAME)"
+
+              - script: |
+                  pwd
+                  sed -i -e 's/name:.*/name: $(SERVICE_NAME)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+                  sed -i -e 's/appVersion:.*/appVersion: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+                  sed -i -e 's/version:.*/version: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+                  sed -i -e 's/tag:.*/tag: $(version)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(ENV)-values.yaml
+                  sed -i -e 's/istio_tag:.*/istio_tag: $(istio_image)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(ENV)-values.yaml
+                  if [[ ${{ parameters.ENABLE_ISTIO }} == "True" ]]; then
+                    echo "Custom Istio is enabled"
+                    awk '/isCustomIstio:/ { found=1 } found && /enabled:/ { sub(/false/, "true"); found=0 } { print }' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(ENV)-values.yaml > temp.yaml
+                    mv temp.yaml $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(ENV)-values.yaml
+                  else
+                    awk '/isCustomIstio:/ { found=1 } found && /enabled:/ { sub(/true/, "false"); found=0 } { print }' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(ENV)-values.yaml > temp.yaml
+                    mv temp.yaml $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(ENV)-values.yaml
+                  fi
+                displayName: "Updating Chart Values"
+
+              - script: |
+                  pwd
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  helm s3 init $(HELM_S3BUCKET_URL)
+                  helm repo add $(ENV)-$(SERVICE_NAME) $(HELM_S3BUCKET_URL) 
+                  helm package $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/
+                  helm s3 push --force $(System.DefaultWorkingDirectory)/$(SERVICE_NAME)-1.$(Build.BuildNumber).tgz $(ENV)-$(SERVICE_NAME)
+                  aws s3 ls $(HELM_S3BUCKET_URL) 
+                  helm repo update 
+                  helm search repo $(ENV)-$(SERVICE_NAME)
+                displayName: "Charts Push To S3"
+
+              - script: |
+                  pwd
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  rm -rf $(System.DefaultWorkingDirectory)/*.tgz
+                  helm repo update
+                  helm fetch $(ENV)-$(SERVICE_NAME)/$(SERVICE_NAME)
+                  tar -xvf $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
+                  helm upgrade --install $(ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ -f $(SERVICE_NAME)/$(ENV)-values.yaml --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) --wait --timeout 3m
+                displayName: "Helm Charts Deployment"
+                continueOnError: true
+
+              - script: |
+                  pwd
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  sleep 10
+                  echo "########################## list of pods ########################################"
+                  kubectl get po --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME)
+                  echo "########################## list of deployed services ########################################"
+                  kubectl get deployment --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME)
+
+                  echo "########################## Get logs of latest pod ########################################"
+                  kubectl logs $(kubectl get pods --sort-by=.metadata.creationTimestamp -l app=$(SERVICE_NAME) -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | tail -n 1 | awk '{print $1}') -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH)
+                displayName: "Application Status"
+                continueOnError: true
+
+          - job: Continue_deployment_in_UAT_Pass
+            dependsOn:
+              - Service_deployment_in_UAT
+              - ManualValidationJob
+            pool:
+              name: $(POOL_NAME)
+              demands:
+                - agent.name -equals $(Agent_Name)
+            variables:
+              Agent_Name: $[ dependencies.Service_deployment_in_UAT.outputs['passOutput.AgentName'] ]
+            condition: |
+              and
+              (
+                eq(dependencies.Service_deployment_in_UAT.result, 'Succeeded'),
+                eq(dependencies.ManualValidationJob.result, 'Skipped')
+              )
+            displayName: "Continue Deployment in UAT when VACA Passes"
+            steps:
+              - script: |
+                  pwd
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  version=$(kubectl get deployment $(SOURCE_SERVICE_NAME) -o jsonpath=''{$.spec.template.spec.containers[:1].image}'' -n $(SOURCE_NAMESPACE) --kubeconfig $(SOURCE_KUBE_CONFIG_PATH) | cut -d ':' -f 2)
+                  istio_image=$(kubectl get deployment $(SOURCE_SERVICE_NAME) -o jsonpath='{.spec.template.metadata.annotations.sidecar\.istio\.io/proxyImage}' -n $(SOURCE_NAMESPACE) --kubeconfig $(SOURCE_KUBE_CONFIG_PATH) | awk -F':' '{print $2}')                
+                  echo "Service $(SOURCE_SERVICE_NAME) Image in UAT ENV is $version"
+                  echo "Service $(SOURCE_SERVICE_NAME) Istio Image in UAT ENV is $istio_image"                  
+                  echo "##vso[task.setvariable variable=version]$version"                  
+                  echo "##vso[task.setvariable variable=istio_image]$istio_image"
+                displayName: "$(SOURCE_SERVICE_NAME) Tag value in dev environment ."
+
+              - script: |
+                  pwd
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+                  # docker pull $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version)
+                  docker tag $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version) $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_FOLDER_NAME)/$(ECR_REPO_NAME):$(version)
+                  docker push $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_FOLDER_NAME)/$(ECR_REPO_NAME):$(version)
+                  docker rmi $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version)
+                  docker rmi $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_FOLDER_NAME)/$(ECR_REPO_NAME):$(version)
+                displayName: "UAT Docker Image Push"
+
+              - script: |
+                  pwd
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  image=$(kubectl get deployment $(SERVICE_NAME) -o jsonpath=''{$.spec.template.spec.containers[:1].image}'' -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH))
+                  echo "Below Image is for reference the Existing Docker Image:"
+                  echo $image
+                displayName: "Existing Docker image of $(SERVICE_NAME)"
+
+              - script: |
+                  pwd
+                  sed -i -e 's/name:.*/name: $(SERVICE_NAME)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+                  sed -i -e 's/appVersion:.*/appVersion: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+                  sed -i -e 's/version:.*/version: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+                  echo "The image is updated in the $(ENV)-values.yaml"
+                  echo "$(version)"
+                  sed -i -e 's/tag:.*/tag: $(version)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(ENV)-values.yaml
+                  sed -i -e 's/istio_tag:.*/istio_tag: $(istio_image)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(ENV)-values.yaml
+                  if [[ ${{ parameters.ENABLE_ISTIO }} == "True" ]]; then
+                    echo "Custom Istio is enabled"
+                    awk '/isCustomIstio:/ { found=1 } found && /enabled:/ { sub(/false/, "true"); found=0 } { print }' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(ENV)-values.yaml > temp.yaml
+                    mv temp.yaml $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(ENV)-values.yaml
+                  else
+                    awk '/isCustomIstio:/ { found=1 } found && /enabled:/ { sub(/true/, "false"); found=0 } { print }' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(ENV)-values.yaml > temp.yaml
+                    mv temp.yaml $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(ENV)-values.yaml
+                  fi
+                displayName: "Updating Chart Values"
+
+              - script: |
+                  pwd
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  helm s3 init $(HELM_S3BUCKET_URL)
+                  helm repo add $(ENV)-$(SERVICE_NAME) $(HELM_S3BUCKET_URL) 
+                  helm package $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/
+                  helm s3 push --force $(System.DefaultWorkingDirectory)/$(SERVICE_NAME)-1.$(Build.BuildNumber).tgz $(ENV)-$(SERVICE_NAME)
+                  aws s3 ls $(HELM_S3BUCKET_URL) 
+                  helm repo update 
+                  helm search repo $(ENV)-$(SERVICE_NAME)
+                displayName: "Charts Push To S3"
+
+              - script: |
+                  pwd
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  rm -rf $(System.DefaultWorkingDirectory)/*.tgz
+                  helm repo update
+                  helm fetch $(ENV)-$(SERVICE_NAME)/$(SERVICE_NAME)
+                  tar -xvf $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
+                  helm upgrade --install $(ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ -f $(SERVICE_NAME)/$(ENV)-values.yaml --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) --wait --timeout 3m
+                displayName: "Helm Charts Deployment"
+                continueOnError: true
+
+              - script: |
+                  pwd
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  sleep 10
+                  echo "########################## list of pods ########################################"
+                  kubectl get po --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME)
+                  echo "########################## list of deployed services ########################################"
+                  kubectl get deployment --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME)
+
+                  echo "########################## Get logs of latest pod ########################################"
+                  kubectl logs $(kubectl get pods --sort-by=.metadata.creationTimestamp -l app=$(SERVICE_NAME) -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | tail -n 1 | awk '{print $1}') -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH)
+                displayName: "Application Status"
+                continueOnError: true
+
+
+############################send-sms-pipeline.yaml#######
+
+trigger:
+  none
+
+variables:
+  - name: SERVICE_NAME
+    value: k811-send-sms
+  - group: onb-811-services
+  - group: UAT-Static-Variables 
+  - name: ENV
+    value: uat
+  - name: apigw_env
+    value: uat
+  - name: apigw_env_dr
+    value: uat_dr   
+  # source Enviornmnet details
+  - name: SOURCE_ECR_FOLDER_NAME
+    value: 811devonb
+  - name: SOURCE_ECR_REPO_NAME
+    value: k811_ms_send_sms
+  - name: SOURCE_SERVICE_NAME
+    value: k811-send-sms
+  - name: SOURCE_KUBE_CONFIG_PATH
+    value: /home/app_user/.kube/config-dev-arm
+  - name: SOURCE_NAMESPACE
+    value: dev
+  # Docker Details to push to uat ECR
+  - name: AWS_REGION
+    value: ap-south-1
+  - name: AWS_ACCOUNT_ID
+    value: "483584640083"
+  - name: ROLE_NAME
+    value: EKS_Setup_Role
+  - name: ECR_FOLDER_NAME
+    value: 811uatonb
+  - name: ECR_REPO_NAME
+    value: k811_ms_send_sms
+  #pool details
+  - name: POOL_NAME
+    value: "K811-DevOps"
+  # helm related variables for uat environment
+  - name: HELM_CHARTS_PATH
+    value: helm-charts/k811-send-sms/charts
+  - name: HELM_S3BUCKET_URL
+    value: s3://kotak811-helmcharts/uat/k811-send-sms/
+  - name: KUBE_CONFIG_PATH
+    value: /home/app_user/.kube/config-uat
+  - name: NAMESPACE
+    value: 811-uat
+  - name: DR_HELM_S3BUCKET_URL
+    value: s3://kotak811-helmcharts-dr/uat/k811-send-sms/
+
+
+parameters:
+  - name: service
+    displayName: 'Service Name'
+    type: string
+    default: 'k811-send-sms'
+    values:
+      - k811-send-sms
+  - name: ServiceBuild
+    displayName: ServiceBuild
+    type: boolean
+    default: false
+  - name: RestartPod
+    displayName: 'Restart Service'
+    type: boolean
+    default: false
+  - name: PodLogs
+    displayName: 'Running pod logs'
+    type: boolean
+    default: false     
+
+pool:
+  name: $(POOL_NAME)
+
+stages:
+  - template: ../templates/uat/uat-deploy.yaml
+    parameters:
+      ServiceBuild: '${{ parameters.ServiceBuild }}'
+      service: '${{ parameters.service }}'
+
+  # - template: ../templates/uat/helm-build-dr.yaml
+  #   parameters:
+  #     ServiceBuild: '${{ parameters.ServiceBuild }}'
+  #     service: '${{ parameters.service }}'
+
+  - template: ../templates/uat/pod-restart.yaml
+    parameters:
+      RestartPod: '${{ parameters.RestartPod }}'
+      ServiceBuild: '${{ parameters.ServiceBuild }}'
+      service: '${{ parameters.service }}'
+      KUBE_CONFIG_PATH: $(KUBE_CONFIG_PATH)
+      NAMESPACE: $(NAMESPACE)
+
+  # - template: ../templates/uat/pod-restart-dr.yaml
+  #   parameters:
+  #     RestartPod: '${{ parameters.RestartPod }}'
+  #     ServiceBuild: '${{ parameters.ServiceBuild }}'
+  #     service: '${{ parameters.service }}'
+  #     KUBE_CONFIG_PATH: $(DR_KUBE_CONFIG_PATH)      
+  #     NAMESPACE: $(DR_NAMESPACE)            
+
+  - template: ../templates/uat/pod-logs.yaml
+    parameters:
+      service: '${{ parameters.service }}'
+      PodLogs: '${{ parameters.PodLogs }}'
+      KUBE_CONFIG_PATH: $(KUBE_CONFIG_PATH)
+      NAMESPACE: $(NAMESPACE)
+
+  # - template: ../templates/uat/pod-logs-dr.yaml
+  #   parameters:
+  #     service: '${{ parameters.service }}'
+  #     PodLogs: '${{ parameters.PodLogs }}'
+  #     KUBE_CONFIG_PATH: $(DR_KUBE_CONFIG_PATH)      
+  #     NAMESPACE: $(DR_NAMESPACE)  
