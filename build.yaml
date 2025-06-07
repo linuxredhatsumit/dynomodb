@@ -1,0 +1,93 @@
+
+parameters:
+  - name: DeployUAT
+    type: boolean
+    default: true
+  - name: service
+    type: string
+
+stages:
+  - ${{ if eq( parameters['DeployUAT'], true) }}:
+      - stage: UAT
+        displayName: "Build in UAT Environment"
+        jobs:
+          - job: UpdateHelmCharts
+            displayName: "Cronjob Update"
+            steps:
+              - script: |
+                  pwd
+                  # Get the latest image tag from UAT ECR
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  version=$(aws ecr describe-images --repository-name $(ECR_FOLDER_NAME)/$(ECR_REPO_NAME) --region $(AWS_REGION) --query 'sort_by(imageDetails, &imagePushedAt)[-1].imageTags[0]' --output text)
+                  echo "##vso[task.setvariable variable=version]$version"
+                  echo "Latest image tag in UAT ECR: $version"
+                displayName: "Get Latest Image Tag from UAT ECR"
+
+              - script: |
+                  pwd
+                  sed -i -e 's/name:.*/name: ${{ parameters.service }}/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+                  sed -i -e 's/appVersion:.*/appVersion: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+                  sed -i -e 's/version:.*/version: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+                  sed -i -e 's/tag:.*/tag: $(version)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(ENV)-values.yaml
+                displayName: "Updating Chart Values"
+
+              - script: |
+                  pwd
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  helm s3 init $(HELM_S3BUCKET_URL)
+                  helm repo add $(ENV)-${{ parameters.service }} $(HELM_S3BUCKET_URL)
+                  helm package $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/
+                  helm s3 push --force $(System.DefaultWorkingDirectory)/${{ parameters.service }}-1.$(Build.BuildNumber).tgz $(ENV)-${{ parameters.service }}
+                  aws s3 ls $(HELM_S3BUCKET_URL)
+                  helm repo update
+                  helm search repo $(ENV)-${{ parameters.service }}
+                displayName: "Charts Push To S3"
+
+              - script: |
+                  pwd
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  rm -rf $(System.DefaultWorkingDirectory)/*.tgz
+                  helm repo update
+                  helm fetch $(ENV)-${{ parameters.service }}/$(SERVICE_NAME)
+                  tar -xvf ${{ parameters.service }}-1.$(Build.BuildNumber).tgz
+                  echo "Starting the deployment in the namespace $(NAMESPACE)"
+                  helm upgrade --install $(ENV)-${{ parameters.service }} ${{ parameters.service }}/ -f ${{ parameters.service }}/$(ENV)-values.yaml --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) --wait --timeout 3m
+                displayName: "Helm Charts Deployment"
+                continueOnError: true
+
+              - script: |
+                  pwd
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  sleep 10
+                  echo "########################## List of pods ########################################"
+                  kubectl get po --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i ${{ parameters.service }}
+                  echo "########################## List of deployed cronjobs ########################################"
+                  kubectl get cronjob --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i ${{ parameters.service }}
+                  echo "########################## Get logs of latest pod ########################################"
+                  kubectl logs $(kubectl get pods --sort-by=.metadata.creationTimestamp -l app=${{ parameters.service }} -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | tail -n 1 | awk '{print $1}') -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH)
+                displayName: "Application Status"
+                continueOnError: true
