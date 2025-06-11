@@ -1,1 +1,76 @@
+import boto3
+import logging
+import sys
 
+# Step 1: Set up logging (like a diary for the inspector)
+logging.basicConfig(level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+logger = logging.getLogger()
+
+# Step 2: Connect to AWS API Gateway
+try:
+    client = boto3.client('apigateway', region_name='ap-south-1')
+    logger.info("Connected to AWS API Gateway in region ap-south-1")
+except Exception as e:
+    logger.error(f"Failed to connect to AWS API Gateway: {str(e)}")
+    sys.exit(1)
+
+# Step 3: Specify a single API ID for testing
+# Replace 'abc123' with your API ID
+api_id = 'abc123'  # <<< CHANGE THIS TO YOUR API ID
+api_name = 'TestAPI'  # Optional: Give it a name for logging (you can change this)
+
+logger.info(f"Checking API with ID: {api_id} (Name: {api_name})")
+
+# Step 4: Get all stages for this API (using a paginator)
+stage_paginator = client.get_paginator('get_stages')
+try:
+    stages_response = stage_paginator.paginate(restApiId=api_id)
+    for stage_page in stages_response:
+        stages = stage_page.get('item', [])
+        logger.info(f"Found {len(stages)} stages for API {api_name}")
+
+        # Step 5: Check and update each stage's settings
+        for stage in stages:
+            stage_name = stage['stageName']
+            logger.info(f"Checking stage: {stage_name} in API: {api_name}")
+
+            # Get the current settings
+            logs_enabled = stage.get('methodSettings', {}).get('*/*', {}).get('loggingLevel', 'OFF') != 'OFF'
+            tracing_enabled = stage.get('methodSettings', {}).get('*/*', {}).get('dataTraceEnabled', False)
+
+            # Log the current state
+            logger.info(f"Stage {stage_name} - CloudWatch Logs: {'Enabled' if logs_enabled else 'Disabled'}, Data Tracing: {'Enabled' if tracing_enabled else 'Disabled'}")
+
+            # If either is enabled, update the stage to disable them
+            if logs_enabled or tracing_enabled:
+                logger.info(f"Updating stage {stage_name} to disable CloudWatch logs and Data Tracing")
+                try:
+                    client.update_stage(
+                        restApiId=api_id,
+                        stageName=stage_name,
+                        patchOperations=[
+                            # Disable CloudWatch logs by setting loggingLevel to OFF
+                            {
+                                'op': 'replace',
+                                'path': '/*/*/loggingLevel',
+                                'value': 'OFF'
+                            },
+                            # Disable Data Tracing
+                            {
+                                'op': 'replace',
+                                'path': '/*/*/dataTraceEnabled',
+                                'value': 'false'
+                            }
+                        ]
+                    )
+                    logger.info(f"Successfully disabled CloudWatch logs and Data Tracing for stage {stage_name} in API {api_name}")
+                except client.exceptions.ClientError as e:
+                    logger.error(f"Failed to update stage {stage_name} in API {api_name}: {e.response['Error']['Message']}")
+            else:
+                logger.info(f"No changes needed for stage {stage_name} in API {api_name}")
+
+except client.exceptions.ClientError as e:
+    logger.error(f"Error fetching stages for API {api_name}: {e.response['Error']['Message']}")
+    sys.exit(1)
+
+logger.info("Script completed successfully!")
