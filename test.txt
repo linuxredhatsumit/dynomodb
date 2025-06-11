@@ -1,101 +1,38 @@
-#!/usr/bin/env python3
-"""
-Simple API Gateway Logs and Tracing Disabler
-Just input API ID and region - it will disable CloudWatch logs and data tracing
-"""
-
 import boto3
-from botocore.exceptions import ClientError
 
-def disable_logs_and_tracing(api_id, region):
-    """
-    Simple function to disable CloudWatch logs and data tracing
-    """
-    client = boto3.client('apigatewayv2', region_name=region)
-    
-    print(f"Processing API: {api_id} in region: {region}")
-    
+def disable_logs_and_tracing(api_id, region='ap-south-1'):
+    client = boto3.client('apigateway', region_name=region)
+
     try:
-        # Get API details
-        api = client.get_api(ApiId=api_id)
-        print(f"✅ Found API: {api.get('Name')}")
-        
-        # Get all stages
-        stages_response = client.get_stages(ApiId=api_id)
-        stages = stages_response.get('Items', [])
-        print(f"✅ Found {len(stages)} stages")
-        
-        # Process each stage
-        for stage in stages:
-            stage_name = stage['StageName']
-            print(f"\n--- Stage: {stage_name} ---")
-            
-            # Check current settings
-            access_logs = stage.get('AccessLogSettings', {})
-            route_settings = stage.get('DefaultRouteSettings', {})
-            
-            has_access_logs = bool(access_logs.get('DestinationArn'))
-            has_data_tracing = route_settings.get('DataTraceEnabled', False)
-            logging_level = route_settings.get('LoggingLevel', 'OFF')
-            
-            print(f"Current Access Logs: {'ON' if has_access_logs else 'OFF'}")
-            print(f"Current Data Tracing: {'ON' if has_data_tracing else 'OFF'}")
-            print(f"Current Logging Level: {logging_level}")
-            
-            # Prepare update
-            update_needed = False
-            update_params = {
-                'ApiId': api_id,
-                'StageName': stage_name
-            }
-            
-            # Disable access logs if enabled
-            if has_access_logs:
-                update_params['AccessLogSettings'] = {
-                    'DestinationArn': '',
-                    'Format': ''
-                }
-                update_needed = True
-                print("→ Will disable Access Logs")
-            
-            # Disable data tracing and logging if enabled
-            if has_data_tracing or logging_level in ['INFO', 'ERROR']:
-                update_params['DefaultRouteSettings'] = {
-                    'DataTraceEnabled': False,
-                    'LoggingLevel': 'OFF',
-                    'DetailedMetricsEnabled': route_settings.get('DetailedMetricsEnabled', False),
-                    'ThrottlingBurstLimit': route_settings.get('ThrottlingBurstLimit', 5000),
-                    'ThrottlingRateLimit': route_settings.get('ThrottlingRateLimit', 2000)
-                }
-                update_needed = True
-                print("→ Will disable Data Tracing and Logging")
-            
-            # Apply changes
-            if update_needed:
-                print("Updating stage...")
-                client.update_stage(**update_params)
-                print("✅ Stage updated successfully!")
-            else:
-                print("✅ No changes needed - already disabled")
-        
-        print(f"\n🎉 Completed processing API: {api_id}")
-        
-    except ClientError as e:
-        print(f"❌ Error: {e}")
+        stages = client.get_stages(restApiId=api_id)['item']
     except Exception as e:
-        print(f"❌ Unexpected error: {e}")
+        print(f"❌ Failed to fetch stages: {e}")
+        return
 
-# =============================================================================
-# CONFIGURATION - Just change these two values:
-# =============================================================================
+    for stage in stages:
+        stage_name = stage['stageName']
+        print(f"🔧 Disabling logs and tracing for stage: {stage_name}")
 
-API_ID = "3boyxurfk7"    # Your API ID from screenshot
-REGION = "ap-south-1"    # Your region
+        patch_ops = [
+            # Disable logging
+            {'op': 'replace', 'path': '/*/*/logging/loglevel', 'value': 'OFF'},
+            # Disable data tracing
+            {'op': 'replace', 'path': '/*/*/logging/dataTrace', 'value': 'false'},
+            # Disable detailed metrics
+            # {'op': 'replace', 'path': '/*/*/metrics/enabled', 'value': 'false'},
+            # Disable X-Ray tracing
+            {'op': 'replace', 'path': '/tracingEnabled', 'value': 'false'},
+        ]
 
-# =============================================================================
-# RUN THE SCRIPT
-# =============================================================================
+        try:
+            client.update_stage(
+                restApiId=api_id,
+                stageName=stage_name,
+                patchOperations=patch_ops
+            )
+            print(f"✅ Successfully updated stage: {stage_name}")
+        except Exception as e:
+            print(f"❌ Failed to update stage {stage_name}: {e}")
 
-if __name__ == "__main__":
-    print("=== Simple API Gateway Logs Disabler ===\n")
-    disable_logs_and_tracing(API_ID, REGION)
+# 🔁 Replace this with your API Gateway ID
+disable_logs_and_tracing('sezsgjedic')
