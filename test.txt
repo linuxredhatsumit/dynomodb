@@ -1,186 +1,101 @@
 #!/usr/bin/env python3
 """
-AWS API Gateway CloudWatch Logs and Data Tracing Disabler - Testing Script
-This script disables CloudWatch logging and data tracing for a specific API Gateway API.
+Simple API Gateway Logs and Tracing Disabler
+Just input API ID and region - it will disable CloudWatch logs and data tracing
 """
 
 import boto3
-import json
-from botocore.exceptions import ClientError, NoCredentialsError
+from botocore.exceptions import ClientError
 
-def disable_api_logging_and_tracing(api_id, region='us-east-1'):
+def disable_logs_and_tracing(api_id, region):
     """
-    Disable CloudWatch logs and data tracing for a specific API Gateway API
-    
-    Args:
-        api_id (str): The API Gateway API ID
-        region (str): AWS region (default: us-east-1)
-    
-    Returns:
-        dict: Results of the operations
+    Simple function to disable CloudWatch logs and data tracing
     """
+    client = boto3.client('apigatewayv2', region_name=region)
+    
+    print(f"Processing API: {api_id} in region: {region}")
+    
     try:
-        # Initialize API Gateway client
-        client = boto3.client('apigatewayv2', region_name=region)
+        # Get API details
+        api = client.get_api(ApiId=api_id)
+        print(f"✅ Found API: {api.get('Name')}")
         
-        results = {
-            'api_id': api_id,
-            'region': region,
-            'cloudwatch_logs_disabled': False,
-            'data_tracing_disabled': False,
-            'errors': []
-        }
-        
-        print(f"Processing API ID: {api_id} in region: {region}")
-        
-        # Get current API configuration
-        try:
-            api_response = client.get_api(ApiId=api_id)
-            print(f"API Name: {api_response.get('Name', 'Unknown')}")
-            print(f"Protocol Type: {api_response.get('ProtocolType', 'Unknown')}")
-        except ClientError as e:
-            error_msg = f"Failed to get API details: {e}"
-            print(f"ERROR: {error_msg}")
-            results['errors'].append(error_msg)
-            return results
-        
-        # Get all stages for this API
-        try:
-            stages_response = client.get_stages(ApiId=api_id)
-            stages = stages_response.get('Items', [])
-            print(f"Found {len(stages)} stages")
-            
-            if not stages:
-                print("No stages found for this API")
-                return results
-                
-        except ClientError as e:
-            error_msg = f"Failed to get stages: {e}"
-            print(f"ERROR: {error_msg}")
-            results['errors'].append(error_msg)
-            return results
+        # Get all stages
+        stages_response = client.get_stages(ApiId=api_id)
+        stages = stages_response.get('Items', [])
+        print(f"✅ Found {len(stages)} stages")
         
         # Process each stage
         for stage in stages:
             stage_name = stage['StageName']
-            print(f"\n--- Processing Stage: {stage_name} ---")
+            print(f"\n--- Stage: {stage_name} ---")
             
-            # Check current logging configuration
-            access_log_settings = stage.get('AccessLogSettings', {})
-            default_route_settings = stage.get('DefaultRouteSettings', {})
+            # Check current settings
+            access_logs = stage.get('AccessLogSettings', {})
+            route_settings = stage.get('DefaultRouteSettings', {})
             
-            print(f"Current Access Log Destination: {access_log_settings.get('DestinationArn', 'None')}")
-            print(f"Current Data Trace Enabled: {default_route_settings.get('DataTraceEnabled', False)}")
-            print(f"Current Logging Level: {default_route_settings.get('LoggingLevel', 'None')}")
+            has_access_logs = bool(access_logs.get('DestinationArn'))
+            has_data_tracing = route_settings.get('DataTraceEnabled', False)
+            logging_level = route_settings.get('LoggingLevel', 'OFF')
             
-            # Prepare update parameters
+            print(f"Current Access Logs: {'ON' if has_access_logs else 'OFF'}")
+            print(f"Current Data Tracing: {'ON' if has_data_tracing else 'OFF'}")
+            print(f"Current Logging Level: {logging_level}")
+            
+            # Prepare update
+            update_needed = False
             update_params = {
                 'ApiId': api_id,
                 'StageName': stage_name
             }
             
-            needs_update = False
-            
-            # Disable CloudWatch Access Logging
-            if access_log_settings.get('DestinationArn'):
-                print("Disabling CloudWatch Access Logs...")
+            # Disable access logs if enabled
+            if has_access_logs:
                 update_params['AccessLogSettings'] = {
                     'DestinationArn': '',
                     'Format': ''
                 }
-                needs_update = True
+                update_needed = True
+                print("→ Will disable Access Logs")
             
-            # Disable Data Tracing and Detailed Logging
-            current_route_settings = default_route_settings.copy()
-            if (current_route_settings.get('DataTraceEnabled', False) or 
-                current_route_settings.get('LoggingLevel') in ['INFO', 'ERROR']):
-                
-                print("Disabling Data Tracing and Detailed Logging...")
+            # Disable data tracing and logging if enabled
+            if has_data_tracing or logging_level in ['INFO', 'ERROR']:
                 update_params['DefaultRouteSettings'] = {
                     'DataTraceEnabled': False,
                     'LoggingLevel': 'OFF',
-                    'DetailedMetricsEnabled': current_route_settings.get('DetailedMetricsEnabled', False),
-                    'ThrottlingBurstLimit': current_route_settings.get('ThrottlingBurstLimit', 5000),
-                    'ThrottlingRateLimit': current_route_settings.get('ThrottlingRateLimit', 2000)
+                    'DetailedMetricsEnabled': route_settings.get('DetailedMetricsEnabled', False),
+                    'ThrottlingBurstLimit': route_settings.get('ThrottlingBurstLimit', 5000),
+                    'ThrottlingRateLimit': route_settings.get('ThrottlingRateLimit', 2000)
                 }
-                needs_update = True
+                update_needed = True
+                print("→ Will disable Data Tracing and Logging")
             
-            # Update stage if changes are needed
-            if needs_update:
-                try:
-                    print("Updating stage configuration...")
-                    update_response = client.update_stage(**update_params)
-                    print("✅ Stage updated successfully")
-                    
-                    # Verify the changes
-                    updated_stage = client.get_stage(ApiId=api_id, StageName=stage_name)
-                    updated_access_logs = updated_stage.get('AccessLogSettings', {})
-                    updated_route_settings = updated_stage.get('DefaultRouteSettings', {})
-                    
-                    print(f"✅ Access Log Destination after update: {updated_access_logs.get('DestinationArn', 'None')}")
-                    print(f"✅ Data Trace Enabled after update: {updated_route_settings.get('DataTraceEnabled', False)}")
-                    print(f"✅ Logging Level after update: {updated_route_settings.get('LoggingLevel', 'None')}")
-                    
-                    results['cloudwatch_logs_disabled'] = True
-                    results['data_tracing_disabled'] = True
-                    
-                except ClientError as e:
-                    error_msg = f"Failed to update stage {stage_name}: {e}"
-                    print(f"❌ ERROR: {error_msg}")
-                    results['errors'].append(error_msg)
+            # Apply changes
+            if update_needed:
+                print("Updating stage...")
+                client.update_stage(**update_params)
+                print("✅ Stage updated successfully!")
             else:
-                print("✅ No changes needed - logging already disabled")
-                results['cloudwatch_logs_disabled'] = True
-                results['data_tracing_disabled'] = True
+                print("✅ No changes needed - already disabled")
         
-        return results
+        print(f"\n🎉 Completed processing API: {api_id}")
         
-    except NoCredentialsError:
-        error_msg = "AWS credentials not found. Please configure your credentials."
-        print(f"ERROR: {error_msg}")
-        return {'error': error_msg}
+    except ClientError as e:
+        print(f"❌ Error: {e}")
     except Exception as e:
-        error_msg = f"Unexpected error: {e}"
-        print(f"ERROR: {error_msg}")
-        return {'error': error_msg}
+        print(f"❌ Unexpected error: {e}")
 
-def main():
-    """
-    Main function for testing
-    """
-    # Configuration - MODIFY THESE VALUES
-    API_ID = "your-api-id-here"  # Replace with your actual API ID
-    REGION = "us-east-1"         # Replace with your AWS region
-    
-    print("=== API Gateway Logs and Tracing Disabler - Test Mode ===\n")
-    
-    if API_ID == "your-api-id-here":
-        print("❌ Please update the API_ID variable with your actual API Gateway ID")
-        print("Example: API_ID = 'abc123def456'")
-        return
-    
-    # Process the API
-    result = disable_api_logging_and_tracing(API_ID, REGION)
-    
-    # Print summary
-    print("\n" + "="*60)
-    print("SUMMARY")
-    print("="*60)
-    
-    if 'error' in result:
-        print(f"❌ Operation failed: {result['error']}")
-    else:
-        print(f"API ID: {result['api_id']}")
-        print(f"Region: {result['region']}")
-        print(f"CloudWatch Logs Disabled: {'✅' if result['cloudwatch_logs_disabled'] else '❌'}")
-        print(f"Data Tracing Disabled: {'✅' if result['data_tracing_disabled'] else '❌'}")
-        
-        if result['errors']:
-            print(f"\nErrors encountered: {len(result['errors'])}")
-            for error in result['errors']:
-                print(f"  - {error}")
-        else:
-            print("\n✅ All operations completed successfully!")
+# =============================================================================
+# CONFIGURATION - Just change these two values:
+# =============================================================================
+
+API_ID = "3boyxurfk7"    # Your API ID from screenshot
+REGION = "ap-south-1"    # Your region
+
+# =============================================================================
+# RUN THE SCRIPT
+# =============================================================================
 
 if __name__ == "__main__":
-    main()
+    print("=== Simple API Gateway Logs Disabler ===\n")
+    disable_logs_and_tracing(API_ID, REGION)
