@@ -1,0 +1,59 @@
+import boto3
+import logging
+import json
+from botocore.exceptions import ClientError
+
+# --- JSON Logging Setup ---
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        return json.dumps({
+            "level": record.levelname,
+            "logger": f"{record.name}.{record.funcName}",
+            "message": record.getMessage(),
+        })
+
+logger = logging.getLogger("apigw-checker")
+handler = logging.StreamHandler()
+handler.setFormatter(JsonFormatter())
+logger.setLevel(logging.INFO)
+logger.addHandler(handler)
+
+# --- Create API Gateway Client ---
+try:
+    client = boto3.client("apigateway", region_name="ap-south-1")
+except Exception as e:
+    logger.error(f"client.creation.{str(e)}")
+    exit(1)
+
+# --- Use paginator to list all APIs ---
+def get_all_apis():
+    paginator = client.get_paginator("get_rest_apis")
+    for page in paginator.paginate():
+        for item in page.get("items", []):
+            yield item["id"], item["name"]
+
+# --- Check if any logging/tracing is enabled ---
+def is_logging_or_tracing_enabled(stage):
+    method_settings = stage.get("methodSettings", {})
+    for path, settings in method_settings.items():
+        if settings.get("loggingLevel", "OFF") != "OFF":
+            return True
+        if settings.get("dataTraceEnabled", False):
+            return True
+    if stage.get("tracingEnabled"):
+        return True
+    return False
+
+# --- Main check logic ---
+def main():
+    for api_id, api_name in get_all_apis():
+        try:
+            stages = client.get_stages(restApiId=api_id).get("item", [])
+            for stage in stages:
+                if is_logging_or_tracing_enabled(stage):
+                    logger.info(f"api.check.logging_enabled: API={api_name}, Stage={stage['stageName']}, ID={api_id}")
+        except ClientError as e:
+            logger.error(f"api.error.get_stages: {str(e)}")
+
+if __name__ == "__main__":
+    main()
