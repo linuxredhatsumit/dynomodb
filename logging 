@@ -1,0 +1,12 @@
+logger = logging.getLogger("apigw-checker")
+logger.setLevel(logging.INFO)
+
+# File handler to write logs to enable-api.txt
+file_handler = logging.FileHandler("enable-api.txt")
+file_handler.setFormatter(JsonFormatter())
+logger.addHandler(file_handler)
+
+# Console handler to print logs to terminal
+console_handler = logging.StreamHandler()
+console_handler.setFormatter(JsonFormatter())
+logger.addHandler(console_handler)
