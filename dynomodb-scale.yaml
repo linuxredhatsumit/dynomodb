@@ -1,0 +1,68 @@
+trigger: none
+
+pool:
+  name: aws
+
+parameters:
+  - name: tableName
+    type: string
+  - name: region
+    type: string
+  - name: readMode
+    type: string
+    values: [ondemand, provisioned]
+  - name: writeMode
+    type: string
+    values: [ondemand, provisioned]
+  - name: minRead
+    type: string
+    default: '5'
+  - name: maxRead
+    type: string
+    default: '100'
+  - name: targetRead
+    type: string
+    default: '70'
+  - name: minWrite
+    type: string
+    default: '5'
+  - name: maxWrite
+    type: string
+    default: '100'
+  - name: targetWrite
+    type: string
+    default: '70'
+
+stages:
+  - stage: DynamoDBOperation
+    jobs:
+      - job: ExecuteDynamoDBOperation
+        displayName: "Execute DynamoDB Operation"
+        steps:
+          - checkout: self
+            displayName: 'Checkout repository'
+
+          - task: UsePythonVersion@0
+            inputs:
+              versionSpec: '3.8'
+            displayName: 'Set up Python 3.8'
+
+          - script: |
+              pip install boto3
+            displayName: 'Install boto3'
+
+          - bash: >
+              echo "Running DynamoDB Auto Scaling Management Script" &&
+              cd $(Build.SourcesDirectory)/dynomodb-scale &&
+              python3 manage_dynamodb_autoscaling.py
+              --tableName "${{ parameters.tableName }}"
+              --region "${{ parameters.region }}"
+              --readMode "${{ parameters.readMode }}"
+              --writeMode "${{ parameters.writeMode }}"
+              --minRead "${{ parameters.minRead }}"
+              --maxRead "${{ parameters.maxRead }}"
+              --targetRead "${{ parameters.targetRead }}"
+              --minWrite "${{ parameters.minWrite }}"
+              --maxWrite "${{ parameters.maxWrite }}"
+              --targetWrite "${{ parameters.targetWrite }}"
+            displayName: "Configure DynamoDB Auto Scaling"
