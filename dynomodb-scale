@@ -91,10 +91,59 @@ def update_billing_mode(dynamodb, table_name, mode, read=None, write=None, gsi_t
             logger.error(json.dumps({"context": "update_billing_mode", "error": str(e)}))
         sys.exit(1)
 
+def register_scaling(application_autoscaling, table_name, dimension, min_capacity, max_capacity, target_utilization):
+    resource_id = f'table/{table_name}'
+    try:
+        logger.info(f"Registering scalable target for {dimension} | min: {min_capacity}, max: {max_capacity}",
+                    extra={"context": f"autoscaling.register.{dimension}"})
+
+        application_autoscaling.register_scalable_target(
+            ServiceNamespace="dynamodb",
+            ResourceId=resource_id,
+            ScalableDimension=dimension,
+            MinCapacity=min_capacity,
+            MaxCapacity=max_capacity
+        )
+
+        logger.info(f"Creating scaling policy for {dimension} | target: {target_utilization}",
+                    extra={"context": f"autoscaling.policy.{dimension}"})
+
+        application_autoscaling.put_scaling_policy(
+            PolicyName=f"{table_name}-{dimension}-policy",
+            ServiceNamespace="dynamodb",
+            ResourceId=resource_id,
+            ScalableDimension=dimension,
+            PolicyType='TargetTrackingScaling',
+            TargetTrackingScalingPolicyConfiguration={
+                'TargetValue': target_utilization,
+                'PredefinedMetricSpecification': {
+                    'PredefinedMetricType': 'DynamoDBReadCapacityUtilization'
+                    if "Read" in dimension else 'DynamoDBWriteCapacityUtilization'
+                },
+                'ScaleInCooldown': 60,
+                'ScaleOutCooldown': 60
+            }
+        )
+    except ClientError as e:
+        logger.error(json.dumps({"context": f"autoscaling.register.{dimension}", "error": str(e)}))
+        sys.exit(1)
+
+def deregister_scaling(application_autoscaling, table_name, dimension):
+    try:
+        resource_id = f'table/{table_name}'
+        logger.info(f"Deregistering scaling for {dimension}", extra={"context": f"autoscaling.deregister.{dimension}"})
+        application_autoscaling.deregister_scalable_target(
+            ServiceNamespace="dynamodb",
+            ResourceId=resource_id,
+            ScalableDimension=dimension
+        )
+    except ClientError as e:
+        logger.warning(json.dumps({"context": f"autoscaling.deregister.{dimension}", "error": str(e)}))
+
 def main():
     parser = argparse.ArgumentParser()
     parser.add_argument("--tableName", required=True, type=lambda s: s.strip(), help="DynamoDB table name")
-    parser.add_argument("--region", required=True, type=str, help="AWS region")
+    parser.add_argument("--region", required=True, help="AWS region")
     parser.add_argument("--readMode", choices=["ondemand", "provisioned"], required=True)
     parser.add_argument("--writeMode", choices=["ondemand", "provisioned"], required=True)
     parser.add_argument("--minRead", type=int)
@@ -103,13 +152,15 @@ def main():
     parser.add_argument("--minWrite", type=int)
     parser.add_argument("--maxWrite", type=int)
     parser.add_argument("--targetWrite", type=int)
-
     args = parser.parse_args()
+
     dynamodb = boto3.client('dynamodb', region_name=args.region)
+    autoscaling = boto3.client('application-autoscaling', region_name=args.region)
 
     desc = get_table_description(dynamodb, args.tableName)
     current_mode = desc.get('BillingModeSummary', {}).get('BillingMode', 'PROVISIONED')
 
+    # Prepare GSI if exists
     gsi_throughput = {}
     for gsi in desc.get("GlobalSecondaryIndexes", []):
         gsi_name = gsi["IndexName"]
@@ -120,23 +171,29 @@ def main():
 
     if args.readMode == "provisioned" or args.writeMode == "provisioned":
         if current_mode == "PAY_PER_REQUEST":
-            update_billing_mode(
-                dynamodb,
-                args.tableName,
-                "provisioned",
-                read=args.targetRead,
-                write=args.targetWrite,
-                gsi_throughput=gsi_throughput
-            )
+            update_billing_mode(dynamodb, args.tableName, "provisioned",
+                                read=args.targetRead, write=args.targetWrite,
+                                gsi_throughput=gsi_throughput)
             wait_for_table_active(dynamodb, args.tableName)
-        else:
-            logger.info("Table is already in PROVISIONED mode. No switch needed.", extra={"context": "mode_check"})
+
+        # Register scaling after switch
+        if args.readMode == "provisioned":
+            register_scaling(autoscaling, args.tableName, "dynamodb:table:ReadCapacityUnits",
+                             args.minRead, args.maxRead, args.targetRead)
+
+        if args.writeMode == "provisioned":
+            register_scaling(autoscaling, args.tableName, "dynamodb:table:WriteCapacityUnits",
+                             args.minWrite, args.maxWrite, args.targetWrite)
+
     else:
         if current_mode == "PROVISIONED":
+            deregister_scaling(autoscaling, args.tableName, "dynamodb:table:ReadCapacityUnits")
+            deregister_scaling(autoscaling, args.tableName, "dynamodb:table:WriteCapacityUnits")
             update_billing_mode(dynamodb, args.tableName, "ondemand")
             wait_for_table_active(dynamodb, args.tableName)
         else:
-            logger.info("Table is already in PAY_PER_REQUEST mode. No switch needed.", extra={"context": "mode_check"})
+            logger.info("Table already in PAY_PER_REQUEST mode. Nothing to do.",
+                        extra={"context": "mode_check"})
 
 if __name__ == "__main__":
     main()
