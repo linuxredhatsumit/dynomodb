@@ -1,67 +1,58 @@
-## DynamoDB Auto Scaling Management – Automation Script
+✅ Agenda:
+Review DynamoDB automation progress.
 
-### Overview
+Finalize handling of GSIs during billing mode transitions.
 
-This document describes the process of managing DynamoDB auto scaling using an automated Python script.
+Plan next steps for testing and global replication setup.
 
-### Purpose
+🧠 Discussion Summary:
+✅ Current Progress:
 
-To enable teams to dynamically manage DynamoDB billing mode and auto scaling configurations across environments using an automated and repeatable solution.
+A Python script is developed to switch DynamoDB table billing mode (On-Demand ↔ Provisioned).
 
-### Problem Statement
+The script also detects GSIs and updates their capacity units if the table is in provisioned mode.
 
-Manually switching DynamoDB billing modes and managing auto scaling policies is error-prone and non-scalable. We needed a way to:
+⚠️ Challenges Identified:
 
-* Transition tables between `PROVISIONED` and `PAY_PER_REQUEST` modes.
-* Register/Deregister auto scaling targets for read and write capacity.
-* Automate this logic with a repeatable and parameterized script.
+Many tables have 3–5 GSIs with different provisioned capacities.
 
-### Solution Summary
+Not feasible to hardcode capacities or maintain a config file for each table.
 
-We implemented a Python script that performs the following:
+🧩 Agreed Solution:
 
-* Accepts table name, region, billing mode, and scaling thresholds as input arguments.
-* Switches billing mode from `PROVISIONED` to `PAY_PER_REQUEST` and vice versa.
-* Deregisters or registers scalable targets for Read/Write Capacity Units accordingly.
+Developers will provide a JSON input in the Azure DevOps pipeline to define GSI throughput (read/write units).
 
-### Script Arguments
+The script will parse this JSON and update GSIs accordingly.
 
-```bash
---tableName      # Required: DynamoDB table name
---region         # Required: AWS region
---readMode       # Required: 'ondemand' or 'provisioned'
---writeMode      # Required: 'ondemand' or 'provisioned'
---minRead        # Optional: Minimum read capacity
---maxRead        # Optional: Maximum read capacity
---targetRead     # Optional: Target read utilization
---minWrite       # Optional: Minimum write capacity
---maxWrite       # Optional: Maximum write capacity
---targetWrite    # Optional: Target write utilization
-```
+Example input:
 
-### Python Logic Overview
+json
+Copy
+Edit
+{
+  "IndexName1": { "ReadCapacityUnits": 5, "WriteCapacityUnits": 10 },
+  "IndexName2": { "ReadCapacityUnits": 3, "WriteCapacityUnits": 6 }
+}
+📦 Why JSON Works Best:
 
-* Uses `boto3` to interact with AWS DynamoDB and Application Auto Scaling services.
-* Dynamically updates billing mode based on input flags.
-* For provisioned mode, registers scaling policies using the provided thresholds.
-* For on-demand mode, deregisters any existing scaling policies.
-* Implements logging in JSON format for structured output.
+Avoids code change for every table or GSI.
 
-### Common Errors and Their Meanings
+Easy to maintain, especially in a shared repo per environment.
 
-| Error                     | Meaning                      | Solution                                                                                |
-| ------------------------- | ---------------------------- | --------------------------------------------------------------------------------------- |
-| `ObjectNotFoundException` | No scalable target found     | Safe to ignore if the table was already on-demand or auto scaling was never set         |
-| `command not found`       | Bad argument syntax in shell | Ensure arguments are passed after the script call and not interpreted as shell commands |
-| Exit Code `127`           | Command not found in script  | Possibly a missing Python environment or syntax error in bash                           |
+Developers get control without modifying core automation.
 
-### Final Remarks
+🌐 Global Tables Behavior:
 
-The implementation ensures safe, idempotent updates to DynamoDB billing and scaling configurations. Error logs and warnings are handled gracefully, making the script resilient to unintended states.
+Billing mode and GSI configuration must be consistent across all participating regions.
 
-This automation has reduced manual overhead, increased consistency, and can be extended to multiple tables and environments as needed.
+Region-specific billing modes are not supported in global tables.
 
----
+Changing table or GSI settings in one region replicates the change to all others.
 
-**Author:** Sumit Kumar Singh
-**Last Updated:** June 24, 2025
+🧪 Planned Testing:
+
+Identify a candidate DynamoDB table in the non-prod AWS account.
+
+Enable global replication on that table (e.g., replicate to another region like ap-south-1 → ap-northeast-1).
+
+Test switching billing modes and validate how GSIs and configuration sync across regions.
