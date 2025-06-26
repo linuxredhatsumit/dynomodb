@@ -1,0 +1,574 @@
+import argparse
+import boto3
+import time
+from datetime import datetime
+import logging
+import json
+import sys
+import os
+from botocore.exceptions import ClientError
+
+class JSONFormatter(logging.Formatter):
+    def format(self, record):
+        log_entry = {
+            "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+            "level": record.levelname,
+            "context": getattr(record, "context", "autoscaling"),
+            "message": record.getMessage()
+        }
+        return json.dumps(log_entry)
+
+logger = logging.getLogger()
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(JSONFormatter())
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+
+def get_table_description(dynamodb, table_name):
+    try:
+        return dynamodb.describe_table(TableName=table_name)['Table']
+    except ClientError as e:
+        logger.error(json.dumps({"context": "describe_table", "error": str(e)}))
+        sys.exit(1)
+
+def wait_for_table_active(dynamodb, table_name):
+    while True:
+        desc = get_table_description(dynamodb, table_name)
+        if desc['TableStatus'] == 'ACTIVE':
+            break
+        logger.info("Waiting for table to become ACTIVE...", extra={"context": "wait_for_table_active"})
+        time.sleep(5)
+
+def load_gsi_config(table_name, check_gsi):
+    if not check_gsi:
+        logger.info("checkGSI is false. Skipping GSI config load.", extra={"context": "config.load"})
+        return {}
+
+    repo_root = os.environ.get("Build_SourcesDirectory", ".")
+    repo_name = os.environ.get("REPOSITORY_NAME", "gsi-config-repo")
+    folder_path = os.path.join(repo_root, repo_name, table_name)
+    file_path = os.path.join(folder_path, "scaling.json")
+
+    logger.info(f"Looking for config file at: {file_path}", extra={"context": "config.load"})
+
+    if not os.path.exists(folder_path):
+        logger.warning(json.dumps({
+            "context": "config.load",
+            "message": f"Table folder not found at: {folder_path}. Assuming no GSIs."
+        }))
+        return {}
+
+    if not os.path.exists(file_path):
+        logger.warning(json.dumps({
+            "context": "config.load",
+            "message": f"Scaling config file not found at: {file_path}. Assuming no GSIs."
+        }))
+        return {}
+
+    try:
+        with open(file_path, "r") as f:
+            gsi_config = json.load(f)
+        
+        # Validate GSI configuration
+        valid_projection_types = {"ALL", "KEYS_ONLY", "INCLUDE"}
+        for index_name, conf in gsi_config.items():
+            if "ProjectionType" in conf and conf["ProjectionType"] not in valid_projection_types:
+                logger.error(json.dumps({
+                    "context": "config.validate",
+                    "error": f"Invalid ProjectionType for index {index_name}: {conf['ProjectionType']}. Must be one of {valid_projection_types}"
+                }))
+                sys.exit(1)
+            if conf.get("ProjectionType") == "INCLUDE" and "NonKeyAttributes" not in conf:
+                logger.error(json.dumps({
+                    "context": "config.validate",
+                    "error": f"NonKeyAttributes required for index {index_name} when ProjectionType is INCLUDE"
+                }))
+                sys.exit(1)
+            if "NonKeyAttributes" in conf and not isinstance(conf["NonKeyAttributes"], list):
+                logger.error(json.dumps({
+                    "context": "config.validate",
+                    "error": f"NonKeyAttributes for index {index_name} must be a list"
+                }))
+                sys.exit(1)
+        
+        logger.info(json.dumps({"context": "config.load", "message": f"Loaded GSI config: {gsi_config}"}))
+        return gsi_config
+    except json.JSONDecodeError as e:
+        logger.error(json.dumps({"context": "config.load", "error": f"Invalid JSON format: {str(e)}"}))
+        sys.exit(1)
+
+def validate_gsi_config(desc, gsi_config, check_gsi):
+    if not check_gsi or not gsi_config:
+        logger.info("No GSI config to validate (checkGSI=false or no config found).", extra={"context": "config.validate"})
+        return
+
+    actual_indexes = set(gsi['IndexName'] for gsi in desc.get("GlobalSecondaryIndexes", []))
+    config_indexes = set(gsi_config.keys())
+    if actual_indexes != config_indexes:
+        logger.error(json.dumps({
+            "context": "config.validate",
+            "error": "Mismatch between actual GSIs and scaling.json",
+            "actual_indexes": list(actual_indexes),
+            "config_indexes": list(config_indexes)
+        }))
+        sys.exit(1)
+
+def update_gsi_configuration(dynamodb, table_name, gsi_config):
+    """
+    Update GSI configurations, including throughput and projection attributes.
+    If projection attributes differ, delete and recreate the GSI with AttributeDefinitions.
+    """
+    try:
+        updated = False
+        table_desc = dynamodb.describe_table(TableName=table_name)["Table"]
+        existing_gsis = {gsi["IndexName"]: gsi for gsi in table_desc.get("GlobalSecondaryIndexes", [])}
+        table_attribute_definitions = table_desc.get("AttributeDefinitions", [])
+        gsi_updates = []
+
+        for index_name, conf in gsi_config.items():
+            existing = existing_gsis.get(index_name)
+            if not existing:
+                logger.warning(json.dumps({
+                    "context": "gsi.update",
+                    "message": f"GSI {index_name} not found in table. Skipping update."
+                }))
+                continue
+
+            projection_needs_update = False
+            throughput_needs_update = False
+
+            # Check projection attributes
+            current_projection = existing.get("Projection", {})
+            desired_projection_type = conf.get("ProjectionType", current_projection.get("ProjectionType", "ALL"))
+            desired_non_key_attributes = conf.get("NonKeyAttributes", [])
+            current_non_key_attributes = current_projection.get("NonKeyAttributes", [])
+
+            # Log current and desired projection attributes for debugging
+            logger.info(json.dumps({
+                "context": "gsi.update",
+                "message": f"Checking projection attributes for GSI {index_name}",
+                "current_projection_type": current_projection.get("ProjectionType"),
+                "desired_projection_type": desired_projection_type,
+                "current_non_key_attributes": current_non_key_attributes,
+                "desired_non_key_attributes": desired_non_key_attributes
+            }))
+
+            # Compare projection attributes
+            if (current_projection.get("ProjectionType") != desired_projection_type or
+                    sorted(current_non_key_attributes or []) != sorted(desired_non_key_attributes or [])):
+                projection_needs_update = True
+                logger.info(json.dumps({
+                    "context": "gsi.update",
+                    "message": f"Projection attributes for GSI {index_name} need updating: current={current_projection}, desired={{'ProjectionType': '{desired_projection_type}', 'NonKeyAttributes': {desired_non_key_attributes}}}"
+                }))
+
+            # Check throughput
+            current_throughput = existing.get("ProvisionedThroughput", {})
+            desired_throughput = {
+                "ReadCapacityUnits": conf.get("ReadCapacityUnits", 5),
+                "WriteCapacityUnits": conf.get("WriteCapacityUnits", 5)
+            }
+            if (current_throughput.get("ReadCapacityUnits") != desired_throughput["ReadCapacityUnits"] or
+                    current_throughput.get("WriteCapacityUnits") != desired_throughput["WriteCapacityUnits"]):
+                throughput_needs_update = True
+                logger.info(json.dumps({
+                    "context": "gsi.update",
+                    "message": f"Throughput for GSI {index_name} needs updating",
+                    "current_read_capacity": current_throughput.get("ReadCapacityUnits"),
+                    "current_write_capacity": current_throughput.get("WriteCapacityUnits"),
+                    "desired_read_capacity": desired_throughput["ReadCapacityUnits"],
+                    "desired_write_capacity": desired_throughput["WriteCapacityUnits"]
+                }))
+
+            if projection_needs_update:
+                # Delete GSI
+                logger.info(json.dumps({
+                    "context": "gsi.update",
+                    "message": f"Deleting GSI {index_name} to update projection attributes"
+                }))
+                gsi_updates.append({
+                    "Delete": {
+                        "IndexName": index_name
+                    }
+                })
+                dynamodb.update_table(
+                    TableName=table_name,
+                    GlobalSecondaryIndexUpdates=gsi_updates
+                )
+                wait_for_table_active(dynamodb, table_name)
+                gsi_updates = []
+
+                # Prepare AttributeDefinitions for GSI creation
+                key_attributes = [ks["AttributeName"] for ks in existing["KeySchema"]]
+                required_attributes = set(key_attributes + desired_non_key_attributes)
+                attribute_definitions = []
+                attribute_types = {
+                    "id": "S",
+                    "status": "S",
+                    "mandateStatus": "S",
+                    "customerid": "N",
+                    "email": "S"
+                }
+
+                for attr in required_attributes:
+                    attr_type = attribute_types.get(attr)
+                    if not attr_type:
+                        logger.warning(json.dumps({
+                            "context": "gsi.update",
+                            "message": f"Attribute {attr} not found in table's AttributeDefinitions. Assuming type 'S'."
+                        }))
+                        attr_type = "S"
+                    attribute_definitions.append({
+                        "AttributeName": attr,
+                        "AttributeType": attr_type
+                    })
+
+                # Recreate GSI
+                create_update = {
+                    "Create": {
+                        "IndexName": index_name,
+                        "KeySchema": existing["KeySchema"],
+                        "Projection": {
+                            "ProjectionType": desired_projection_type
+                        },
+                        "ProvisionedThroughput": desired_throughput
+                    }
+                }
+                if desired_projection_type == "INCLUDE":
+                    create_update["Create"]["Projection"]["NonKeyAttributes"] = desired_non_key_attributes
+                gsi_updates.append(create_update)
+                updated = True
+            elif throughput_needs_update:
+                # Update throughput only
+                gsi_updates.append({
+                    "Update": {
+                        "IndexName": index_name,
+                        "ProvisionedThroughput": desired_throughput
+                    }
+                })
+                updated = True
+
+        if gsi_updates:
+            logger.info(json.dumps({
+                "context": "gsi.update",
+                "message": f"Applying GSI updates: {gsi_updates}"
+            }))
+            # Include AttributeDefinitions when creating GSIs
+            update_kwargs = {
+                "TableName": table_name,
+                "GlobalSecondaryIndexUpdates": gsi_updates
+            }
+            if any("Create" in update for update in gsi_updates):
+                update_kwargs["AttributeDefinitions"] = attribute_definitions
+                logger.info(json.dumps({
+                    "context": "gsi.update",
+                    "message": f"Including AttributeDefinitions: {attribute_definitions}"
+                }))
+
+            dynamodb.update_table(**update_kwargs)
+            logger.info("GSI configuration update submitted. Waiting 10 seconds before continuing...")
+            time.sleep(10)
+
+        # Verify final GSI configuration
+        final_desc = dynamodb.describe_table(TableName=table_name)["Table"]
+        for gsi in final_desc.get("GlobalSecondaryIndexes", []):
+            name = gsi["IndexName"]
+            rcu = gsi["ProvisionedThroughput"]["ReadCapacityUnits"]
+            wcu = gsi["ProvisionedThroughput"]["WriteCapacityUnits"]
+            projection = gsi.get("Projection", {})
+            logger.info(json.dumps({
+                "context": "gsi.verification",
+                "message": f"Final configuration for GSI {name}",
+                "IndexName": name,
+                "ReadCapacityUnits": rcu,
+                "WriteCapacityUnits": wcu,
+                "ProjectionType": projection.get("ProjectionType"),
+                "NonKeyAttributes": projection.get("NonKeyAttributes", [])
+            }))
+
+        return updated
+
+    except ClientError as e:
+        logger.error(json.dumps({"context": "gsi.update", "error": str(e)}))
+        sys.exit(1)
+
+def update_billing_mode(dynamodb, table_name, mode, read=None, write=None, gsi_config=None):
+    try:
+        updated = False
+
+        table_desc = dynamodb.describe_table(TableName=table_name)["Table"]
+        current_mode = table_desc.get("BillingModeSummary", {}).get("BillingMode", "PROVISIONED")
+
+        if mode.upper() == "PROVISIONED":
+            if current_mode == "PAY_PER_REQUEST":
+                logger.info("Switching table to PROVISIONED mode...", extra={"context": "update_billing_mode"})
+                update_kwargs = {
+                    'TableName': table_name,
+                    'BillingMode': 'PROVISIONED',
+                    'ProvisionedThroughput': {
+                        'ReadCapacityUnits': read or 5,
+                        'WriteCapacityUnits': write or 5
+                    }
+                }
+
+                if gsi_config:
+                    gsi_updates = []
+                    for gsi_name, conf in gsi_config.items():
+                        gsi_updates.append({
+                            'Update': {
+                                'IndexName': gsi_name,
+                                'ProvisionedThroughput': {
+                                    'ReadCapacityUnits': conf.get("ReadCapacityUnits", 5),
+                                    'WriteCapacityUnits': conf.get("WriteCapacityUnits", 5)
+                                }
+                            }
+                        })
+                    update_kwargs["GlobalSecondaryIndexUpdates"] = gsi_updates
+
+                dynamodb.update_table(**update_kwargs)
+                updated = True
+                logger.info("Table and GSIs switched to PROVISIONED.", extra={"context": "update_billing_mode"})
+                wait_for_table_active(dynamodb, table_name)
+            else:
+                logger.info("Table already in PROVISIONED mode. Checking GSI configuration...", extra={"context": "gsi.update"})
+                if gsi_config:
+                    updated = update_gsi_configuration(dynamodb, table_name, gsi_config) or updated
+
+        else:
+            if current_mode == "PROVISIONED":
+                logger.info("Switching table to PAY_PER_REQUEST mode...", extra={"context": "update_billing_mode"})
+                dynamodb.update_table(TableName=table_name, BillingMode='PAY_PER_REQUEST')
+                updated = True
+                wait_for_table_active(dynamodb, table_name)
+            else:
+                logger.info("Table already in PAY_PER_REQUEST mode.", extra={"context": "update_billing_mode"})
+
+        if not updated:
+            logger.info("No updates found for table or GSIs.", extra={"context": "update_billing_mode"})
+            return
+
+        # Verify final table configuration
+        final_desc = dynamodb.describe_table(TableName=table_name)["Table"]
+        logger.info(json.dumps({
+            "context": "table.verification",
+            "message": f"Final table configuration",
+            "TableName": table_name,
+            "BillingMode": final_desc.get("BillingModeSummary", {}).get("BillingMode", "PROVISIONED"),
+            "ReadCapacityUnits": final_desc.get("ProvisionedThroughput", {}).get("ReadCapacityUnits", 0),
+            "WriteCapacityUnits": final_desc.get("ProvisionedThroughput", {}).get("WriteCapacityUnits", 0)
+        }))
+
+    except ClientError as e:
+        logger.error(json.dumps({"context": "update_billing_mode", "error": str(e)}))
+        sys.exit(1)
+def register_scaling(autoscaling, table_name, dimension, min_capacity, max_capacity, target_utilization, index_name=None):
+    if dimension.startswith("dynamodb:table:"):
+        resource_id = f"table/{table_name}"
+    elif index_name:
+        resource_id = f"table/{table_name}/index/{index_name}"
+    else:
+        logger.error(json.dumps({
+            "context": f"autoscaling.register.{dimension}",
+            "error": "Index name is required for GSI autoscaling"
+        }))
+        sys.exit(1)
+
+    policy_name = f"{resource_id.replace('/', '-')}-{dimension.split(':')[-1]}-policy"
+
+    try:
+        # Check existing scalable target
+        scalable_targets = autoscaling.describe_scalable_targets(
+            ServiceNamespace='dynamodb',
+            ResourceIds=[resource_id],  # Fixed: Use ResourceIds (plural) instead of ResourceId
+            ScalableDimension=dimension
+        )['ScalableTargets']
+
+        # Check existing policy
+        existing_policies = autoscaling.describe_scaling_policies(
+            ServiceNamespace='dynamodb',
+            ResourceId=resource_id,
+            ScalableDimension=dimension
+        )['ScalingPolicies']
+
+        # Check if existing scalable target and policy match desired settings
+        policy_matches = False
+        if scalable_targets and existing_policies:
+            target = scalable_targets[0]
+            policy = existing_policies[0]
+            current_min = target.get('MinCapacity', 0)
+            current_max = target.get('MaxCapacity', 0)
+            current_target_value = policy.get('TargetTrackingScalingPolicyConfiguration', {}).get('TargetValue', 0)
+
+            if (current_min == min_capacity and
+                current_max == max_capacity and
+                current_target_value == target_utilization and
+                policy.get('PolicyType') == 'TargetTrackingScaling'):
+                policy_matches = True
+                logger.info(json.dumps({
+                    "context": f"autoscaling.register.{dimension}",
+                    "message": f"No updates needed for autoscaling policy: {policy_name}, settings already match (min={min_capacity}, max={max_capacity}, target={target_utilization})"
+                }))
+                return
+
+        # If no match, proceed with registration
+        logger.info(json.dumps({
+            "context": f"autoscaling.register.{dimension}",
+            "message": f"Registering scalable target: min={min_capacity}, max={max_capacity}, target={target_utilization}"
+        }))
+
+        autoscaling.register_scalable_target(
+            ServiceNamespace="dynamodb",
+            ResourceId=resource_id,
+            ScalableDimension=dimension,
+            MinCapacity=min_capacity,
+            MaxCapacity=max_capacity
+        )
+
+        # Delete existing policies if they exist
+        for pol in existing_policies:
+            logger.info(json.dumps({
+                "context": f"autoscaling.cleanup.{dimension}",
+                "message": f"Deleting existing policy: {pol['PolicyName']}"
+            }))
+            autoscaling.delete_scaling_policy(
+                PolicyName=pol['PolicyName'],
+                ServiceNamespace='dynamodb',
+                ResourceId=resource_id,
+                ScalableDimension=dimension
+            )
+
+        autoscaling.put_scaling_policy(
+            PolicyName=policy_name,
+            ServiceNamespace="dynamodb",
+            ResourceId=resource_id,
+            ScalableDimension=dimension,
+            PolicyType='TargetTrackingScaling',
+            TargetTrackingScalingPolicyConfiguration={
+                'TargetValue': target_utilization,
+                'PredefinedMetricSpecification': {
+                    'PredefinedMetricType': 'DynamoDBReadCapacityUtilization'
+                    if "Read" in dimension else 'DynamoDBWriteCapacityUtilization'
+                },
+                'ScaleInCooldown': 60,
+                'ScaleOutCooldown': 60
+            }
+        )
+
+        logger.info(json.dumps({
+            "context": f"autoscaling.register.{dimension}",
+            "message": "Scaling policy registered successfully"
+        }))
+
+    except ClientError as e:
+        logger.error(json.dumps({
+            "context": f"autoscaling.register.{dimension}",
+            "error": str(e)
+        }))
+        sys.exit(1)
+        
+def deregister_scaling(autoscaling, table_name, dimension):
+    try:
+        autoscaling.deregister_scalable_target(
+            ServiceNamespace="dynamodb",
+            ResourceId=table_name,
+            ScalableDimension=dimension
+        )
+    except ClientError as e:
+        logger.warning(json.dumps({"context": f"autoscaling.deregister.{dimension}", "warning": str(e)}))
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--tableName", required=True)
+    parser.add_argument("--region", required=True)
+    parser.add_argument("--readMode", choices=["ondemand", "provisioned"], required=True)
+    parser.add_argument("--writeMode", choices=["ondemand", "provisioned"], required=True)
+    parser.add_argument("--minRead", type=int)
+    parser.add_argument("--maxRead", type=int)
+    parser.add_argument("--targetRead", type=int)
+    parser.add_argument("--minWrite", type=int)
+    parser.add_argument("--maxWrite", type=int)
+    parser.add_argument("--targetWrite", type=int)
+    parser.add_argument("--checkGSI", type=lambda x: x.lower() == 'true', default=True)
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+
+    # Log received arguments for debugging
+    logger.info(json.dumps({
+        "context": "args",
+        "message": f"Received arguments: tableName={args.tableName}, region={args.region}, readMode={args.readMode}, writeMode={args.writeMode}, minRead={args.minRead}, maxRead={args.maxRead}, targetRead={args.targetRead}, minWrite={args.minWrite}, maxWrite={args.maxWrite}, targetWrite={args.targetWrite}, checkGSI={args.checkGSI}, dry-run={args.dry_run}"
+    }))
+
+    dynamodb = boto3.client("dynamodb", region_name=args.region)
+    autoscaling = boto3.client("application-autoscaling", region_name=args.region)
+
+    logger.info("Found credentials from IAM Role: vpn-access", extra={"context": "autoscaling"})
+
+    desc = get_table_description(dynamodb, args.tableName)
+    current_mode = desc.get('BillingModeSummary', {}).get('BillingMode', 'PROVISIONED')
+    gsi_config = load_gsi_config(args.tableName, args.checkGSI)
+    validate_gsi_config(desc, gsi_config, args.checkGSI)
+
+    if args.dry_run:
+        logger.info(json.dumps({
+            "context": "dry_run",
+            "message": "Dry run mode - no changes applied",
+            "tableName": args.tableName,
+            "targetBilling": args.readMode,
+            "checkGSI": args.checkGSI
+        }))
+        sys.exit(0)
+
+    if args.readMode == "provisioned" or args.writeMode == "provisioned":
+        update_billing_mode(dynamodb, args.tableName, "provisioned",
+                            read=args.targetRead, write=args.targetWrite,
+                            gsi_config=gsi_config)
+        wait_for_table_active(dynamodb, args.tableName)
+
+        if args.readMode == "provisioned":
+            register_scaling(autoscaling, args.tableName, "dynamodb:table:ReadCapacityUnits",
+                             args.minRead or 5, args.maxRead or 100, args.targetRead or 70)
+
+        if args.writeMode == "provisioned":
+            register_scaling(autoscaling, args.tableName, "dynamodb:table:WriteCapacityUnits",
+                             args.minWrite or 5, args.maxWrite or 100, args.targetWrite or 70)
+
+        if args.checkGSI and gsi_config:
+            for index_name, conf in gsi_config.items():
+                logger.info(json.dumps({
+                    "context": "autoscaling.config",
+                    "message": f"Applying autoscaling for index: {index_name}"
+                }))
+
+                if "MinReadCapacityUnits" in conf:
+                    register_scaling(
+                        autoscaling,
+                        args.tableName,
+                        "dynamodb:index:ReadCapacityUnits",
+                        conf["MinReadCapacityUnits"],
+                        conf["MaxReadCapacityUnits"],
+                        conf["TargetReadUtilization"],
+                        index_name=index_name
+                    )
+
+                if "MinWriteCapacityUnits" in conf:
+                    register_scaling(
+                        autoscaling,
+                        args.tableName,
+                        "dynamodb:index:WriteCapacityUnits",
+                        conf["MinWriteCapacityUnits"],
+                        conf["MaxWriteCapacityUnits"],
+                        conf["TargetWriteUtilization"],
+                        index_name=index_name
+                    )
+
+    else:
+        if current_mode == "PROVISIONED":
+            deregister_scaling(autoscaling, args.tableName, "dynamodb:table:ReadCapacityUnits")
+            deregister_scaling(autoscaling, args.tableName, "dynamodb:table:WriteCapacityUnits")
+            update_billing_mode(dynamodb, args.tableName, "ondemand")
+            wait_for_table_active(dynamodb, args.tableName)
+        else:
+            logger.info("Table already in PAY_PER_REQUEST mode. Nothing to do.", extra={"context": "mode_check"})
+
+if __name__ == "__main__":
+    main()
