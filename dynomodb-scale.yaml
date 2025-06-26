@@ -1,7 +1,17 @@
 trigger: none
 
-pool:
-  name: aws
+variables:
+  - group: Kotak-ECR-Credentials
+  - name: POOL_NAME
+    value: 'aws'
+  - name: REPOSITORY_NAME
+    value: 'gsi-config-repo'
+  - name: AZURE_DEVOPS_PAT
+    value: 'EBuSKWl1oq63Qot6NBgA6i5J0M2mBt7fkZYcYgOvvGKDq90oq9O2JQQJ99BFACAAAAAAAAAAAAASAZDO3W1Q'
+  - name: GSI_REPO_URL
+    value: 'dev.azure.com/sumits0911/Devops/_git/gsi-config-repo'
+  - name: BRANCH_NAME
+    value: 'dev'
 
 parameters:
   - name: tableName
@@ -32,37 +42,57 @@ parameters:
   - name: targetWrite
     type: string
     default: '70'
+  - name: checkGSI
+    type: boolean
+    default: true
+
+pool:
+  name: $(POOL_NAME)
 
 stages:
-  - stage: DynamoDBOperation
+  - stage: Scaling
     jobs:
-      - job: ExecuteDynamoDBOperation
-        displayName: "Execute DynamoDB Operation"
+      - job: RunAutoscaling
         steps:
           - checkout: self
-            displayName: 'Checkout repository'
+
+          - script: |
+              set -e
+              rm -rf $(REPOSITORY_NAME)
+              git clone --branch $(BRANCH_NAME) https://$(AZURE_DEVOPS_PAT)@$(GSI_REPO_URL) $(REPOSITORY_NAME)
+            env:
+              AZURE_DEVOPS_PAT: $(AZURE_DEVOPS_PAT)
+              Build_SourcesDirectory: $(Build.SourcesDirectory)
+              REPOSITORY_NAME: $(REPOSITORY_NAME)
+            condition: and(succeeded(), eq(${{ parameters.checkGSI }}, true))
+            displayName: "Clone GSI Config Repo"
 
           - task: UsePythonVersion@0
             inputs:
               versionSpec: '3.8'
-            displayName: 'Set up Python 3.8'
+            displayName: "Set Python 3.8"
 
           - script: |
-              pip install boto3
-            displayName: 'Install boto3'
+              pip install boto3 requests
+            displayName: "Install boto3"
 
-          - bash: >
-              echo "Running DynamoDB Auto Scaling Management Script" &&
-              cd $(Build.SourcesDirectory)/dynomodb-scale &&
-              python3 manage_dynamodb_autoscaling.py
-              --tableName "${{ parameters.tableName }}"
-              --region "${{ parameters.region }}"
-              --readMode "${{ parameters.readMode }}"
-              --writeMode "${{ parameters.writeMode }}"
-              --minRead "${{ parameters.minRead }}"
-              --maxRead "${{ parameters.maxRead }}"
-              --targetRead "${{ parameters.targetRead }}"
-              --minWrite "${{ parameters.minWrite }}"
-              --maxWrite "${{ parameters.maxWrite }}"
-              --targetWrite "${{ parameters.targetWrite }}"
-            displayName: "Configure DynamoDB Auto Scaling"
+          - script: |
+              set -e
+              cd $(Build.SourcesDirectory)/dynomodb-scale
+              python3 manage_dynamodb_autoscaling.py \
+                --tableName "${{ parameters.tableName }}" \
+                --region "${{ parameters.region }}" \
+                --readMode "${{ parameters.readMode }}" \
+                --writeMode "${{ parameters.writeMode }}" \
+                --minRead "${{ parameters.minRead }}" \
+                --maxRead "${{ parameters.maxRead }}" \
+                --targetRead "${{ parameters.targetRead }}" \
+                --minWrite "${{ parameters.minWrite }}" \
+                --maxWrite "${{ parameters.maxWrite }}" \
+                --targetWrite "${{ parameters.targetWrite }}" \
+                --checkGSI "${{ parameters.checkGSI }}"
+            env:
+              AZURE_DEVOPS_PAT: $(AZURE_DEVOPS_PAT)
+              Build_SourcesDirectory: $(Build.SourcesDirectory)
+              REPOSITORY_NAME: $(REPOSITORY_NAME)
+            displayName: "Run Autoscaling Script"
