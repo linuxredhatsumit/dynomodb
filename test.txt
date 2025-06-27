@@ -1,20 +1,23 @@
-Running DynamoDB Auto Scaling Management Script
-{"timestamp": "2025-06-27 17:24:28", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"args\", \"message\": \"Received arguments: tableName=test-table, region=ap-south-1, readMode=ondemand, writeMode=ondemand, minRead=1, maxRead=1, targetRead=70, minWrite=1, maxWrite=1, targetWrite=70, maxReadUnits=1, maxWriteUnits=1, checkGSI=True, dry-run=False\"}"}
-{"timestamp": "2025-06-27 17:24:28", "level": "INFO", "context": "autoscaling", "message": "Found credentials in environment variables."}
-{"timestamp": "2025-06-27 17:24:29", "level": "INFO", "context": "autoscaling", "message": "Found credentials from IAM Role: vpn-access"}
-{"timestamp": "2025-06-27 17:24:29", "level": "INFO", "context": "config.load", "message": "Looking for config file at: /home/app_user/workspace/Agent1/_work/355/s/k811-ddb-index/test-table/scaling.json"}
-{"timestamp": "2025-06-27 17:24:29", "level": "WARNING", "context": "autoscaling", "message": "{\"context\": \"config.load\", \"message\": \"Table folder not found at: /home/app_user/workspace/Agent1/_work/355/s/k811-ddb-index/test-table. Assuming no GSIs.\"}"}
-{"timestamp": "2025-06-27 17:24:29", "level": "INFO", "context": "config.validate", "message": "No GSI config to validate (checkGSI=false or no config found)."}
-{"timestamp": "2025-06-27 17:24:29", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"global_tables\", \"message\": \"Table test-table is not a Global Table or has no replicas.\"}"}
-{"timestamp": "2025-06-27 17:24:29", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"global_tables\", \"message\": \"Found replica regions: []\"}"}
-{"timestamp": "2025-06-27 17:24:29", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.deregister.dynamodb:table:ReadCapacityUnits\", \"message\": \"Deregistered scalable target for table/test-table\"}"}
-{"timestamp": "2025-06-27 17:24:29", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.deregister.dynamodb:table:WriteCapacityUnits\", \"message\": \"Deregistered scalable target for table/test-table\"}"}
-{"timestamp": "2025-06-27 17:24:29", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"wait_for_no_scaling\", \"message\": \"Autoscaling fully deregistered for table test-table after 0 seconds\"}"}
-{"timestamp": "2025-06-27 17:24:30", "level": "INFO", "context": "update_billing_mode", "message": "Removing provisioned throughput before switching to PAY_PER_REQUEST..."}
+
+{"timestamp": "2025-06-27 17:51:11", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"args\", \"message\": \"Received arguments: tableName=global_scaling_inidex_test, region=ap-south-1, readMode=ondemand, writeMode=ondemand, minRead=1, maxRead=1, targetRead=70, minWrite=1, maxWrite=1, targetWrite=70, maxReadUnits=1, maxWriteUnits=1, checkGSI=True, dry-run=False\"}"}
+{"timestamp": "2025-06-27 17:51:11", "level": "INFO", "context": "autoscaling", "message": "Found credentials in environment variables."}
+{"timestamp": "2025-06-27 17:51:11", "level": "INFO", "context": "autoscaling", "message": "Found credentials from IAM Role: vpn-access"}
+{"timestamp": "2025-06-27 17:51:11", "level": "INFO", "context": "config.load", "message": "Looking for config file at: /home/app_user/workspace/Agent1/_work/355/s/k811-ddb-index/global_scaling_inidex_test/scaling.json"}
+{"timestamp": "2025-06-27 17:51:11", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"config.load\", \"message\": \"Loaded GSI config: {'referee-Index': {'ReadCapacityUnits': 1, 'WriteCapacityUnits': 1, 'MinReadCapacityUnits': 1, 'MaxReadCapacityUnits': 10, 'TargetReadUtilization': 70, 'MinWriteCapacityUnits': 1, 'MaxWriteCapacityUnits': 1, 'TargetWriteUtilization': 70, 'ProjectionType': 'INCLUDE', 'NonKeyAttributes': ['claimExpiryTime', 'referrerRewardId', 'rewardClaimedAt', 'refereeRewardStatus', 'epoch', 'refereeName', 'referrerRewardStatus', 'refereeRewardId', 'refereeRewardAmount', 'createdAt', 'referralCode', 'referralCompletedAt', 'referrerCrn', 'referrerRewardAmount', 'updatedAt']}, 'referrer-Index': {'ReadCapacityUnits': 1, 'WriteCapacityUnits': 1, 'MinReadCapacityUnits': 1, 'MaxReadCapacityUnits': 10, 'TargetReadUtilization': 70, 'MinWriteCapacityUnits': 1, 'MaxWriteCapacityUnits': 1, 'TargetWriteUtilization': 70, 'ProjectionType': 'INCLUDE', 'NonKeyAttributes': ['claimExpiryTime', 'referrerRewardId', 'rewardClaimedAt', 'refereeRewardStatus', 'epoch', 'refereeName', 'referrerRewardStatus', 'refereeRewardId', 'refereeRewardAmount', 'createdAt', 'referralCode', 'refereeCrn', 'referralCompletedAt', 'referrerRewardAmount', 'updatedAt']}}\"}"}
+{"timestamp": "2025-06-27 17:51:11", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"global_tables\", \"message\": \"Table global_scaling_inidex_test is not a Global Table or has no replicas.\"}"}
+{"timestamp": "2025-06-27 17:51:11", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"global_tables\", \"message\": \"Found replica regions: []\"}"}
+{"timestamp": "2025-06-27 17:51:11", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.deregister.dynamodb:table:ReadCapacityUnits\", \"message\": \"Deregistered scalable target for table/global_scaling_inidex_test\"}"}
+{"timestamp": "2025-06-27 17:51:12", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.deregister.dynamodb:table:WriteCapacityUnits\", \"message\": \"Deregistered scalable target for table/global_scaling_inidex_test\"}"}
+{"timestamp": "2025-06-27 17:51:12", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"wait_for_no_scaling\", \"message\": \"Autoscaling fully deregistered for table global_scaling_inidex_test after 0 seconds\"}"}
+{"timestamp": "2025-06-27 17:51:12", "level": "INFO", "context": "update_billing_mode", "message": "Attempt 1/3: Removing provisioned throughput..."}
+{"timestamp": "2025-06-27 17:51:13", "level": "WARNING", "context": "autoscaling", "message": "{\"context\": \"update_billing_mode\", \"warning\": \"Validation error on attempt 1: Table write capacity should either be Pay-Per-Request or AutoScaled.. Retrying after 10 seconds...\"}"}
+{"timestamp": "2025-06-27 17:51:23", "level": "INFO", "context": "update_billing_mode", "message": "Attempt 2/3: Removing provisioned throughput..."}
+{"timestamp": "2025-06-27 17:51:25", "level": "WARNING", "context": "autoscaling", "message": "{\"context\": \"update_billing_mode\", \"warning\": \"Validation error on attempt 2: Table write capacity should either be Pay-Per-Request or AutoScaled.. Retrying after 10 seconds...\"}"}
+{"timestamp": "2025-06-27 17:51:35", "level": "INFO", "context": "update_billing_mode", "message": "Attempt 3/3: Removing provisioned throughput..."}
 Traceback (most recent call last):
-  File "manage_dynamodb_autoscaling.py", line 807, in <module>
+  File "manage_dynamodb_autoscaling.py", line 838, in <module>
     main()
-  File "manage_dynamodb_autoscaling.py", line 778, in main
+  File "manage_dynamodb_autoscaling.py", line 799, in main
     dynamodb.update_table(
   File "/home/app_user/workspace/Agent1/_work/355/s/others/dynamodb-scale/dynomoscaleenv/lib/python3.8/site-packages/botocore/client.py", line 570, in _api_call
     return self._make_api_call(operation_name, kwargs)
