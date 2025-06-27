@@ -1,38 +1,25 @@
-import boto3
-
-def disable_logs_and_tracing(api_id, region='ap-south-1'):
-    client = boto3.client('apigateway', region_name=region)
-
-    try:
-        stages = client.get_stages(restApiId=api_id)['item']
-    except Exception as e:
-        print(f"❌ Failed to fetch stages: {e}")
-        return
-
-    for stage in stages:
-        stage_name = stage['stageName']
-        print(f"🔧 Disabling logs and tracing for stage: {stage_name}")
-
-        patch_ops = [
-            # Disable logging
-            {'op': 'replace', 'path': '/*/*/logging/loglevel', 'value': 'OFF'},
-            # Disable data tracing
-            {'op': 'replace', 'path': '/*/*/logging/dataTrace', 'value': 'false'},
-            # Disable detailed metrics
-            # {'op': 'replace', 'path': '/*/*/metrics/enabled', 'value': 'false'},
-            # Disable X-Ray tracing
-            {'op': 'replace', 'path': '/tracingEnabled', 'value': 'false'},
-        ]
-
-        try:
-            client.update_stage(
-                restApiId=api_id,
-                stageName=stage_name,
-                patchOperations=patch_ops
-            )
-            print(f"✅ Successfully updated stage: {stage_name}")
-        except Exception as e:
-            print(f"❌ Failed to update stage {stage_name}: {e}")
-
-# 🔁 Replace this with your API Gateway ID
-disable_logs_and_tracing('sezsgjedic')
+{
+  "id-status-index": {
+    "ReadCapacityUnits": 1,
+    "WriteCapacityUnits": 1,
+    "MinReadCapacityUnits": 1,
+    "MaxReadCapacityUnits": 10,
+    "TargetReadUtilization": 50,
+    "MinWriteCapacityUnits": 1,
+    "MaxWriteCapacityUnits": 10,
+    "TargetWriteUtilization": 50,
+    "ProjectionType": "INCLUDE",
+    "NonKeyAttributes": ["mandateStatus", "customerid","email"]
+  },
+  "id-test-index": {
+    "ReadCapacityUnits": 1,
+    "WriteCapacityUnits": 1,
+    "MinReadCapacityUnits": 1,
+    "MaxReadCapacityUnits": 10,
+    "TargetReadUtilization": 50,
+    "MinWriteCapacityUnits": 1,
+    "MaxWriteCapacityUnits": 10,
+    "TargetWriteUtilization": 50,
+    "ProjectionType": "ALL"
+  }
+}
