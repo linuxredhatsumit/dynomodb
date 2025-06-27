@@ -31,24 +31,24 @@ def get_table_description(dynamodb, table_name):
         logger.error(json.dumps({"context": "describe_table", "error": f"AWS Error: {e.response['Error']['Code']} - {e.response['Error']['Message']}"}))
         sys.exit(1)
 
-def wait_for_table_active(dynamodb, table_name, target_billing_mode=None, max_wait=1200):
+def wait_for_table_active(dynamodb, table_name, target_billing_mode=None, max_wait=900):
     start_time = time.time()
     attempt = 0
     while time.time() - start_time < max_wait:
         desc = get_table_description(dynamodb, table_name)
         current_billing_mode = desc.get('BillingModeSummary', {}).get('BillingMode', 'PROVISIONED')
         elapsed_time = int(time.time() - start_time)
-        logger.info(json.dumps({
-            "context": "wait_for_table_active",
-            "message": f"Current state: {desc['TableStatus']}, BillingMode: {current_billing_mode}, Elapsed: {elapsed_time} seconds"
-        }))
         if desc['TableStatus'] == 'ACTIVE' and (target_billing_mode is None or current_billing_mode == target_billing_mode):
             logger.info(json.dumps({
                 "context": "wait_for_table_active",
                 "message": f"Table {table_name} is ACTIVE with BillingMode {current_billing_mode} after {elapsed_time} seconds"
             }))
             return
-        time.sleep(15)
+        logger.info(json.dumps({
+            "context": "wait_for_table_active",
+            "message": f"Waiting for table {table_name} to become ACTIVE and BillingMode {target_billing_mode}... (current: {desc['TableStatus']}, {current_billing_mode}, elapsed time: {elapsed_time} seconds, attempt {attempt + 1})"
+        }))
+        time.sleep(10)
         attempt += 1
     logger.error(json.dumps({
         "context": "wait_for_table_active",
@@ -59,7 +59,7 @@ def wait_for_table_active(dynamodb, table_name, target_billing_mode=None, max_wa
 def wait_for_no_scaling(autoscaling, resource_id, dimension):
     start_time = time.time()
     attempt = 0
-    max_wait = 600
+    max_wait = 300
     while time.time() - start_time < max_wait:
         try:
             scalable_targets = autoscaling.describe_scalable_targets(
@@ -67,10 +67,6 @@ def wait_for_no_scaling(autoscaling, resource_id, dimension):
                 ResourceIds=[resource_id],
                 ScalableDimension=dimension
             )['ScalableTargets']
-            logger.info(json.dumps({
-                "context": "wait_for_no_scaling",
-                "message": f"Checking scalable targets for {resource_id} with {dimension}, Count: {len(scalable_targets)}"
-            }))
             if not scalable_targets:
                 elapsed_time = int(time.time() - start_time)
                 logger.info(json.dumps({
@@ -78,7 +74,11 @@ def wait_for_no_scaling(autoscaling, resource_id, dimension):
                     "message": f"Autoscaling fully deregistered for {resource_id} with {dimension} after {elapsed_time} seconds"
                 }))
                 return
-            time.sleep(15)
+            logger.info(json.dumps({
+                "context": "wait_for_no_scaling",
+                "message": f"Waiting for autoscaling to deregister from {resource_id} with {dimension}... (elapsed time: {int(time.time() - start_time)} seconds, attempt {attempt + 1})"
+            }))
+            time.sleep(10)
             attempt += 1
         except ClientError as e:
             if e.response['Error']['Code'] == 'ValidationException' and 'No scalable targets' in e.response['Error']['Message']:
@@ -240,22 +240,50 @@ def deregister_gsi_scaling(autoscaling, table_name, index_name):
                 "warning": f"Failed to deregister write capacity for {index_name}: {e.response['Error']['Code']} - {e.response['Error']['Message']}"
             }))
 
-def switch_to_pay_per_request(dynamodb, table_name, gsi_config):
+def remove_provisioned_throughput(dynamodb, table_name, index_name=None):
     try:
-        # Check current state
-        table_desc = get_table_description(dynamodb, table_name)
+        update_kwargs = {"TableName": table_name}
+        if index_name:
+            resource_id = f"table/{table_name}/index/{index_name}"
+            update_kwargs["GlobalSecondaryIndexUpdates"] = [{
+                "Update": {
+                    "IndexName": index_name,
+                    "ProvisionedThroughput": {
+                        "ReadCapacityUnits": 0,
+                        "WriteCapacityUnits": 0
+                    }
+                }
+            }]
+            logger.info(json.dumps({
+                "context": "provisioned_throughput",
+                "message": f"Removing provisioned throughput from GSI {index_name}"
+            }))
+        else:
+            resource_id = f"table/{table_name}"
+            update_kwargs["ProvisionedThroughput"] = {
+                "ReadCapacityUnits": 0,
+                "WriteCapacityUnits": 0
+            }
+            logger.info(json.dumps({
+                "context": "provisioned_throughput",
+                "message": f"Removing provisioned throughput from table {table_name}"
+            }))
+        dynamodb.update_table(**update_kwargs)
+        wait_for_table_active(dynamodb, table_name)
         logger.info(json.dumps({
-            "context": "billing_mode",
-            "message": f"Current table state: BillingMode: {table_desc.get('BillingModeSummary', {}).get('BillingMode', 'PROVISIONED')}, ReadCapacityUnits: {table_desc.get('ProvisionedThroughput', {}).get('ReadCapacityUnits', 'N/A')}, WriteCapacityUnits: {table_desc.get('ProvisionedThroughput', {}).get('WriteCapacityUnits', 'N/A')}"
+            "context": "provisioned_throughput",
+            "message": f"Successfully removed provisioned throughput from {resource_id}"
         }))
-        if gsi_config:
-            for gsi in table_desc.get("GlobalSecondaryIndexes", []):
-                logger.info(json.dumps({
-                    "context": "billing_mode",
-                    "message": f"Current GSI {gsi['IndexName']} state: ReadCapacityUnits: {gsi.get('ProvisionedThroughput', {}).get('ReadCapacityUnits', 'N/A')}, WriteCapacityUnits: {gsi.get('ProvisionedThroughput', {}).get('WriteCapacityUnits', 'N/A')}"
-                }))
+        return True
+    except ClientError as e:
+        logger.error(json.dumps({
+            "context": "provisioned_throughput",
+            "error": f"AWS Error: {e.response['Error']['Code']} - {e.response['Error']['Message']}"
+        }))
+        return False
 
-        # Switch table to PAY_PER_REQUEST
+def switch_to_pay_per_request(dynamodb, table_name):
+    try:
         dynamodb.update_table(
             TableName=table_name,
             BillingMode='PAY_PER_REQUEST'
@@ -265,27 +293,6 @@ def switch_to_pay_per_request(dynamodb, table_name, gsi_config):
             "context": "billing_mode",
             "message": f"Successfully switched table {table_name} to PAY_PER_REQUEST mode"
         }))
-
-        # Update GSIs to PAY_PER_REQUEST
-        if gsi_config:
-            table_desc = get_table_description(dynamodb, table_name)
-            existing_gsis = {gsi["IndexName"]: gsi for gsi in table_desc.get("GlobalSecondaryIndexes", [])}
-            for index_name in gsi_config.keys():
-                if index_name in existing_gsis:
-                    dynamodb.update_table(
-                        TableName=table_name,
-                        GlobalSecondaryIndexUpdates=[{
-                            "Update": {
-                                "IndexName": index_name,
-                                "BillingMode": "PAY_PER_REQUEST"
-                            }
-                        }]
-                    )
-                    wait_for_table_active(dynamodb, table_name, target_billing_mode="PAY_PER_REQUEST")
-                    logger.info(json.dumps({
-                        "context": "billing_mode",
-                        "message": f"Switched GSI {index_name} to PAY_PER_REQUEST mode"
-                    }))
         return True
     except ClientError as e:
         logger.error(json.dumps({
@@ -446,49 +453,77 @@ def main():
         sys.exit(0)
     else:
         if current_mode == "PROVISIONED":
-            # Deregister all scaling
+            # Phase 1: Deregister all scaling
             deregister_scaling(autoscaling, args.tableName, "dynamodb:table:ReadCapacityUnits")
             deregister_scaling(autoscaling, args.tableName, "dynamodb:table:WriteCapacityUnits")
             if gsi_config:
                 for index_name in gsi_config.keys():
                     deregister_gsi_scaling(autoscaling, args.tableName, index_name)
-            # Switch to PAY_PER_REQUEST with retry
+            # Phase 2: Remove provisioned throughput
             max_attempts = 5
-            retry_delay = 30
+            retry_delay = 20
             for attempt in range(max_attempts):
-                if switch_to_pay_per_request(dynamodb, args.tableName, gsi_config):
-                    break
+                if remove_provisioned_throughput(dynamodb, args.tableName):
+                    table_desc = get_table_description(dynamodb, args.tableName)
+                    if not table_desc.get('ProvisionedThroughput', {}):
+                        logger.info(json.dumps({
+                            "context": "provisioned_throughput",
+                            "message": f"Table {args.tableName} provisioned throughput removed"
+                        }))
+                        break
+                if gsi_config:
+                    all_gsi_cleared = True
+                    for index_name in gsi_config.keys():
+                        if not remove_provisioned_throughput(dynamodb, args.tableName, index_name):
+                            all_gsi_cleared = False
+                            break
+                    if all_gsi_cleared:
+                        table_desc = get_table_description(dynamodb, args.tableName)
+                        gsi_throughputs = {gsi["IndexName"]: gsi.get('ProvisionedThroughput', {}) for gsi in table_desc.get("GlobalSecondaryIndexes", [])}
+                        if all(not tp for tp in gsi_throughputs.values()):
+                            logger.info(json.dumps({
+                                "context": "provisioned_throughput",
+                                "message": f"All GSIs provisioned throughput removed for {args.tableName}"
+                            }))
+                            break
                 if attempt < max_attempts - 1:
                     logger.warning(json.dumps({
-                        "context": "billing_mode",
-                        "warning": f"Attempt {attempt + 1}/{max_attempts} failed to switch to PAY_PER_REQUEST. Retrying after {retry_delay} seconds..."
+                        "context": "provisioned_throughput",
+                        "warning": f"Attempt {attempt + 1}/{max_attempts} failed to remove provisioned throughput. Retrying after {retry_delay} seconds..."
                     }))
                     time.sleep(retry_delay)
                 else:
                     logger.error(json.dumps({
-                        "context": "billing_mode",
-                        "error": f"Failed to switch {args.tableName} to PAY_PER_REQUEST mode after {max_attempts} attempts"
+                        "context": "provisioned_throughput",
+                        "error": f"Failed to remove provisioned throughput after {max_attempts} attempts"
                     }))
                     sys.exit(1)
+            # Phase 3: Switch to PAY_PER_REQUEST
+            if not switch_to_pay_per_request(dynamodb, args.tableName):
+                logger.error(json.dumps({
+                    "context": "billing_mode",
+                    "error": f"Failed to switch {args.tableName} to PAY_PER_REQUEST mode"
+                }))
+                sys.exit(1)
         # Apply OnDemandThroughput if specified
-        if args.maxReadUnits is not None or args.maxWriteUnits is not None:
+        if max_read_units is not None or max_write_units is not None:
             update_kwargs = {
                 'TableName': args.tableName,
                 'BillingMode': 'PAY_PER_REQUEST',
                 'OnDemandThroughput': {}
             }
-            if args.maxReadUnits is not None:
+            if max_read_units is not None:
                 logger.info(json.dumps({
                     "context": "update_billing_mode",
-                    "message": f"Setting maximum read request units to {args.maxReadUnits}"
+                    "message": f"Setting maximum read request units to {max_read_units}"
                 }))
-                update_kwargs['OnDemandThroughput']['MaxReadRequestUnits'] = args.maxReadUnits
-            if args.maxWriteUnits is not None:
+                update_kwargs['OnDemandThroughput']['MaxReadRequestUnits'] = max_read_units
+            if max_write_units is not None:
                 logger.info(json.dumps({
                     "context": "update_billing_mode",
-                    "message": f"Setting maximum write request units to {args.maxWriteUnits}"
+                    "message": f"Setting maximum write request units to {max_write_units}"
                 }))
-                update_kwargs['OnDemandThroughput']['MaxWriteRequestUnits'] = args.maxWriteUnits
+                update_kwargs['OnDemandThroughput']['MaxWriteRequestUnits'] = max_write_units
             dynamodb.update_table(**update_kwargs)
             wait_for_table_active(dynamodb, args.tableName, target_billing_mode="PAY_PER_REQUEST")
         logger.info(json.dumps({
