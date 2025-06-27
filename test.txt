@@ -1,32 +1,17 @@
-{"timestamp": "2025-06-27 18:18:04", "level": "INFO", "context": "config.load", "message": "Looking for config file at: /home/app_user/workspace/Agent1/_work/355/s/k811-ddb-index/global_scaling_inidex_test/scaling.json"}
-{"timestamp": "2025-06-27 18:18:04", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"config.load\", \"message\": \"Loaded GSI config: {'referee-Index': {'ReadCapacityUnits': 1, 'WriteCapacityUnits': 1, 'MinReadCapacityUnits': 1, 'MaxReadCapacityUnits': 10, 'TargetReadUtilization': 70, 'MinWriteCapacityUnits': 1, 'MaxWriteCapacityUnits': 1, 'TargetWriteUtilization': 70, 'ProjectionType': 'INCLUDE', 'NonKeyAttributes': ['claimExpiryTime', 'referrerRewardId', 'rewardClaimedAt', 'refereeRewardStatus', 'epoch', 'refereeName', 'referrerRewardStatus', 'refereeRewardId', 'refereeRewardAmount', 'createdAt', 'referralCode', 'referralCompletedAt', 'referrerCrn', 'referrerRewardAmount', 'updatedAt']}, 'referrer-Index': {'ReadCapacityUnits': 1, 'WriteCapacityUnits': 1, 'MinReadCapacityUnits': 1, 'MaxReadCapacityUnits': 10, 'TargetReadUtilization': 70, 'MinWriteCapacityUnits': 1, 'MaxWriteCapacityUnits': 1, 'TargetWriteUtilization': 70, 'ProjectionType': 'INCLUDE', 'NonKeyAttributes': ['claimExpiryTime', 'referrerRewardId', 'rewardClaimedAt', 'refereeRewardStatus', 'epoch', 'refereeName', 'referrerRewardStatus', 'refereeRewardId', 'refereeRewardAmount', 'createdAt', 'referralCode', 'refereeCrn', 'referralCompletedAt', 'referrerRewardAmount', 'updatedAt']}}\"}"}
-{"timestamp": "2025-06-27 18:18:04", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"global_tables\", \"message\": \"Table global_scaling_inidex_test is not a Global Table or has no replicas.\"}"}
-{"timestamp": "2025-06-27 18:18:04", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"global_tables\", \"message\": \"Found replica regions: []\"}"}
-{"timestamp": "2025-06-27 18:18:05", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"wait_for_no_scaling\", \"message\": \"Autoscaling fully deregistered for table/global_scaling_inidex_test with dynamodb:table:ReadCapacityUnits after 0 seconds\"}"}
-{"timestamp": "2025-06-27 18:18:05", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.deregister.dynamodb:table:ReadCapacityUnits\", \"message\": \"Deregistered scalable target for table/global_scaling_inidex_test\"}"}
-{"timestamp": "2025-06-27 18:18:05", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"wait_for_no_scaling\", \"message\": \"Autoscaling fully deregistered for table/global_scaling_inidex_test with dynamodb:table:WriteCapacityUnits after 0 seconds\"}"}
-{"timestamp": "2025-06-27 18:18:05", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.deregister.dynamodb:table:WriteCapacityUnits\", \"message\": \"Deregistered scalable target for table/global_scaling_inidex_test\"}"}
-{"timestamp": "2025-06-27 18:18:06", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"provisioned_throughput\", \"message\": \"Removing provisioned throughput from table global_scaling_inidex_test\"}"}
-Traceback (most recent call last):
-  File "manage_dynamodb_autoscaling.py", line 698, in <module>
-    main()
-  File "manage_dynamodb_autoscaling.py", line 466, in main
-    if remove_provisioned_throughput(dynamodb, args.tableName):
-  File "manage_dynamodb_autoscaling.py", line 271, in remove_provisioned_throughput
-    dynamodb.update_table(**update_kwargs)
-  File "/home/app_user/workspace/Agent1/_work/355/s/others/dynamodb-scale/dynomoscaleenv/lib/python3.8/site-packages/botocore/client.py", line 570, in _api_call
-    return self._make_api_call(operation_name, kwargs)
-  File "/home/app_user/workspace/Agent1/_work/355/s/others/dynamodb-scale/dynomoscaleenv/lib/python3.8/site-packages/botocore/context.py", line 124, in wrapper
-    return func(*args, **kwargs)
-  File "/home/app_user/workspace/Agent1/_work/355/s/others/dynamodb-scale/dynomoscaleenv/lib/python3.8/site-packages/botocore/client.py", line 988, in _make_api_call
-    request_dict = self._convert_to_request_dict(
-  File "/home/app_user/workspace/Agent1/_work/355/s/others/dynamodb-scale/dynomoscaleenv/lib/python3.8/site-packages/botocore/client.py", line 1055, in _convert_to_request_dict
-    request_dict = self._serializer.serialize_to_request(
-  File "/home/app_user/workspace/Agent1/_work/355/s/others/dynamodb-scale/dynomoscaleenv/lib/python3.8/site-packages/botocore/validate.py", line 381, in serialize_to_request
-    raise ParamValidationError(report=report.generate_report())
-botocore.exceptions.ParamValidationError: Parameter validation failed:
-Invalid value for parameter ProvisionedThroughput.ReadCapacityUnits, value: 0, valid min value: 1
-Invalid value for parameter ProvisionedThroughput.WriteCapacityUnits, value: 0, valid min value: 1
+Running DynamoDB Auto Scaling Management Script
+{"timestamp": "2025-06-27 18:26:14", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"args\", \"message\": \"Received arguments: tableName=global_scaling_inidex_test, region=ap-south-1, readMode=ondemand, writeMode=ondemand, minRead=1, maxRead=1, targetRead=70, minWrite=1, maxWrite=1, targetWrite=70, maxReadUnits=1, maxWriteUnits=1, checkGSI=True, dry-run=False\"}"}
+{"timestamp": "2025-06-27 18:26:14", "level": "INFO", "context": "autoscaling", "message": "Found credentials in environment variables."}
+{"timestamp": "2025-06-27 18:26:14", "level": "INFO", "context": "autoscaling", "message": "Found credentials from IAM Role: vpn-access"}
+{"timestamp": "2025-06-27 18:26:14", "level": "INFO", "context": "config.load", "message": "Looking for config file at: /home/app_user/workspace/Agent1/_work/355/s/k811-ddb-index/global_scaling_inidex_test/scaling.json"}
+{"timestamp": "2025-06-27 18:26:14", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"config.load\", \"message\": \"Loaded GSI config: {'referee-Index': {'ReadCapacityUnits': 1, 'WriteCapacityUnits': 1, 'MinReadCapacityUnits': 1, 'MaxReadCapacityUnits': 10, 'TargetReadUtilization': 70, 'MinWriteCapacityUnits': 1, 'MaxWriteCapacityUnits': 1, 'TargetWriteUtilization': 70, 'ProjectionType': 'INCLUDE', 'NonKeyAttributes': ['claimExpiryTime', 'referrerRewardId', 'rewardClaimedAt', 'refereeRewardStatus', 'epoch', 'refereeName', 'referrerRewardStatus', 'refereeRewardId', 'refereeRewardAmount', 'createdAt', 'referralCode', 'referralCompletedAt', 'referrerCrn', 'referrerRewardAmount', 'updatedAt']}, 'referrer-Index': {'ReadCapacityUnits': 1, 'WriteCapacityUnits': 1, 'MinReadCapacityUnits': 1, 'MaxReadCapacityUnits': 10, 'TargetReadUtilization': 70, 'MinWriteCapacityUnits': 1, 'MaxWriteCapacityUnits': 1, 'TargetWriteUtilization': 70, 'ProjectionType': 'INCLUDE', 'NonKeyAttributes': ['claimExpiryTime', 'referrerRewardId', 'rewardClaimedAt', 'refereeRewardStatus', 'epoch', 'refereeName', 'referrerRewardStatus', 'refereeRewardId', 'refereeRewardAmount', 'createdAt', 'referralCode', 'refereeCrn', 'referralCompletedAt', 'referrerRewardAmount', 'updatedAt']}}\"}"}
+{"timestamp": "2025-06-27 18:26:14", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"global_tables\", \"message\": \"Table global_scaling_inidex_test is not a Global Table or has no replicas.\"}"}
+{"timestamp": "2025-06-27 18:26:14", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"global_tables\", \"message\": \"Found replica regions: []\"}"}
+{"timestamp": "2025-06-27 18:26:15", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"wait_for_no_scaling\", \"message\": \"Autoscaling fully deregistered for table/global_scaling_inidex_test with dynamodb:table:ReadCapacityUnits after 0 seconds\"}"}
+{"timestamp": "2025-06-27 18:26:15", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.deregister.dynamodb:table:ReadCapacityUnits\", \"message\": \"Deregistered scalable target for table/global_scaling_inidex_test\"}"}
+{"timestamp": "2025-06-27 18:26:15", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"wait_for_no_scaling\", \"message\": \"Autoscaling fully deregistered for table/global_scaling_inidex_test with dynamodb:table:WriteCapacityUnits after 0 seconds\"}"}
+{"timestamp": "2025-06-27 18:26:15", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.deregister.dynamodb:table:WriteCapacityUnits\", \"message\": \"Deregistered scalable target for table/global_scaling_inidex_test\"}"}
+{"timestamp": "2025-06-27 18:26:16", "level": "ERROR", "context": "autoscaling", "message": "{\"context\": \"billing_mode\", \"error\": \"AWS Error: ValidationException - Table write capacity should either be Pay-Per-Request or AutoScaled.\"}"}
+{"timestamp": "2025-06-27 18:26:16", "level": "ERROR", "context": "autoscaling", "message": "{\"context\": \"billing_mode\", \"error\": \"Failed to switch global_scaling_inidex_test to PAY_PER_REQUEST mode\"}"}
 
 ##[error]Bash exited with code '1'.
 Finishing: Configure DynamoDB Auto Scaling
