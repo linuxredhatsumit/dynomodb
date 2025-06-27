@@ -386,7 +386,7 @@ def update_billing_mode(dynamodb, table_name, mode, autoscaling, read=None, writ
         else:
             if current_mode == "PROVISIONED":
                 logger.info("Switching table to PAY_PER_REQUEST mode...", extra={"context": "update_billing_mode"})
-                # Wait for autoscaling to be fully deregistered
+                # Wait for autoscaling to be fully deregistered using the passed autoscaling client
                 wait_for_no_scaling(autoscaling, table_name)
                 update_kwargs = {
                     'TableName': table_name,
