@@ -333,7 +333,7 @@ def update_gsi_configuration(dynamodb, table_name, gsi_config):
 def update_billing_mode(dynamodb, table_name, mode, autoscaling, read=None, write=None, gsi_config=None, max_read_units=None, max_write_units=None):
     try:
         updated = False
-        table_desc = dynamodb.describe_table(TableName=table_name)["Table"]
+        table_desc = get_table_description(dynamodb, table_name)
         current_mode = table_desc.get('BillingModeSummary', {}).get('BillingMode', 'PROVISIONED')
         existing_gsis = table_desc.get("GlobalSecondaryIndexes", [])
 
@@ -383,17 +383,27 @@ def update_billing_mode(dynamodb, table_name, mode, autoscaling, read=None, writ
                     "context": "update_billing_mode",
                     "message": "maxReadUnits and maxWriteUnits are ignored in PROVISIONED mode."
                 }))
-        else:
+        else:  # PAY_PER_REQUEST mode
             if current_mode == "PROVISIONED":
                 logger.info("Switching table to PAY_PER_REQUEST mode...", extra={"context": "update_billing_mode"})
-                # Wait for autoscaling to be fully deregistered using the passed autoscaling client
+                # Ensure no provisioned throughput remains
                 wait_for_no_scaling(autoscaling, table_name)
-                update_kwargs = {
-                    'TableName': table_name,
-                    'BillingMode': 'PAY_PER_REQUEST'
-                }
+                # Check current throughput settings
+                current_throughput = table_desc.get('ProvisionedThroughput', {})
+                if current_throughput:
+                    logger.info("Removing provisioned throughput before switching to PAY_PER_REQUEST...", extra={"context": "update_billing_mode"})
+                    dynamodb.update_table(
+                        TableName=table_name,
+                        BillingMode='PAY_PER_REQUEST'  # Initial switch to clear provisioned settings
+                    )
+                    wait_for_table_active(dynamodb, table_name, target_billing_mode="PAY_PER_REQUEST")
+                # Apply OnDemandThroughput if specified
                 if max_read_units is not None or max_write_units is not None:
-                    update_kwargs['OnDemandThroughput'] = {}
+                    update_kwargs = {
+                        'TableName': table_name,
+                        'BillingMode': 'PAY_PER_REQUEST',
+                        'OnDemandThroughput': {}
+                    }
                     if max_read_units is not None:
                         logger.info(json.dumps({
                             "context": "update_billing_mode",
@@ -410,9 +420,9 @@ def update_billing_mode(dynamodb, table_name, mode, autoscaling, read=None, writ
                         "context": "update_billing_mode",
                         "message": f"OnDemandThroughput parameter added to update request: {update_kwargs['OnDemandThroughput']}"
                     }))
-                dynamodb.update_table(**update_kwargs)
-                updated = True
-                wait_for_table_active(dynamodb, table_name, target_billing_mode="PAY_PER_REQUEST")
+                    dynamodb.update_table(**update_kwargs)
+                    updated = True
+                    wait_for_table_active(dynamodb, table_name, target_billing_mode="PAY_PER_REQUEST")
             else:
                 if max_read_units is not None or max_write_units is not None:
                     logger.info("Table already in PAY_PER_REQUEST mode. Updating OnDemandThroughput...", extra={"context": "update_billing_mode"})
@@ -445,7 +455,7 @@ def update_billing_mode(dynamodb, table_name, mode, autoscaling, read=None, writ
         if not updated:
             logger.info("No updates found for table or GSIs.", extra={"context": "update_billing_mode"})
             return
-        final_desc = dynamodb.describe_table(TableName=table_name)["Table"]
+        final_desc = get_table_description(dynamodb, table_name)
         logger.info(json.dumps({
             "context": "table.verification",
             "message": f"Final table configuration in region {dynamodb.meta.region_name}",
@@ -760,6 +770,16 @@ def main():
             deregister_scaling(autoscaling, args.tableName, "dynamodb:table:ReadCapacityUnits")
             deregister_scaling(autoscaling, args.tableName, "dynamodb:table:WriteCapacityUnits")
             wait_for_no_scaling(autoscaling, args.tableName)
+            # Clear provisioned throughput before switching
+            table_desc = get_table_description(dynamodb, args.tableName)
+            current_throughput = table_desc.get('ProvisionedThroughput', {})
+            if current_throughput:
+                logger.info("Removing provisioned throughput before switching to PAY_PER_REQUEST...", extra={"context": "update_billing_mode"})
+                dynamodb.update_table(
+                    TableName=args.tableName,
+                    BillingMode='PAY_PER_REQUEST'
+                )
+                wait_for_table_active(dynamodb, args.tableName, target_billing_mode="PAY_PER_REQUEST")
         update_billing_mode(dynamodb, args.tableName, "ondemand", autoscaling,
                            max_read_units=args.maxReadUnits, max_write_units=args.maxWriteUnits)
         wait_for_table_active(dynamodb, args.tableName, target_billing_mode="PAY_PER_REQUEST")
