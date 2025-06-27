@@ -342,7 +342,7 @@ def update_billing_mode(dynamodb, table_name, mode, read=None, write=None, gsi_c
             if max_read_units is not None or max_write_units is not None:
                 logger.warning(json.dumps({
                     "context": "update_billing_mode",
-                    "message": "maxReadUnits and maxWriteUnits are only supported in PAY_PER_REQUEST mode. Ignoring."
+                    "message": "maxReadUnits and maxWriteUnits are ignored in PROVISIONED mode."
                 }))
         else:
             if current_mode == "PROVISIONED":
@@ -454,7 +454,6 @@ def register_scaling(autoscaling, table_name, dimension, min_capacity, max_capac
             "context": f"autoscaling.register.{dimension}",
             "message": f"Parameters for scalable target: min={min_capacity}, max={max_capacity}, target={target_utilization}"
         }))
-        # Deregister any existing scalable target to clear defaults
         try:
             autoscaling.deregister_scalable_target(
                 ServiceNamespace="dynamodb",
@@ -669,7 +668,6 @@ def main():
         "message": f"Found replica regions: {replica_regions}"
     }))
     if args.readMode == "provisioned" or args.writeMode == "provisioned":
-        # Deregister existing autoscaling targets to clear any defaults
         if current_mode == "PAY_PER_REQUEST":
             deregister_scaling(autoscaling, args.tableName, "dynamodb:table:ReadCapacityUnits")
             deregister_scaling(autoscaling, args.tableName, "dynamodb:table:WriteCapacityUnits")
@@ -711,17 +709,23 @@ def main():
                         conf["TargetWriteUtilization"],
                         index_name=index_name
                     )
+        logger.info(json.dumps({
+            "context": "pipeline.verification",
+            "message": f"Pipeline completed successfully for table {args.tableName} in region {args.region}"
+        }))
+        sys.exit(0)  # Explicit success exit code
     else:
         if current_mode == "PROVISIONED":
             deregister_scaling(autoscaling, args.tableName, "dynamodb:table:ReadCapacityUnits")
             deregister_scaling(autoscaling, args.tableName, "dynamodb:table:WriteCapacityUnits")
-            update_billing_mode(dynamodb, args.tableName, "ondemand",
-                               max_read_units=args.maxReadUnits, max_write_units=args.maxWriteUnits)
-            wait_for_table_active(dynamodb, args.tableName, target_billing_mode="PAY_PER_REQUEST")
-        else:
-            update_billing_mode(dynamodb, args.tableName, "ondemand",
-                               max_read_units=args.maxReadUnits, max_write_units=args.maxWriteUnits)
-            wait_for_table_active(dynamodb, args.tableName, target_billing_mode="PAY_PER_REQUEST")
+        update_billing_mode(dynamodb, args.tableName, "ondemand",
+                           max_read_units=args.maxReadUnits, max_write_units=args.maxWriteUnits)
+        wait_for_table_active(dynamodb, args.tableName, target_billing_mode="PAY_PER_REQUEST")
+        logger.info(json.dumps({
+            "context": "pipeline.verification",
+            "message": f"Pipeline completed successfully for table {args.tableName} in region {args.region}"
+        }))
+        sys.exit(0)  # Explicit success exit code
     all_regions = [args.region] + replica_regions
     for region in all_regions:
         region_dynamodb = boto3.client("dynamodb", region_name=region)
@@ -736,5 +740,6 @@ def main():
             "MaxReadRequestUnits": final_desc.get("OnDemandThroughput", {}).get("MaxReadRequestUnits", "Not set"),
             "MaxWriteRequestUnits": final_desc.get("OnDemandThroughput", {}).get("MaxWriteRequestUnits", "Not set")
         }))
+
 if __name__ == "__main__":
     main()
