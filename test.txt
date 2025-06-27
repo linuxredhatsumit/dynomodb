@@ -1,22 +1,23 @@
-{"timestamp": "2025-06-27 18:00:12", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"global_tables\", \"message\": \"Found replica regions: []\"}"}
-{"timestamp": "2025-06-27 18:00:12", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.deregister.dynamodb:table:ReadCapacityUnits\", \"message\": \"Deregistered scalable target for table/global_scaling_inidex_test\"}"}
-{"timestamp": "2025-06-27 18:00:12", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.deregister.dynamodb:table:WriteCapacityUnits\", \"message\": \"Deregistered scalable target for table/global_scaling_inidex_test\"}"}
-{"timestamp": "2025-06-27 18:00:12", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"wait_for_no_scaling\", \"message\": \"Autoscaling fully deregistered for table global_scaling_inidex_test after 0 seconds\"}"}
-{"timestamp": "2025-06-27 18:00:13", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.deregister.gsi\", \"message\": \"Deregistered scalable target for index referee-Index\"}"}
-{"timestamp": "2025-06-27 18:00:13", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.deregister.gsi\", \"message\": \"Deregistered scalable target for index referee-Index\"}"}
-{"timestamp": "2025-06-27 18:00:13", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"wait_for_no_scaling\", \"message\": \"Autoscaling fully deregistered for table global_scaling_inidex_test after 0 seconds\"}"}
-{"timestamp": "2025-06-27 18:00:13", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.deregister.gsi\", \"message\": \"Deregistered scalable target for index referrer-Index\"}"}
-{"timestamp": "2025-06-27 18:00:13", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.deregister.gsi\", \"message\": \"Deregistered scalable target for index referrer-Index\"}"}
-{"timestamp": "2025-06-27 18:00:13", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"wait_for_no_scaling\", \"message\": \"Autoscaling fully deregistered for table global_scaling_inidex_test after 0 seconds\"}"}
-{"timestamp": "2025-06-27 18:00:13", "level": "INFO", "context": "update_billing_mode", "message": "Attempt 1/3: Removing provisioned throughput..."}
-{"timestamp": "2025-06-27 18:00:14", "level": "WARNING", "context": "autoscaling", "message": "{\"context\": \"update_billing_mode\", \"warning\": \"Validation error on attempt 1: Table write capacity should either be Pay-Per-Request or AutoScaled.. Retrying after 10 seconds...\"}"}
-{"timestamp": "2025-06-27 18:00:25", "level": "INFO", "context": "update_billing_mode", "message": "Attempt 2/3: Removing provisioned throughput..."}
-{"timestamp": "2025-06-27 18:00:26", "level": "WARNING", "context": "autoscaling", "message": "{\"context\": \"update_billing_mode\", \"warning\": \"Validation error on attempt 2: Table write capacity should either be Pay-Per-Request or AutoScaled.. Retrying after 10 seconds...\"}"}
-{"timestamp": "2025-06-27 18:00:36", "level": "INFO", "context": "update_billing_mode", "message": "Attempt 3/3: Removing provisioned throughput..."}
+
+{"timestamp": "2025-06-27 18:08:40", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"global_tables\", \"message\": \"Table global_scaling_inidex_test is not a Global Table or has no replicas.\"}"}
+{"timestamp": "2025-06-27 18:08:40", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"global_tables\", \"message\": \"Found replica regions: []\"}"}
+{"timestamp": "2025-06-27 18:08:40", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"wait_for_no_scaling\", \"message\": \"Autoscaling fully deregistered for table/global_scaling_inidex_test with dynamodb:table:ReadCapacityUnits after 0 seconds\"}"}
+{"timestamp": "2025-06-27 18:08:40", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.deregister.dynamodb:table:ReadCapacityUnits\", \"message\": \"Deregistered scalable target for table/global_scaling_inidex_test\"}"}
+{"timestamp": "2025-06-27 18:08:40", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"wait_for_no_scaling\", \"message\": \"Autoscaling fully deregistered for table/global_scaling_inidex_test with dynamodb:table:WriteCapacityUnits after 0 seconds\"}"}
+{"timestamp": "2025-06-27 18:08:40", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.deregister.dynamodb:table:WriteCapacityUnits\", \"message\": \"Deregistered scalable target for table/global_scaling_inidex_test\"}"}
+{"timestamp": "2025-06-27 18:08:41", "level": "INFO", "context": "update_billing_mode", "message": "Attempt 1/5: Switching to PAY_PER_REQUEST..."}
+{"timestamp": "2025-06-27 18:08:42", "level": "WARNING", "context": "autoscaling", "message": "{\"context\": \"update_billing_mode\", \"warning\": \"Validation error on attempt 1: Table write capacity should either be Pay-Per-Request or AutoScaled.. Retrying after 15 seconds...\"}"}
+{"timestamp": "2025-06-27 18:08:57", "level": "INFO", "context": "update_billing_mode", "message": "Attempt 2/5: Switching to PAY_PER_REQUEST..."}
+{"timestamp": "2025-06-27 18:08:58", "level": "WARNING", "context": "autoscaling", "message": "{\"context\": \"update_billing_mode\", \"warning\": \"Validation error on attempt 2: Table write capacity should either be Pay-Per-Request or AutoScaled.. Retrying after 15 seconds...\"}"}
+{"timestamp": "2025-06-27 18:09:13", "level": "INFO", "context": "update_billing_mode", "message": "Attempt 3/5: Switching to PAY_PER_REQUEST..."}
+{"timestamp": "2025-06-27 18:09:14", "level": "WARNING", "context": "autoscaling", "message": "{\"context\": \"update_billing_mode\", \"warning\": \"Validation error on attempt 3: Table write capacity should either be Pay-Per-Request or AutoScaled.. Retrying after 15 seconds...\"}"}
+{"timestamp": "2025-06-27 18:09:29", "level": "INFO", "context": "update_billing_mode", "message": "Attempt 4/5: Switching to PAY_PER_REQUEST..."}
+{"timestamp": "2025-06-27 18:09:30", "level": "WARNING", "context": "autoscaling", "message": "{\"context\": \"update_billing_mode\", \"warning\": \"Validation error on attempt 4: Table write capacity should either be Pay-Per-Request or AutoScaled.. Retrying after 15 seconds...\"}"}
+{"timestamp": "2025-06-27 18:09:45", "level": "INFO", "context": "update_billing_mode", "message": "Attempt 5/5: Switching to PAY_PER_REQUEST..."}
 Traceback (most recent call last):
-  File "manage_dynamodb_autoscaling.py", line 882, in <module>
+  File "manage_dynamodb_autoscaling.py", line 786, in <module>
     main()
-  File "manage_dynamodb_autoscaling.py", line 843, in main
+  File "manage_dynamodb_autoscaling.py", line 747, in main
     dynamodb.update_table(
   File "/home/app_user/workspace/Agent1/_work/355/s/others/dynamodb-scale/dynomoscaleenv/lib/python3.8/site-packages/botocore/client.py", line 570, in _api_call
     return self._make_api_call(operation_name, kwargs)
