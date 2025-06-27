@@ -28,21 +28,34 @@ def get_table_description(dynamodb, table_name):
     try:
         return dynamodb.describe_table(TableName=table_name)['Table']
     except ClientError as e:
-        logger.error(json.dumps({"context": "describe_table", "error": str(e)}))
+        logger.error(json.dumps({"context": "describe_table", "error": f"AWS Error: {e.response['Error']['Code']} - {e.response['Error']['Message']}"}))
         sys.exit(1)
 
-def wait_for_table_active(dynamodb, table_name):
-    while True:
+def wait_for_table_active(dynamodb, table_name, target_billing_mode=None):
+    max_attempts = 60
+    attempt = 0
+    while attempt < max_attempts:
         desc = get_table_description(dynamodb, table_name)
-        if desc['TableStatus'] == 'ACTIVE':
-            break
-        logger.info("Waiting for table to become ACTIVE...", extra={"context": "wait_for_table_active"})
+        current_billing_mode = desc.get('BillingModeSummary', {}).get('BillingMode', 'PROVISIONED')
+        if desc['TableStatus'] == 'ACTIVE' and (target_billing_mode is None or current_billing_mode == target_billing_mode):
+            logger.info(json.dumps({
+                "context": "wait_for_table_active",
+                "message": f"Table {table_name} is ACTIVE with BillingMode {current_billing_mode}"
+            }))
+            return
+        logger.info(json.dumps({
+            "context": "wait_for_table_active",
+            "message": f"Waiting for table {table_name} to become ACTIVE and BillingMode {target_billing_mode}... (current: {desc['TableStatus']}, {current_billing_mode})"
+        }))
         time.sleep(5)
+        attempt += 1
+    logger.error(json.dumps({
+        "context": "wait_for_table_active",
+        "error": f"Timeout waiting for table {table_name} to reach ACTIVE status and BillingMode {target_billing_mode}"
+    }))
+    sys.exit(1)
 
 def get_replica_regions(dynamodb, table_name):
-    """
-    Get the list of regions where the table has replicas (for Global Tables).
-    """
     try:
         response = dynamodb.list_global_tables()
         global_tables = response.get('GlobalTables', [])
@@ -60,40 +73,33 @@ def get_replica_regions(dynamodb, table_name):
         }))
         return []
     except ClientError as e:
-        logger.error(json.dumps({"context": "global_tables", "error": str(e)}))
+        logger.error(json.dumps({"context": "global_tables", "error": f"AWS Error: {e.response['Error']['Code']} - {e.response['Error']['Message']}"}))
         sys.exit(1)
 
 def load_gsi_config(table_name, check_gsi):
     if not check_gsi:
         logger.info("checkGSI is false. Skipping GSI config load.", extra={"context": "config.load"})
         return {}
-
     repo_root = os.environ.get("Build_SourcesDirectory", ".")
     repo_name = os.environ.get("REPOSITORY_NAME", "gsi-config-repo")
     folder_path = os.path.join(repo_root, repo_name, table_name)
     file_path = os.path.join(folder_path, "scaling.json")
-
     logger.info(f"Looking for config file at: {file_path}", extra={"context": "config.load"})
-
     if not os.path.exists(folder_path):
         logger.warning(json.dumps({
             "context": "config.load",
             "message": f"Table folder not found at: {folder_path}. Assuming no GSIs."
         }))
         return {}
-
     if not os.path.exists(file_path):
         logger.warning(json.dumps({
             "context": "config.load",
             "message": f"Scaling config file not found at: {file_path}. Assuming no GSIs."
         }))
         return {}
-
     try:
         with open(file_path, "r") as f:
             gsi_config = json.load(f)
-        
-        # Validate GSI configuration
         valid_projection_types = {"ALL", "KEYS_ONLY", "INCLUDE"}
         for index_name, conf in gsi_config.items():
             if "ProjectionType" in conf and conf["ProjectionType"] not in valid_projection_types:
@@ -114,7 +120,6 @@ def load_gsi_config(table_name, check_gsi):
                     "error": f"NonKeyAttributes for index {index_name} must be a list"
                 }))
                 sys.exit(1)
-        
         logger.info(json.dumps({"context": "config.load", "message": f"Loaded GSI config: {gsi_config}"}))
         return gsi_config
     except json.JSONDecodeError as e:
@@ -125,7 +130,6 @@ def validate_gsi_config(desc, gsi_config, check_gsi):
     if not check_gsi or not gsi_config:
         logger.info("No GSI config to validate (checkGSI=false or no config found).", extra={"context": "config.validate"})
         return
-
     actual_indexes = set(gsi['IndexName'] for gsi in desc.get("GlobalSecondaryIndexes", []))
     config_indexes = set(gsi_config.keys())
     if actual_indexes != config_indexes:
@@ -138,17 +142,12 @@ def validate_gsi_config(desc, gsi_config, check_gsi):
         sys.exit(1)
 
 def update_gsi_configuration(dynamodb, table_name, gsi_config):
-    """
-    Update GSI configurations, including throughput and projection attributes.
-    If projection attributes differ, delete and recreate the GSI with AttributeDefinitions.
-    """
     try:
         updated = False
         table_desc = dynamodb.describe_table(TableName=table_name)["Table"]
         existing_gsis = {gsi["IndexName"]: gsi for gsi in table_desc.get("GlobalSecondaryIndexes", [])}
         table_attribute_definitions = table_desc.get("AttributeDefinitions", [])
         gsi_updates = []
-
         for index_name, conf in gsi_config.items():
             existing = existing_gsis.get(index_name)
             if not existing:
@@ -157,17 +156,12 @@ def update_gsi_configuration(dynamodb, table_name, gsi_config):
                     "message": f"GSI {index_name} not found in table. Skipping update."
                 }))
                 continue
-
             projection_needs_update = False
             throughput_needs_update = False
-
-            # Check projection attributes
             current_projection = existing.get("Projection", {})
             desired_projection_type = conf.get("ProjectionType", current_projection.get("ProjectionType", "ALL"))
             desired_non_key_attributes = conf.get("NonKeyAttributes", [])
             current_non_key_attributes = current_projection.get("NonKeyAttributes", [])
-
-            # Log current and desired projection attributes for debugging
             logger.info(json.dumps({
                 "context": "gsi.update",
                 "message": f"Checking projection attributes for GSI {index_name}",
@@ -176,8 +170,6 @@ def update_gsi_configuration(dynamodb, table_name, gsi_config):
                 "current_non_key_attributes": current_non_key_attributes,
                 "desired_non_key_attributes": desired_non_key_attributes
             }))
-
-            # Compare projection attributes
             if (current_projection.get("ProjectionType") != desired_projection_type or
                     sorted(current_non_key_attributes or []) != sorted(desired_non_key_attributes or [])):
                 projection_needs_update = True
@@ -185,8 +177,6 @@ def update_gsi_configuration(dynamodb, table_name, gsi_config):
                     "context": "gsi.update",
                     "message": f"Projection attributes for GSI {index_name} need updating: current={current_projection}, desired={{'ProjectionType': '{desired_projection_type}', 'NonKeyAttributes': {desired_non_key_attributes}}}"
                 }))
-
-            # Check throughput
             current_throughput = existing.get("ProvisionedThroughput", {})
             desired_throughput = {
                 "ReadCapacityUnits": conf.get("ReadCapacityUnits", 5),
@@ -203,12 +193,10 @@ def update_gsi_configuration(dynamodb, table_name, gsi_config):
                     "desired_read_capacity": desired_throughput["ReadCapacityUnits"],
                     "desired_write_capacity": desired_throughput["WriteCapacityUnits"]
                 }))
-
             if projection_needs_update:
-                # Delete GSI
                 logger.info(json.dumps({
                     "context": "gsi.update",
-                    "message": f"Deleting GGI {index_name} to update projection attributes"
+                    "message": f"Deleting GSI {index_name} to update projection attributes"
                 }))
                 gsi_updates.append({
                     "Delete": {
@@ -221,8 +209,6 @@ def update_gsi_configuration(dynamodb, table_name, gsi_config):
                 )
                 wait_for_table_active(dynamodb, table_name)
                 gsi_updates = []
-
-                # Prepare AttributeDefinitions for GSI creation
                 key_attributes = [ks["AttributeName"] for ks in existing["KeySchema"]]
                 required_attributes = set(key_attributes + desired_non_key_attributes)
                 attribute_definitions = []
@@ -233,7 +219,6 @@ def update_gsi_configuration(dynamodb, table_name, gsi_config):
                     "customerid": "N",
                     "email": "S"
                 }
-
                 for attr in required_attributes:
                     attr_type = attribute_types.get(attr)
                     if not attr_type:
@@ -246,8 +231,6 @@ def update_gsi_configuration(dynamodb, table_name, gsi_config):
                         "AttributeName": attr,
                         "AttributeType": attr_type
                     })
-
-                # Recreate GSI
                 create_update = {
                     "Create": {
                         "IndexName": index_name,
@@ -263,7 +246,6 @@ def update_gsi_configuration(dynamodb, table_name, gsi_config):
                 gsi_updates.append(create_update)
                 updated = True
             elif throughput_needs_update:
-                # Update throughput only
                 gsi_updates.append({
                     "Update": {
                         "IndexName": index_name,
@@ -271,13 +253,11 @@ def update_gsi_configuration(dynamodb, table_name, gsi_config):
                     }
                 })
                 updated = True
-
         if gsi_updates:
             logger.info(json.dumps({
                 "context": "gsi.update",
                 "message": f"Applying GSI updates: {gsi_updates}"
             }))
-            # Include AttributeDefinitions when creating GSIs
             update_kwargs = {
                 "TableName": table_name,
                 "GlobalSecondaryIndexUpdates": gsi_updates
@@ -288,12 +268,9 @@ def update_gsi_configuration(dynamodb, table_name, gsi_config):
                     "context": "gsi.update",
                     "message": f"Including AttributeDefinitions: {attribute_definitions}"
                 }))
-
             dynamodb.update_table(**update_kwargs)
             logger.info("GSI configuration update submitted. Waiting 10 seconds before continuing...")
             time.sleep(10)
-
-        # Verify final GSI configuration
         final_desc = dynamodb.describe_table(TableName=table_name)["Table"]
         for gsi in final_desc.get("GlobalSecondaryIndexes", []):
             name = gsi["IndexName"]
@@ -309,18 +286,17 @@ def update_gsi_configuration(dynamodb, table_name, gsi_config):
                 "ProjectionType": projection.get("ProjectionType"),
                 "NonKeyAttributes": projection.get("NonKeyAttributes", [])
             }))
-
         return updated
-
     except ClientError as e:
-        logger.error(json.dumps({"context": "gsi.update", "error": str(e)}))
+        logger.error(json.dumps({"context": "gsi.update", "error": f"AWS Error: {e.response['Error']['Code']} - {e.response['Error']['Message']}"}))
         sys.exit(1)
 
 def update_billing_mode(dynamodb, table_name, mode, read=None, write=None, gsi_config=None, max_read_units=None, max_write_units=None):
     try:
         updated = False
         table_desc = dynamodb.describe_table(TableName=table_name)["Table"]
-        current_mode = table_desc.get("BillingModeSummary", {}).get("BillingMode", "PROVISIONED")
+        current_mode = table_desc.get('BillingModeSummary', {}).get('BillingMode', 'PROVISIONED')
+        existing_gsis = table_desc.get("GlobalSecondaryIndexes", [])
 
         if mode.upper() == "PROVISIONED":
             if current_mode == "PAY_PER_REQUEST":
@@ -333,37 +309,41 @@ def update_billing_mode(dynamodb, table_name, mode, read=None, write=None, gsi_c
                         'WriteCapacityUnits': write or 5
                     }
                 }
-
-                if gsi_config:
+                if existing_gsis:
                     gsi_updates = []
-                    for gsi_name, conf in gsi_config.items():
+                    for gsi in existing_gsis:
+                        gsi_name = gsi["IndexName"]
+                        gsi_throughput = gsi_config.get(gsi_name, {}).get("ProvisionedThroughput", {
+                            "ReadCapacityUnits": 5,
+                            "WriteCapacityUnits": 5
+                        })
                         gsi_updates.append({
                             'Update': {
                                 'IndexName': gsi_name,
                                 'ProvisionedThroughput': {
-                                    'ReadCapacityUnits': conf.get("ReadCapacityUnits", 5),
-                                    'WriteCapacityUnits': conf.get("WriteCapacityUnits", 5)
+                                    'ReadCapacityUnits': gsi_throughput.get("ReadCapacityUnits", 5),
+                                    'WriteCapacityUnits': gsi_throughput.get("WriteCapacityUnits", 5)
                                 }
                             }
                         })
                     update_kwargs["GlobalSecondaryIndexUpdates"] = gsi_updates
-
+                    logger.info(json.dumps({
+                        "context": "update_billing_mode",
+                        "message": f"Including GSI updates for PROVISIONED mode: {gsi_updates}"
+                    }))
                 dynamodb.update_table(**update_kwargs)
                 updated = True
                 logger.info("Table and GSIs switched to PROVISIONED.", extra={"context": "update_billing_mode"})
-                wait_for_table_active(dynamodb, table_name)
+                wait_for_table_active(dynamodb, table_name, target_billing_mode="PROVISIONED")
             else:
                 logger.info("Table already in PROVISIONED mode. Checking GSI configuration...", extra={"context": "gsi.update"})
                 if gsi_config:
                     updated = update_gsi_configuration(dynamodb, table_name, gsi_config) or updated
-
-            # Warn if maxReadUnits or maxWriteUnits are provided in PROVISIONED mode
             if max_read_units is not None or max_write_units is not None:
                 logger.warning(json.dumps({
                     "context": "update_billing_mode",
                     "message": "maxReadUnits and maxWriteUnits are only supported in PAY_PER_REQUEST mode. Ignoring."
                 }))
-
         else:
             if current_mode == "PROVISIONED":
                 logger.info("Switching table to PAY_PER_REQUEST mode...", extra={"context": "update_billing_mode"})
@@ -391,9 +371,8 @@ def update_billing_mode(dynamodb, table_name, mode, read=None, write=None, gsi_c
                     }))
                 dynamodb.update_table(**update_kwargs)
                 updated = True
-                wait_for_table_active(dynamodb, table_name)
+                wait_for_table_active(dynamodb, table_name, target_billing_mode="PAY_PER_REQUEST")
             else:
-                # Update OnDemandThroughput if already in PAY_PER_REQUEST mode
                 if max_read_units is not None or max_write_units is not None:
                     logger.info("Table already in PAY_PER_REQUEST mode. Updating OnDemandThroughput...", extra={"context": "update_billing_mode"})
                     update_kwargs = {
@@ -419,15 +398,12 @@ def update_billing_mode(dynamodb, table_name, mode, read=None, write=None, gsi_c
                     }))
                     dynamodb.update_table(**update_kwargs)
                     updated = True
-                    wait_for_table_active(dynamodb, table_name)
+                    wait_for_table_active(dynamodb, table_name, target_billing_mode="PAY_PER_REQUEST")
                 else:
                     logger.info("Table already in PAY_PER_REQUEST mode with no OnDemandThroughput changes.", extra={"context": "update_billing_mode"})
-
         if not updated:
             logger.info("No updates found for table or GSIs.", extra={"context": "update_billing_mode"})
             return
-
-        # Verify final table configuration
         final_desc = dynamodb.describe_table(TableName=table_name)["Table"]
         logger.info(json.dumps({
             "context": "table.verification",
@@ -439,9 +415,8 @@ def update_billing_mode(dynamodb, table_name, mode, read=None, write=None, gsi_c
             "MaxReadRequestUnits": final_desc.get("OnDemandThroughput", {}).get("MaxReadRequestUnits", "Not set"),
             "MaxWriteRequestUnits": final_desc.get("OnDemandThroughput", {}).get("MaxWriteRequestUnits", "Not set")
         }))
-
     except ClientError as e:
-        logger.error(json.dumps({"context": "update_billing_mode", "error": str(e)}))
+        logger.error(json.dumps({"context": "update_billing_mode", "error": f"AWS Error: {e.response['Error']['Code']} - {e.response['Error']['Message']}"}))
         sys.exit(1)
 
 def register_scaling(autoscaling, table_name, dimension, min_capacity, max_capacity, target_utilization, index_name=None):
@@ -455,25 +430,57 @@ def register_scaling(autoscaling, table_name, dimension, min_capacity, max_capac
             "error": "Index name is required for GSI autoscaling"
         }))
         sys.exit(1)
-
     policy_name = f"{resource_id.replace('/', '-')}-{dimension.split(':')[-1]}-policy"
-
     try:
-        # Check existing scalable target
+        if min_capacity < 1:
+            logger.error(json.dumps({
+                "context": f"autoscaling.register.{dimension}",
+                "error": f"MinCapacity must be >= 1, got {min_capacity}"
+            }))
+            sys.exit(1)
+        if max_capacity < min_capacity:
+            logger.error(json.dumps({
+                "context": f"autoscaling.register.{dimension}",
+                "error": f"MaxCapacity must be >= MinCapacity, got max={max_capacity}, min={min_capacity}"
+            }))
+            sys.exit(1)
+        if target_utilization <= 0 or target_utilization > 100:
+            logger.error(json.dumps({
+                "context": f"autoscaling.register.{dimension}",
+                "error": f"TargetUtilization must be between 1 and 100, got {target_utilization}"
+            }))
+            sys.exit(1)
+        logger.info(json.dumps({
+            "context": f"autoscaling.register.{dimension}",
+            "message": f"Parameters for scalable target: min={min_capacity}, max={max_capacity}, target={target_utilization}"
+        }))
+        # Deregister any existing scalable target to clear defaults
+        try:
+            autoscaling.deregister_scalable_target(
+                ServiceNamespace="dynamodb",
+                ResourceId=resource_id,
+                ScalableDimension=dimension
+            )
+            logger.info(json.dumps({
+                "context": f"autoscaling.cleanup.{dimension}",
+                "message": f"Deregistered existing scalable target for {resource_id}"
+            }))
+        except ClientError as e:
+            if e.response['Error']['Code'] != 'ObjectNotFoundException':
+                logger.warning(json.dumps({
+                    "context": f"autoscaling.cleanup.{dimension}",
+                    "warning": f"Failed to deregister existing scalable target: {e.response['Error']['Code']} - {e.response['Error']['Message']}"
+                }))
         scalable_targets = autoscaling.describe_scalable_targets(
             ServiceNamespace='dynamodb',
             ResourceIds=[resource_id],
             ScalableDimension=dimension
         )['ScalableTargets']
-
-        # Check existing policy
         existing_policies = autoscaling.describe_scaling_policies(
             ServiceNamespace='dynamodb',
             ResourceId=resource_id,
             ScalableDimension=dimension
         )['ScalingPolicies']
-
-        # Check if existing scalable target and policy match desired settings
         policy_matches = False
         if scalable_targets and existing_policies:
             target = scalable_targets[0]
@@ -481,7 +488,6 @@ def register_scaling(autoscaling, table_name, dimension, min_capacity, max_capac
             current_min = target.get('MinCapacity', 0)
             current_max = target.get('MaxCapacity', 0)
             current_target_value = policy.get('TargetTrackingScalingPolicyConfiguration', {}).get('TargetValue', 0)
-
             if (current_min == min_capacity and
                 current_max == max_capacity and
                 current_target_value == target_utilization and
@@ -492,13 +498,6 @@ def register_scaling(autoscaling, table_name, dimension, min_capacity, max_capac
                     "message": f"No updates needed for autoscaling policy: {policy_name}, settings already match (min={min_capacity}, max={max_capacity}, target={target_utilization})"
                 }))
                 return
-
-        # If no match, proceed with registration
-        logger.info(json.dumps({
-            "context": f"autoscaling.register.{dimension}",
-            "message": f"Registering scalable target: min={min_capacity}, max={max_capacity}, target={target_utilization}"
-        }))
-
         autoscaling.register_scalable_target(
             ServiceNamespace="dynamodb",
             ResourceId=resource_id,
@@ -506,8 +505,6 @@ def register_scaling(autoscaling, table_name, dimension, min_capacity, max_capac
             MinCapacity=min_capacity,
             MaxCapacity=max_capacity
         )
-
-        # Delete existing policies if they exist
         for pol in existing_policies:
             logger.info(json.dumps({
                 "context": f"autoscaling.cleanup.{dimension}",
@@ -519,7 +516,6 @@ def register_scaling(autoscaling, table_name, dimension, min_capacity, max_capac
                 ResourceId=resource_id,
                 ScalableDimension=dimension
             )
-
         autoscaling.put_scaling_policy(
             PolicyName=policy_name,
             ServiceNamespace="dynamodb",
@@ -527,7 +523,7 @@ def register_scaling(autoscaling, table_name, dimension, min_capacity, max_capac
             ScalableDimension=dimension,
             PolicyType='TargetTrackingScaling',
             TargetTrackingScalingPolicyConfiguration={
-                'TargetValue': target_utilization,
+                'TargetValue': float(target_utilization),
                 'PredefinedMetricSpecification': {
                     'PredefinedMetricType': 'DynamoDBReadCapacityUtilization'
                     if "Read" in dimension else 'DynamoDBWriteCapacityUtilization'
@@ -536,16 +532,39 @@ def register_scaling(autoscaling, table_name, dimension, min_capacity, max_capac
                 'ScaleOutCooldown': 60
             }
         )
-
         logger.info(json.dumps({
             "context": f"autoscaling.register.{dimension}",
             "message": "Scaling policy registered successfully"
         }))
-
+        scalable_targets = autoscaling.describe_scalable_targets(
+            ServiceNamespace='dynamodb',
+            ResourceIds=[resource_id],
+            ScalableDimension=dimension
+        )['ScalableTargets']
+        if scalable_targets:
+            target = scalable_targets[0]
+            logger.info(json.dumps({
+                "context": f"autoscaling.verification.{dimension}",
+                "message": f"Verified autoscaling settings for {resource_id}",
+                "MinCapacity": target.get('MinCapacity'),
+                "MaxCapacity": target.get('MaxCapacity')
+            }))
+        policies = autoscaling.describe_scaling_policies(
+            ServiceNamespace='dynamodb',
+            ResourceId=resource_id,
+            ScalableDimension=dimension
+        )['ScalingPolicies']
+        if policies:
+            policy = policies[0]
+            logger.info(json.dumps({
+                "context": f"autoscaling.verification.{dimension}",
+                "message": f"Verified scaling policy for {resource_id}",
+                "TargetValue": policy.get('TargetTrackingScalingPolicyConfiguration', {}).get('TargetValue')
+            }))
     except ClientError as e:
         logger.error(json.dumps({
             "context": f"autoscaling.register.{dimension}",
-            "error": str(e)
+            "error": f"AWS Error: {e.response['Error']['Code']} - {e.response['Error']['Message']}"
         }))
         sys.exit(1)
 
@@ -556,8 +575,16 @@ def deregister_scaling(autoscaling, table_name, dimension):
             ResourceId=f"table/{table_name}",
             ScalableDimension=dimension
         )
+        logger.info(json.dumps({
+            "context": f"autoscaling.deregister.{dimension}",
+            "message": f"Deregistered scalable target for table/{table_name}"
+        }))
     except ClientError as e:
-        logger.warning(json.dumps({"context": f"autoscaling.deregister.{dimension}", "warning": str(e)}))
+        if e.response['Error']['Code'] != 'ObjectNotFoundException':
+            logger.warning(json.dumps({
+                "context": f"autoscaling.deregister.{dimension}",
+                "warning": f"Failed to deregister: {e.response['Error']['Code']} - {e.response['Error']['Message']}"
+            }))
 
 def main():
     parser = argparse.ArgumentParser()
@@ -576,23 +603,55 @@ def main():
     parser.add_argument("--checkGSI", type=lambda x: x.lower() == 'true', default=True)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
-
-    # Log received arguments for debugging
+    if args.readMode == "provisioned":
+        if args.minRead is None or args.minRead < 1:
+            logger.error(json.dumps({
+                "context": "args.validation",
+                "error": f"minRead must be >= 1 for PROVISIONED mode, got {args.minRead}"
+            }))
+            sys.exit(1)
+        if args.maxRead is None or args.maxRead < args.minRead:
+            logger.error(json.dumps({
+                "context": "args.validation",
+                "error": f"maxRead must be >= minRead, got maxRead={args.maxRead}, minRead={args.minRead}"
+            }))
+            sys.exit(1)
+        if args.targetRead is None or args.targetRead <= 0 or args.targetRead > 100:
+            logger.error(json.dumps({
+                "context": "args.validation",
+                "error": f"targetRead must be between 1 and 100, got {args.targetRead}"
+            }))
+            sys.exit(1)
+    if args.writeMode == "provisioned":
+        if args.minWrite is None or args.minWrite < 1:
+            logger.error(json.dumps({
+                "context": "args.validation",
+                "error": f"minWrite must be >= 1 for PROVISIONED mode, got {args.minWrite}"
+            }))
+            sys.exit(1)
+        if args.maxWrite is None or args.maxWrite < args.minWrite:
+            logger.error(json.dumps({
+                "context": "args.validation",
+                "error": f"maxWrite must be >= minWrite, got maxWrite={args.maxWrite}, minWrite={args.minWrite}"
+            }))
+            sys.exit(1)
+        if args.targetWrite is None or args.targetWrite <= 0 or args.targetWrite > 100:
+            logger.error(json.dumps({
+                "context": "args.validation",
+                "error": f"targetWrite must be between 1 and 100, got {args.targetWrite}"
+            }))
+            sys.exit(1)
     logger.info(json.dumps({
         "context": "args",
         "message": f"Received arguments: tableName={args.tableName}, region={args.region}, readMode={args.readMode}, writeMode={args.writeMode}, minRead={args.minRead}, maxRead={args.maxRead}, targetRead={args.targetRead}, minWrite={args.minWrite}, maxWrite={args.maxWrite}, targetWrite={args.targetWrite}, maxReadUnits={args.maxReadUnits}, maxWriteUnits={args.maxWriteUnits}, checkGSI={args.checkGSI}, dry-run={args.dry_run}"
     }))
-
     dynamodb = boto3.client("dynamodb", region_name=args.region)
     autoscaling = boto3.client("application-autoscaling", region_name=args.region)
-
     logger.info("Found credentials from IAM Role: vpn-access", extra={"context": "autoscaling"})
-
     desc = get_table_description(dynamodb, args.tableName)
     current_mode = desc.get('BillingModeSummary', {}).get('BillingMode', 'PROVISIONED')
     gsi_config = load_gsi_config(args.tableName, args.checkGSI)
     validate_gsi_config(desc, gsi_config, args.checkGSI)
-
     if args.dry_run:
         logger.info(json.dumps({
             "context": "dry_run",
@@ -604,37 +663,34 @@ def main():
             "maxWriteUnits": args.maxWriteUnits
         }))
         sys.exit(0)
-
-    # Handle Global Tables: Get replica regions for verification
     replica_regions = get_replica_regions(dynamodb, args.tableName)
     logger.info(json.dumps({
         "context": "global_tables",
         "message": f"Found replica regions: {replica_regions}"
     }))
-
     if args.readMode == "provisioned" or args.writeMode == "provisioned":
+        # Deregister existing autoscaling targets to clear any defaults
+        if current_mode == "PAY_PER_REQUEST":
+            deregister_scaling(autoscaling, args.tableName, "dynamodb:table:ReadCapacityUnits")
+            deregister_scaling(autoscaling, args.tableName, "dynamodb:table:WriteCapacityUnits")
         update_billing_mode(dynamodb, args.tableName, "provisioned",
-                            read=args.targetRead, write=args.targetWrite,
-                            gsi_config=gsi_config,
-                            max_read_units=args.maxReadUnits,
-                            max_write_units=args.maxWriteUnits)
-        wait_for_table_active(dynamodb, args.tableName)
-
+                           read=args.minRead, write=args.minWrite,
+                           gsi_config=gsi_config,
+                           max_read_units=args.maxReadUnits,
+                           max_write_units=args.maxWriteUnits)
+        wait_for_table_active(dynamodb, args.tableName, target_billing_mode="PROVISIONED")
         if args.readMode == "provisioned":
             register_scaling(autoscaling, args.tableName, "dynamodb:table:ReadCapacityUnits",
-                             args.minRead or 5, args.maxRead or 100, args.targetRead or 70)
-
+                            args.minRead, args.maxRead, args.targetRead)
         if args.writeMode == "provisioned":
             register_scaling(autoscaling, args.tableName, "dynamodb:table:WriteCapacityUnits",
-                             args.minWrite or 5, args.maxWrite or 100, args.targetWrite or 70)
-
+                            args.minWrite, args.maxWrite, args.targetWrite)
         if args.checkGSI and gsi_config:
             for index_name, conf in gsi_config.items():
                 logger.info(json.dumps({
                     "context": "autoscaling.config",
                     "message": f"Applying autoscaling for index: {index_name}"
                 }))
-
                 if "MinReadCapacityUnits" in conf:
                     register_scaling(
                         autoscaling,
@@ -645,7 +701,6 @@ def main():
                         conf["TargetReadUtilization"],
                         index_name=index_name
                     )
-
                 if "MinWriteCapacityUnits" in conf:
                     register_scaling(
                         autoscaling,
@@ -656,20 +711,17 @@ def main():
                         conf["TargetWriteUtilization"],
                         index_name=index_name
                     )
-
     else:
         if current_mode == "PROVISIONED":
             deregister_scaling(autoscaling, args.tableName, "dynamodb:table:ReadCapacityUnits")
             deregister_scaling(autoscaling, args.tableName, "dynamodb:table:WriteCapacityUnits")
             update_billing_mode(dynamodb, args.tableName, "ondemand",
                                max_read_units=args.maxReadUnits, max_write_units=args.maxWriteUnits)
-            wait_for_table_active(dynamodb, args.tableName)
+            wait_for_table_active(dynamodb, args.tableName, target_billing_mode="PAY_PER_REQUEST")
         else:
             update_billing_mode(dynamodb, args.tableName, "ondemand",
                                max_read_units=args.maxReadUnits, max_write_units=args.maxWriteUnits)
-            wait_for_table_active(dynamodb, args.tableName)
-
-    # Verify final configuration in all regions (primary and replicas)
+            wait_for_table_active(dynamodb, args.tableName, target_billing_mode="PAY_PER_REQUEST")
     all_regions = [args.region] + replica_regions
     for region in all_regions:
         region_dynamodb = boto3.client("dynamodb", region_name=region)
@@ -684,6 +736,5 @@ def main():
             "MaxReadRequestUnits": final_desc.get("OnDemandThroughput", {}).get("MaxReadRequestUnits", "Not set"),
             "MaxWriteRequestUnits": final_desc.get("OnDemandThroughput", {}).get("MaxWriteRequestUnits", "Not set")
         }))
-
 if __name__ == "__main__":
     main()
