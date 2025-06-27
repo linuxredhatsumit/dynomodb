@@ -264,7 +264,7 @@ def switch_to_pay_per_request(dynamodb, table_name, gsi_config):
         logger.info(json.dumps({
             "context": "billing_mode",
             "message": f"Successfully switched table {table_name} to PAY_PER_REQUEST mode"
-        })
+        }))
 
         # Update GSIs to PAY_PER_REQUEST
         if gsi_config:
