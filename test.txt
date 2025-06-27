@@ -1,25 +1,28 @@
-{
-  "id-status-index": {
-    "ReadCapacityUnits": 1,
-    "WriteCapacityUnits": 1,
-    "MinReadCapacityUnits": 1,
-    "MaxReadCapacityUnits": 10,
-    "TargetReadUtilization": 50,
-    "MinWriteCapacityUnits": 1,
-    "MaxWriteCapacityUnits": 10,
-    "TargetWriteUtilization": 50,
-    "ProjectionType": "INCLUDE",
-    "NonKeyAttributes": ["mandateStatus", "customerid","email"]
-  },
-  "id-test-index": {
-    "ReadCapacityUnits": 1,
-    "WriteCapacityUnits": 1,
-    "MinReadCapacityUnits": 1,
-    "MaxReadCapacityUnits": 10,
-    "TargetReadUtilization": 50,
-    "MinWriteCapacityUnits": 1,
-    "MaxWriteCapacityUnits": 10,
-    "TargetWriteUtilization": 50,
-    "ProjectionType": "ALL"
-  }
-}
+/usr/bin/bash --noprofile --norc /home/app_user/workspace/Agent1/_work/_temp/7c59617e-8cdc-45e5-83de-520cb19997a1.sh
+Running DynamoDB Auto Scaling Management Script
+{"timestamp": "2025-06-27 14:45:36", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"args\", \"message\": \"Received arguments: tableName=test-for-dr-uat, region=ap-south-2, readMode=provisioned, writeMode=provisioned, minRead=1, maxRead=1, targetRead=90, minWrite=1, maxWrite=1, targetWrite=90, maxReadUnits=0, maxWriteUnits=None, checkGSI=False, dry-run=False\"}"}
+{"timestamp": "2025-06-27 14:45:36", "level": "INFO", "context": "autoscaling", "message": "Found credentials in environment variables."}
+{"timestamp": "2025-06-27 14:45:36", "level": "INFO", "context": "autoscaling", "message": "Found credentials from IAM Role: vpn-access"}
+{"timestamp": "2025-06-27 14:45:36", "level": "INFO", "context": "config.load", "message": "checkGSI is false. Skipping GSI config load."}
+{"timestamp": "2025-06-27 14:45:36", "level": "INFO", "context": "config.validate", "message": "No GSI config to validate (checkGSI=false or no config found)."}
+{"timestamp": "2025-06-27 14:45:36", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"global_tables\", \"message\": \"Table test-for-dr-uat is not a Global Table or has no replicas.\"}"}
+{"timestamp": "2025-06-27 14:45:36", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"global_tables\", \"message\": \"Found replica regions: []\"}"}
+{"timestamp": "2025-06-27 14:45:37", "level": "INFO", "context": "gsi.update", "message": "Table already in PROVISIONED mode. Checking GSI configuration..."}
+{"timestamp": "2025-06-27 14:45:37", "level": "WARNING", "context": "autoscaling", "message": "{\"context\": \"update_billing_mode\", \"message\": \"maxReadUnits and maxWriteUnits are ignored in PROVISIONED mode.\"}"}
+{"timestamp": "2025-06-27 14:45:37", "level": "INFO", "context": "update_billing_mode", "message": "No updates found for table or GSIs."}
+{"timestamp": "2025-06-27 14:45:37", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"wait_for_table_active\", \"message\": \"Table test-for-dr-uat is ACTIVE with BillingMode PROVISIONED\"}"}
+{"timestamp": "2025-06-27 14:45:37", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.register.dynamodb:table:ReadCapacityUnits\", \"message\": \"Parameters for scalable target: min=1, max=1, target=90\"}"}
+{"timestamp": "2025-06-27 14:45:37", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.cleanup.dynamodb:table:ReadCapacityUnits\", \"message\": \"Deregistered existing scalable target for table/test-for-dr-uat\"}"}
+{"timestamp": "2025-06-27 14:45:38", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.register.dynamodb:table:ReadCapacityUnits\", \"message\": \"Scaling policy registered successfully\"}"}
+{"timestamp": "2025-06-27 14:45:38", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.verification.dynamodb:table:ReadCapacityUnits\", \"message\": \"Verified autoscaling settings for table/test-for-dr-uat\", \"MinCapacity\": 1, \"MaxCapacity\": 1}"}
+{"timestamp": "2025-06-27 14:45:38", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.verification.dynamodb:table:ReadCapacityUnits\", \"message\": \"Verified scaling policy for table/test-for-dr-uat\", \"TargetValue\": 90.0}"}
+{"timestamp": "2025-06-27 14:45:38", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.register.dynamodb:table:WriteCapacityUnits\", \"message\": \"Parameters for scalable target: min=1, max=1, target=90\"}"}
+{"timestamp": "2025-06-27 14:45:38", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.cleanup.dynamodb:table:WriteCapacityUnits\", \"message\": \"Deregistered existing scalable target for table/test-for-dr-uat\"}"}
+{"timestamp": "2025-06-27 14:45:39", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.register.dynamodb:table:WriteCapacityUnits\", \"message\": \"Scaling policy registered successfully\"}"}
+{"timestamp": "2025-06-27 14:45:39", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.verification.dynamodb:table:WriteCapacityUnits\", \"message\": \"Verified autoscaling settings for table/test-for-dr-uat\", \"MinCapacity\": 1, \"MaxCapacity\": 1}"}
+{"timestamp": "2025-06-27 14:45:39", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.verification.dynamodb:table:WriteCapacityUnits\", \"message\": \"Verified scaling policy for table/test-for-dr-uat\", \"TargetValue\": 90.0}"}
+{"timestamp": "2025-06-27 14:45:39", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"pipeline.verification\", \"message\": \"Pipeline completed successfully for table test-for-dr-uat in region ap-south-2\"}"}
+/home/app_user/workspace/Agent1/_work/_temp/7c59617e-8cdc-45e5-83de-520cb19997a1.sh: line 24: --maxWriteUnits: command not found
+
+##[error]Bash exited with code '127'.
+Finishing: Configure DynamoDB Auto Scaling
