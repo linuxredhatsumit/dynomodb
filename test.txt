@@ -1,19 +1,2 @@
-Running DynamoDB Auto Scaling Management Script
-{"timestamp": "2025-06-27 16:36:20", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"args\", \"message\": \"Received arguments: tableName=test-table, region=ap-south-1, readMode=ondemand, writeMode=ondemand, minRead=1, maxRead=1, targetRead=70, minWrite=1, maxWrite=1, targetWrite=70, maxReadUnits=1, maxWriteUnits=1, checkGSI=True, dry-run=False\"}"}
-{"timestamp": "2025-06-27 16:36:20", "level": "INFO", "context": "autoscaling", "message": "Found credentials in environment variables."}
-{"timestamp": "2025-06-27 16:36:21", "level": "INFO", "context": "autoscaling", "message": "Found credentials from IAM Role: vpn-access"}
-{"timestamp": "2025-06-27 16:36:21", "level": "INFO", "context": "config.load", "message": "Looking for config file at: /home/app_user/workspace/Agent1/_work/355/s/k811-ddb-index/test-table/scaling.json"}
-{"timestamp": "2025-06-27 16:36:21", "level": "WARNING", "context": "autoscaling", "message": "{\"context\": \"config.load\", \"message\": \"Table folder not found at: /home/app_user/workspace/Agent1/_work/355/s/k811-ddb-index/test-table. Assuming no GSIs.\"}"}
-{"timestamp": "2025-06-27 16:36:21", "level": "INFO", "context": "config.validate", "message": "No GSI config to validate (checkGSI=false or no config found)."}
-{"timestamp": "2025-06-27 16:36:21", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"global_tables\", \"message\": \"Table test-table is not a Global Table or has no replicas.\"}"}
-{"timestamp": "2025-06-27 16:36:21", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"global_tables\", \"message\": \"Found replica regions: []\"}"}
-{"timestamp": "2025-06-27 16:36:21", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.deregister.dynamodb:table:ReadCapacityUnits\", \"message\": \"Deregistered scalable target for table/test-table\"}"}
-{"timestamp": "2025-06-27 16:36:22", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.deregister.dynamodb:table:WriteCapacityUnits\", \"message\": \"Deregistered scalable target for table/test-table\"}"}
-{"timestamp": "2025-06-27 16:36:22", "level": "INFO", "context": "update_billing_mode", "message": "Switching table to PAY_PER_REQUEST mode..."}
-{"timestamp": "2025-06-27 16:36:22", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"update_billing_mode\", \"message\": \"Setting maximum read request units to 1\"}"}
-{"timestamp": "2025-06-27 16:36:22", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"update_billing_mode\", \"message\": \"Setting maximum write request units to 1\"}"}
-{"timestamp": "2025-06-27 16:36:22", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"update_billing_mode\", \"message\": \"OnDemandThroughput parameter added to update request: {'MaxReadRequestUnits': 1, 'MaxWriteRequestUnits': 1}\"}"}
-{"timestamp": "2025-06-27 16:36:23", "level": "ERROR", "context": "autoscaling", "message": "{\"context\": \"update_billing_mode\", \"error\": \"AWS Error: ValidationException - Table write capacity should either be Pay-Per-Request or AutoScaled.\"}"}
-
-##[error]Bash exited with code '1'.
-Finishing: Configure DynamoDB Auto Scaling
+--maxReadUnits "${{ coalesce(parameters.maxReadUnits, 0) }}" \
+--maxWriteUnits "${{ coalesce(parameters.maxWriteUnits, 0) }}"
