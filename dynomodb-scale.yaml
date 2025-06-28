@@ -66,10 +66,10 @@ parameters:
     default: development
   - name: maxReadUnits
     type: number
-    default: null
+    default: 0
   - name: maxWriteUnits
     type: number
-    default: null
+    default: 0
 
 stages:
   - stage: DynamoDBOperation
@@ -135,9 +135,9 @@ stages:
                           --maxWrite \"${{ parameters.maxWrite }}\" \
                           --targetWrite \"${{ parameters.targetWrite }}\" \
                           --checkGSI \"${{ parameters.checkGSI }}\""
-                    # Add maxReadUnits and maxWriteUnits only if both are provided and not null
-                    if [ -n "${{ parameters.maxReadUnits }}" ] && [ "${{ parameters.maxReadUnits }}" != "null" ] && \
-                       [ -n "${{ parameters.maxWriteUnits }}" ] && [ "${{ parameters.maxWriteUnits }}" != "null" ]; then
+                    # Add maxReadUnits and maxWriteUnits only if both are non-zero and mode is ondemand
+                    if [ "${{ parameters.readMode }}" = "ondemand" ] && [ "${{ parameters.writeMode }}" = "ondemand" ] && \
+                       [ "${{ parameters.maxReadUnits }}" -gt 0 ] && [ "${{ parameters.maxWriteUnits }}" -gt 0 ]; then
                       ARGS="$ARGS --maxReadUnits \"${{ parameters.maxReadUnits }}\" --maxWriteUnits \"${{ parameters.maxWriteUnits }}\""
                     fi
                     # Run the command with quoted ARGS
