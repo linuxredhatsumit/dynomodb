@@ -341,7 +341,8 @@ def update_billing_mode(dynamodb, table_name, mode, read=None, write=None, gsi_c
                     'TableName': table_name,
                     'BillingMode': 'PAY_PER_REQUEST'
                 }
-                if max_read_units is not None or max_write_units is not None:
+                # Only include OnDemandThroughput if both max_read_units and max_write_units are provided
+                if max_read_units is not None and max_write_units is not None:
                     update_kwargs['OnDemandThroughput'] = {}
                     if max_read_units is not None:
                         update_kwargs['OnDemandThroughput']['MaxReadRequestUnits'] = max_read_units
@@ -355,6 +356,12 @@ def update_billing_mode(dynamodb, table_name, mode, read=None, write=None, gsi_c
                             "context": "update_billing_mode",
                             "message": f"Setting maximum write request units to {max_write_units}"
                         }))
+                else:
+                    logger.info(json.dumps({
+                        "context": "update_billing_mode",
+                        "message": "Skipping OnDemandThroughput settings as not both maxReadUnits and maxWriteUnits are provided"
+                    }))
+
                 dynamodb.update_table(**update_kwargs)
                 updated = True
                 wait_for_table_active(dynamodb, table_name)
@@ -381,7 +388,6 @@ def update_billing_mode(dynamodb, table_name, mode, read=None, write=None, gsi_c
     except ClientError as e:
         logger.error(json.dumps({"context": "update_billing_mode", "error": str(e)}))
         sys.exit(1)
-
 def register_scaling(autoscaling, table_name, dimension, min_capacity, max_capacity, target_utilization, index_name=None):
     if dimension.startswith("dynamodb:table:"):
         resource_id = f"table/{table_name}"
