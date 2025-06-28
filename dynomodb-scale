@@ -291,6 +291,7 @@ def update_gsi_configuration(dynamodb, table_name, gsi_config):
     except ClientError as e:
         logger.error(json.dumps({"context": "gsi.update", "error": str(e)}))
         sys.exit(1)
+
 def update_billing_mode(dynamodb, table_name, mode, read=None, write=None, gsi_config=None, max_read_units=None, max_write_units=None):
     try:
         updated = False
@@ -340,27 +341,23 @@ def update_billing_mode(dynamodb, table_name, mode, read=None, write=None, gsi_c
                     'TableName': table_name,
                     'BillingMode': 'PAY_PER_REQUEST'
                 }
-                # Only include OnDemandThroughput if both max_read_units and max_write_units are positive
+                
+                # Only include OnDemandThroughput if both max_read_units and max_write_units are provided and > 0
                 if max_read_units is not None and max_write_units is not None and max_read_units > 0 and max_write_units > 0:
-                    update_kwargs['OnDemandThroughput'] = {}
-                    if max_read_units > 0:
-                        update_kwargs['OnDemandThroughput']['MaxReadRequestUnits'] = max_read_units
-                        logger.info(json.dumps({
-                            "context": "update_billing_mode",
-                            "message": f"Setting maximum read request units to {max_read_units}"
-                        }))
-                    if max_write_units > 0:
-                        update_kwargs['OnDemandThroughput']['MaxWriteRequestUnits'] = max_write_units
-                        logger.info(json.dumps({
-                            "context": "update_billing_mode",
-                            "message": f"Setting maximum write request units to {max_write_units}"
-                        }))
+                    update_kwargs['OnDemandThroughput'] = {
+                        'MaxReadRequestUnits': max_read_units,
+                        'MaxWriteRequestUnits': max_write_units
+                    }
+                    logger.info(json.dumps({
+                        "context": "update_billing_mode",
+                        "message": f"Setting maximum read request units to {max_read_units} and write request units to {max_write_units}"
+                    }))
                 else:
                     logger.info(json.dumps({
                         "context": "update_billing_mode",
-                        "message": "Skipping OnDemandThroughput settings as not both maxReadUnits and maxWriteUnits are positive"
+                        "message": "No maximum read/write request units specified or values are 0. Using default on-demand settings."
                     }))
-
+                    
                 dynamodb.update_table(**update_kwargs)
                 updated = True
                 wait_for_table_active(dynamodb, table_name)
@@ -387,6 +384,7 @@ def update_billing_mode(dynamodb, table_name, mode, read=None, write=None, gsi_c
     except ClientError as e:
         logger.error(json.dumps({"context": "update_billing_mode", "error": str(e)}))
         sys.exit(1)
+
 def register_scaling(autoscaling, table_name, dimension, min_capacity, max_capacity, target_utilization, index_name=None):
     if dimension.startswith("dynamodb:table:"):
         resource_id = f"table/{table_name}"
@@ -405,7 +403,7 @@ def register_scaling(autoscaling, table_name, dimension, min_capacity, max_capac
         # Check existing scalable target
         scalable_targets = autoscaling.describe_scalable_targets(
             ServiceNamespace='dynamodb',
-            ResourceIds=[resource_id],  # Fixed: Use ResourceIds (plural) instead of ResourceId
+            ResourceIds=[resource_id],
             ScalableDimension=dimension
         )['ScalableTargets']
 
@@ -514,8 +512,8 @@ def main():
     parser.add_argument("--minWrite", type=int)
     parser.add_argument("--maxWrite", type=int)
     parser.add_argument("--targetWrite", type=int)
-    parser.add_argument("--maxReadUnits", type=int, default=None, help="Maximum read request units for PAY_PER_REQUEST mode (optional)")
-    parser.add_argument("--maxWriteUnits", type=int, default=None, help="Maximum write request units for PAY_PER_REQUEST mode (optional)")
+    parser.add_argument("--maxReadUnits", type=int, default=0, help="Maximum read request units for PAY_PER_REQUEST mode (optional)")
+    parser.add_argument("--maxWriteUnits", type=int, default=0, help="Maximum write request units for PAY_PER_REQUEST mode (optional)")
     parser.add_argument("--checkGSI", type=lambda x: x.lower() == 'true', default=True)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
@@ -523,7 +521,7 @@ def main():
     # Log received arguments for debugging
     logger.info(json.dumps({
         "context": "args",
-        "message": f"Received arguments: {vars(args)}"
+        "message": f"Received arguments: tableName={args.tableName}, region={args.region}, readMode={args.readMode}, writeMode={args.writeMode}, minRead={args.minRead}, maxRead={args.maxRead}, targetRead={args.targetRead}, minWrite={args.minWrite}, maxWrite={args.maxWrite}, targetWrite={args.targetWrite}, maxReadUnits={args.maxReadUnits}, maxWriteUnits={args.maxWriteUnits}, checkGSI={args.checkGSI}, dry-run={args.dry_run}"
     }))
 
     dynamodb = boto3.client("dynamodb", region_name=args.region)
@@ -593,8 +591,17 @@ def main():
         if current_mode == "PROVISIONED":
             deregister_scaling(autoscaling, args.tableName, "dynamodb:table:ReadCapacityUnits")
             deregister_scaling(autoscaling, args.tableName, "dynamodb:table:WriteCapacityUnits")
+            
+            # Only pass max units if both are provided and > 0
+            max_read = args.maxReadUnits if args.maxReadUnits and args.maxReadUnits > 0 else None
+            max_write = args.maxWriteUnits if args.maxWriteUnits and args.maxWriteUnits > 0 else None
+            
             update_billing_mode(dynamodb, args.tableName, "ondemand",
-                                max_read_units=args.maxReadUnits, max_write_units=args.maxWriteUnits)
+                              max_read_units=max_read, 
+                              max_write_units=max_write)
             wait_for_table_active(dynamodb, args.tableName)
         else:
             logger.info("Table already in PAY_PER_REQUEST mode. Nothing to do.", extra={"context": "mode_check"})
+
+if __name__ == "__main__":
+    main()
