@@ -1,14 +1,15 @@
 trigger: none
-#pool and agent details.
+
+# pool and agent details.
 variables:
   - group: Kotak-ECR-Credentials
-# Agent pool details
+  # Agent pool details
   - name: POOL_NAME
     value: k811-devops
     #value: k811-prod
   - name: AGENT_IN_AGENTPOOL
     value: 'Linux-Agent1'
-# python version to use from _tool
+  # python version to use from _tool
   - name: PYTHON_VERSION
     value: '3.10'
   - name: ROLE_NAME
@@ -25,7 +26,7 @@ variables:
 pool:
   name: $(POOL_NAME)
   demands:
-  - agent.name -equals $(AGENT_IN_AGENTPOOL)
+    - agent.name -equals $(AGENT_IN_AGENTPOOL)
 
 parameters:
   - name: tableName
@@ -39,23 +40,23 @@ parameters:
     type: string
     values: [ondemand, provisioned]
   - name: minRead
-    type: string
-    default: '5'
+    type: number
+    default: 5
   - name: maxRead
-    type: string
-    default: '100'
+    type: number
+    default: 100
   - name: targetRead
-    type: string
-    default: '70'
+    type: number
+    default: 70
   - name: minWrite
-    type: string
-    default: '5'
+    type: number
+    default: 5
   - name: maxWrite
-    type: string
-    default: '100'
+    type: number
+    default: 100
   - name: targetWrite
-    type: string
-    default: '70'
+    type: number
+    default: 70
   - name: checkGSI
     type: boolean
     default: true
@@ -90,9 +91,9 @@ stages:
                   env:
                     Build_SourcesDirectory: $(Build.SourcesDirectory)
                     REPOSITORY_NAME: $(REPOSITORY_NAME)
+                    PAT: $(PAT)  # Assuming PAT is in the variable group
                   condition: and(succeeded(), eq(${{ parameters.checkGSI }}, true))
                   displayName: "Clone GSI Config Repo"
-
 
                 - script: |
                     unset AWS_SESSION_TOKEN
@@ -102,15 +103,16 @@ stages:
                     export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
                     export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
                     export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-                    # Change to the dynomodbscale directory
+                    # Change to the dynamodb-scale directory
                     cd others/dynamodb-scale &&
                     echo "Setting up Python Environment"
                     python3 -m venv dynomoscaleenv
                     source dynomoscaleenv/bin/activate
                     pip3 install boto3 requests --upgrade
                   displayName: 'Execute Python Script for DynamoDB Operation'
-       
+
                 - script: |
+                    set -e
                     unset AWS_SESSION_TOKEN
                     unset AWS_SECRET_ACCESS_KEY
                     unset AWS_ACCESS_KEY_ID
@@ -120,24 +122,28 @@ stages:
                     export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
                     cd others/dynamodb-scale
                     source dynomoscaleenv/bin/activate
-                    echo "Running DynamoDB Auto Scaling Management Script" &&
-                    python3 manage_dynamodb_autoscaling.py \
-                    --tableName "${{ parameters.tableName }}" \
-                    --region "${{ parameters.region }}" \
-                    --readMode "${{ parameters.readMode }}" \
-                    --writeMode "${{ parameters.writeMode }}" \
-                    --minRead "${{ parameters.minRead }}" \
-                    --maxRead "${{ parameters.maxRead }}" \
-                    --targetRead "${{ parameters.targetRead }}" \
-                    --minWrite "${{ parameters.minWrite }}" \
-                    --maxWrite "${{ parameters.maxWrite }}" \
-                    --targetWrite "${{ parameters.targetWrite }}" \
-                    --checkGSI "${{ parameters.checkGSI }}" \
-                    ${{ if ne(parameters.maxReadUnits, null) }} --maxReadUnits "${{ parameters.maxReadUnits }}" ${{ endif }} \
-                    ${{ if ne(parameters.maxWriteUnits, null) }} --maxWriteUnits "${{ parameters.maxWriteUnits }}" ${{ endif }}
-                
+                    echo "Running DynamoDB Auto Scaling Management Script"
+                    # Build the command with optional parameters
+                    ARGS="--tableName \"${{ parameters.tableName }}\" \
+                          --region \"${{ parameters.region }}\" \
+                          --readMode \"${{ parameters.readMode }}\" \
+                          --writeMode \"${{ parameters.writeMode }}\" \
+                          --minRead \"${{ parameters.minRead }}\" \
+                          --maxRead \"${{ parameters.maxRead }}\" \
+                          --targetRead \"${{ parameters.targetRead }}\" \
+                          --minWrite \"${{ parameters.minWrite }}\" \
+                          --maxWrite \"${{ parameters.maxWrite }}\" \
+                          --targetWrite \"${{ parameters.targetWrite }}\" \
+                          --checkGSI \"${{ parameters.checkGSI }}\""
+                    # Add maxReadUnits and maxWriteUnits only if both are provided and not null
+                    if [ -n "${{ parameters.maxReadUnits }}" ] && [ "${{ parameters.maxReadUnits }}" != "null" ] && \
+                       [ -n "${{ parameters.maxWriteUnits }}" ] && [ "${{ parameters.maxWriteUnits }}" != "null" ]; then
+                      ARGS="$ARGS --maxReadUnits \"${{ parameters.maxReadUnits }}\" --maxWriteUnits \"${{ parameters.maxWriteUnits }}\""
+                    fi
+                    # Run the command with quoted ARGS
+                    echo "Running command: python3 manage_dynamodb_autoscaling.py $ARGS"
+                    python3 manage_dynamodb_autoscaling.py "$ARGS"
                   env:
                     Build_SourcesDirectory: $(Build.SourcesDirectory)
                     REPOSITORY_NAME: $(REPOSITORY_NAME)
                   displayName: "Configure DynamoDB Auto Scaling"
-              
