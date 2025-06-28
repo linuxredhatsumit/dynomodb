@@ -6,7 +6,6 @@ variables:
   # Agent pool details
   - name: POOL_NAME
     value: k811-devops
-    #value: k811-prod
   - name: AGENT_IN_AGENTPOOL
     value: 'Linux-Agent1'
   # python version to use from _tool
@@ -20,8 +19,6 @@ variables:
     value: "483584640083"
   - name: REPOSITORY_NAME
     value: k811-ddb-index
-  # - name: BRANCH_NAME
-  #   value: development
 
 pool:
   name: $(POOL_NAME)
@@ -31,45 +28,60 @@ pool:
 parameters:
   - name: tableName
     type: string
+    displayName: DynamoDB Table Name
   - name: region
     type: string
+    displayName: AWS Region
   - name: readMode
     type: string
+    displayName: Read Capacity Mode
     values: [ondemand, provisioned]
   - name: writeMode
     type: string
+    displayName: Write Capacity Mode
     values: [ondemand, provisioned]
   - name: minRead
     type: number
+    displayName: Minimum Read Capacity
     default: 5
   - name: maxRead
     type: number
+    displayName: Maximum Read Capacity
     default: 100
   - name: targetRead
     type: number
+    displayName: Target Read Utilization (%)
     default: 70
   - name: minWrite
     type: number
+    displayName: Minimum Write Capacity
     default: 5
   - name: maxWrite
     type: number
+    displayName: Maximum Write Capacity
     default: 100
   - name: targetWrite
     type: number
+    displayName: Target Write Utilization (%)
     default: 70
   - name: checkGSI
     type: boolean
+    displayName: Check GSI Configuration
     default: true
   - name: BRANCH_NAME
-    displayName: BRANCH_NAME
+    displayName: GSI Config Branch
     type: string
     default: development
   - name: maxReadUnits
     type: number
+    displayName: Max Read Request Units (ondemand only)
     default: 0
+    description: Maximum read request units for on-demand mode (set both read and write if using)
   - name: maxWriteUnits
     type: number
+    displayName: Max Write Request Units (ondemand only)
     default: 0
+    description: Maximum write request units for on-demand mode (set both read and write if using)
 
 stages:
   - stage: DynamoDBOperation
@@ -123,6 +135,20 @@ stages:
                     cd others/dynamodb-scale
                     source dynomoscaleenv/bin/activate
                     echo "Running DynamoDB Auto Scaling Management Script"
+                    
+                    # Validate max units parameters
+                    if [ "${{ parameters.readMode }}" = "ondemand" ] && [ "${{ parameters.writeMode }}" = "ondemand" ]; then
+                      if [ "${{ parameters.maxReadUnits }}" -gt 0 ] || [ "${{ parameters.maxWriteUnits }}" -gt 0 ]; then
+                        if [ "${{ parameters.maxReadUnits }}" -le 0 ] || [ "${{ parameters.maxWriteUnits }}" -le 0 ]; then
+                          echo "##vso[task.logissue type=error]Both maxReadUnits and maxWriteUnits must be specified and > 0 if either is specified"
+                          exit 1
+                        fi
+                        echo "Using maximum read/write request units: ${{ parameters.maxReadUnits }}/${{ parameters.maxWriteUnits }}"
+                      else
+                        echo "No maximum read/write request units specified (or values are 0). Using default on-demand settings."
+                      fi
+                    fi
+                    
                     # Build the command with optional parameters
                     ARGS="--tableName ${{ parameters.tableName }} \
                           --region ${{ parameters.region }} \
@@ -135,18 +161,17 @@ stages:
                           --maxWrite ${{ parameters.maxWrite }} \
                           --targetWrite ${{ parameters.targetWrite }} \
                           --checkGSI ${{ parameters.checkGSI }}"
-                    # Add maxReadUnits and maxWriteUnits only if both are non-zero and mode is ondemand
+                    
+                    # Add maxReadUnits and maxWriteUnits only if both are > 0 and mode is ondemand
                     if [ "${{ parameters.readMode }}" = "ondemand" ] && [ "${{ parameters.writeMode }}" = "ondemand" ] && \
                        [ "${{ parameters.maxReadUnits }}" -gt 0 ] && [ "${{ parameters.maxWriteUnits }}" -gt 0 ]; then
                       ARGS="$ARGS --maxReadUnits ${{ parameters.maxReadUnits }} --maxWriteUnits ${{ parameters.maxWriteUnits }}"
                     fi
+                    
                     # Debug the raw and expanded command
-                    echo "Raw ARGS: $ARGS"
-                    # Expand and log the final command
-                    FINAL_CMD="python3 manage_dynamodb_autoscaling.py $ARGS"
-                    echo "Final command: $FINAL_CMD"
+                    echo "Command arguments: $ARGS"
                     # Run the command with quoted ARGS
-                    $FINAL_CMD
+                    python3 manage_dynamodb_autoscaling.py $ARGS
                   env:
                     Build_SourcesDirectory: $(Build.SourcesDirectory)
                     REPOSITORY_NAME: $(REPOSITORY_NAME)
