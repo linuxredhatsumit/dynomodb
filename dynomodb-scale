@@ -340,16 +340,16 @@ def update_billing_mode(dynamodb, table_name, mode, read=None, write=None, gsi_c
                     'TableName': table_name,
                     'BillingMode': 'PAY_PER_REQUEST'
                 }
-                # Only include OnDemandThroughput if both max_read_units and max_write_units are provided
-                if max_read_units is not None and max_write_units is not None:
+                # Only include OnDemandThroughput if both max_read_units and max_write_units are positive
+                if max_read_units is not None and max_write_units is not None and max_read_units > 0 and max_write_units > 0:
                     update_kwargs['OnDemandThroughput'] = {}
-                    if max_read_units is not None:
+                    if max_read_units > 0:
                         update_kwargs['OnDemandThroughput']['MaxReadRequestUnits'] = max_read_units
                         logger.info(json.dumps({
                             "context": "update_billing_mode",
                             "message": f"Setting maximum read request units to {max_read_units}"
                         }))
-                    if max_write_units is not None:
+                    if max_write_units > 0:
                         update_kwargs['OnDemandThroughput']['MaxWriteRequestUnits'] = max_write_units
                         logger.info(json.dumps({
                             "context": "update_billing_mode",
@@ -358,7 +358,7 @@ def update_billing_mode(dynamodb, table_name, mode, read=None, write=None, gsi_c
                 else:
                     logger.info(json.dumps({
                         "context": "update_billing_mode",
-                        "message": "Skipping OnDemandThroughput settings as not both maxReadUnits and maxWriteUnits are provided"
+                        "message": "Skipping OnDemandThroughput settings as not both maxReadUnits and maxWriteUnits are positive"
                     }))
 
                 dynamodb.update_table(**update_kwargs)
