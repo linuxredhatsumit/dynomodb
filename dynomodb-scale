@@ -514,8 +514,8 @@ def main():
     parser.add_argument("--minWrite", type=int)
     parser.add_argument("--maxWrite", type=int)
     parser.add_argument("--targetWrite", type=int)
-    parser.add_argument("--maxReadUnits", type=int, help="Maximum read request units for PAY_PER_REQUEST mode (optional)")
-    parser.add_argument("--maxWriteUnits", type=int, help="Maximum write request units for PAY_PER_REQUEST mode (optional)")
+    parser.add_argument("--maxReadUnits", type=int, default=None, help="Maximum read request units for PAY_PER_REQUEST mode (optional)")
+    parser.add_argument("--maxWriteUnits", type=int, default=None, help="Maximum write request units for PAY_PER_REQUEST mode (optional)")
     parser.add_argument("--checkGSI", type=lambda x: x.lower() == 'true', default=True)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
@@ -523,7 +523,7 @@ def main():
     # Log received arguments for debugging
     logger.info(json.dumps({
         "context": "args",
-        "message": f"Received arguments: tableName={args.tableName}, region={args.region}, readMode={args.readMode}, writeMode={args.writeMode}, minRead={args.minRead}, maxRead={args.maxRead}, targetRead={args.targetRead}, minWrite={args.minWrite}, maxWrite={args.maxWrite}, targetWrite={args.targetWrite}, maxReadUnits={args.maxReadUnits}, maxWriteUnits={args.maxWriteUnits}, checkGSI={args.checkGSI}, dry-run={args.dry_run}"
+        "message": f"Received arguments: {vars(args)}"
     }))
 
     dynamodb = boto3.client("dynamodb", region_name=args.region)
@@ -598,6 +598,3 @@ def main():
             wait_for_table_active(dynamodb, args.tableName)
         else:
             logger.info("Table already in PAY_PER_REQUEST mode. Nothing to do.", extra={"context": "mode_check"})
-
-if __name__ == "__main__":
-    main()
