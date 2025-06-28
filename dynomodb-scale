@@ -291,7 +291,6 @@ def update_gsi_configuration(dynamodb, table_name, gsi_config):
     except ClientError as e:
         logger.error(json.dumps({"context": "gsi.update", "error": str(e)}))
         sys.exit(1)
-
 def update_billing_mode(dynamodb, table_name, mode, read=None, write=None, gsi_config=None, max_read_units=None, max_write_units=None):
     try:
         updated = False
