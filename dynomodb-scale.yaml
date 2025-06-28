@@ -140,10 +140,13 @@ stages:
                        [ "${{ parameters.maxReadUnits }}" -gt 0 ] && [ "${{ parameters.maxWriteUnits }}" -gt 0 ]; then
                       ARGS="$ARGS --maxReadUnits ${{ parameters.maxReadUnits }} --maxWriteUnits ${{ parameters.maxWriteUnits }}"
                     fi
-                    # Debug the final command
-                    echo "Final command: python3 manage_dynamodb_autoscaling.py $ARGS"
+                    # Debug the raw and expanded command
+                    echo "Raw ARGS: $ARGS"
+                    # Expand and log the final command
+                    FINAL_CMD="python3 manage_dynamodb_autoscaling.py $ARGS"
+                    echo "Final command: $FINAL_CMD"
                     # Run the command with quoted ARGS
-                    python3 manage_dynamodb_autoscaling.py "$ARGS"
+                    $FINAL_CMD
                   env:
                     Build_SourcesDirectory: $(Build.SourcesDirectory)
                     REPOSITORY_NAME: $(REPOSITORY_NAME)
