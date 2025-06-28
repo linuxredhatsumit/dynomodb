@@ -124,24 +124,25 @@ stages:
                     source dynomoscaleenv/bin/activate
                     echo "Running DynamoDB Auto Scaling Management Script"
                     # Build the command with optional parameters
-                    ARGS="--tableName \"${{ parameters.tableName }}\" \
-                          --region \"${{ parameters.region }}\" \
-                          --readMode \"${{ parameters.readMode }}\" \
-                          --writeMode \"${{ parameters.writeMode }}\" \
-                          --minRead \"${{ parameters.minRead }}\" \
-                          --maxRead \"${{ parameters.maxRead }}\" \
-                          --targetRead \"${{ parameters.targetRead }}\" \
-                          --minWrite \"${{ parameters.minWrite }}\" \
-                          --maxWrite \"${{ parameters.maxWrite }}\" \
-                          --targetWrite \"${{ parameters.targetWrite }}\" \
-                          --checkGSI \"${{ parameters.checkGSI }}\""
+                    ARGS="--tableName ${{ parameters.tableName }} \
+                          --region ${{ parameters.region }} \
+                          --readMode ${{ parameters.readMode }} \
+                          --writeMode ${{ parameters.writeMode }} \
+                          --minRead ${{ parameters.minRead }} \
+                          --maxRead ${{ parameters.maxRead }} \
+                          --targetRead ${{ parameters.targetRead }} \
+                          --minWrite ${{ parameters.minWrite }} \
+                          --maxWrite ${{ parameters.maxWrite }} \
+                          --targetWrite ${{ parameters.targetWrite }} \
+                          --checkGSI ${{ parameters.checkGSI }}"
                     # Add maxReadUnits and maxWriteUnits only if both are non-zero and mode is ondemand
                     if [ "${{ parameters.readMode }}" = "ondemand" ] && [ "${{ parameters.writeMode }}" = "ondemand" ] && \
                        [ "${{ parameters.maxReadUnits }}" -gt 0 ] && [ "${{ parameters.maxWriteUnits }}" -gt 0 ]; then
-                      ARGS="$ARGS --maxReadUnits \"${{ parameters.maxReadUnits }}\" --maxWriteUnits \"${{ parameters.maxWriteUnits }}\""
+                      ARGS="$ARGS --maxReadUnits ${{ parameters.maxReadUnits }} --maxWriteUnits ${{ parameters.maxWriteUnits }}"
                     fi
+                    # Debug the final command
+                    echo "Final command: python3 manage_dynamodb_autoscaling.py $ARGS"
                     # Run the command with quoted ARGS
-                    echo "Running command: python3 manage_dynamodb_autoscaling.py $ARGS"
                     python3 manage_dynamodb_autoscaling.py "$ARGS"
                   env:
                     Build_SourcesDirectory: $(Build.SourcesDirectory)
