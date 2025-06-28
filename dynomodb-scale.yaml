@@ -1,16 +1,32 @@
 trigger: none
+#pool and agent details.
 variables:
   - group: Kotak-ECR-Credentials
+# Agent pool details
   - name: POOL_NAME
-    value: 'aws'
+    value: k811-devops
+    #value: k811-prod
+  - name: AGENT_IN_AGENTPOOL
+    value: 'Linux-Agent1'
+# python version to use from _tool
+  - name: PYTHON_VERSION
+    value: '3.10'
+  - name: ROLE_NAME
+    value: EKS_Setup_Role
+  - name: SOURCE_ACCOUNT_NAME
+    value: NON_PROD
+  - name: AWS_ACCOUNT_ID
+    value: "483584640083"
   - name: REPOSITORY_NAME
-    value: 'gsi-config-repo'
-  - name: AZURE_DEVOPS_PAT
-    value: 'EBuSKWl1oq63Qot6NBgA6i5J0M2mBt7fkZYcYgOvvGKDq90oq9O2JQQJ99BFACAAAAAAAAAAAAASAZDO3W1Q'
-  - name: GSI_REPO_URL
-    value: 'dev.azure.com/sumits0911/Devops/_git/gsi-config-repo'
-  - name: BRANCH_NAME
-    value: 'dev'
+    value: k811-ddb-index
+  # - name: BRANCH_NAME
+  #   value: development
+
+pool:
+  name: $(POOL_NAME)
+  demands:
+  - agent.name -equals $(AGENT_IN_AGENTPOOL)
+
 parameters:
   - name: tableName
     type: string
@@ -40,76 +56,88 @@ parameters:
   - name: targetWrite
     type: string
     default: '70'
-  - name: maxReadUnits
-    type: string
-    default: ''
-    displayName: 'Maximum Read Request Units (optional - for PAY_PER_REQUEST mode)'
-  - name: maxWriteUnits
-    type: string
-    default: ''
-    displayName: 'Maximum Write Request Units (optional - for PAY_PER_REQUEST mode)'
   - name: checkGSI
     type: boolean
     default: true
-pool:
-  name: $(POOL_NAME)
+  - name: BRANCH_NAME
+    displayName: BRANCH_NAME
+    type: string
+    default: development
+  - name: maxReadUnits
+    type: number
+    default: null
+  - name: maxWriteUnits
+    type: number
+    default: null
+
 stages:
-  - stage: Scaling
+  - stage: DynamoDBOperation
     jobs:
-      - job: RunAutoscaling
-        steps:
-          - checkout: self
-          - script: |
-              set -e
-              rm -rf $(REPOSITORY_NAME)
-              git clone --branch $(BRANCH_NAME) https://$(AZURE_DEVOPS_PAT)@$(GSI_REPO_URL) $(REPOSITORY_NAME)
-            env:
-              AZURE_DEVOPS_PAT: $(AZURE_DEVOPS_PAT)
-              Build_SourcesDirectory: $(Build.SourcesDirectory)
-              REPOSITORY_NAME: $(REPOSITORY_NAME)
-            condition: and(succeeded(), eq(${{ parameters.checkGSI }}, true))
-            displayName: "Clone GSI Config Repo"
-          - task: UsePythonVersion@0
-            inputs:
-              versionSpec: '3.8'
-            displayName: "Set Python 3.8"
-          - script: |
-              pip install boto3 requests
-            displayName: "Install boto3"
-          - script: |
-              set -e
-              cd $(Build.SourcesDirectory)/dynomodb-scale
+      - deployment: ExecuteDynamoDBOperation
+        displayName: "Execute DynamoDB Operation"
+        environment: non-prod-Dynamodb-approval
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  displayName: 'Checkout repository'
+
+                - script: |
+                    set -e
+                    rm -rf $(REPOSITORY_NAME)
+                    git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b ${{ parameters.BRANCH_NAME }}
+                  env:
+                    Build_SourcesDirectory: $(Build.SourcesDirectory)
+                    REPOSITORY_NAME: $(REPOSITORY_NAME)
+                  condition: and(succeeded(), eq(${{ parameters.checkGSI }}, true))
+                  displayName: "Clone GSI Config Repo"
+
+
+                - script: |
+                    unset AWS_SESSION_TOKEN
+                    unset AWS_SECRET_ACCESS_KEY
+                    unset AWS_ACCESS_KEY_ID
+                    CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+                    export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                    export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                    export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                    # Change to the dynomodbscale directory
+                    cd others/dynamodb-scale &&
+                    echo "Setting up Python Environment"
+                    python3 -m venv dynomoscaleenv
+                    source dynomoscaleenv/bin/activate
+                    pip3 install boto3 requests --upgrade
+                  displayName: 'Execute Python Script for DynamoDB Operation'
+       
+                - script: |
+                    unset AWS_SESSION_TOKEN
+                    unset AWS_SECRET_ACCESS_KEY
+                    unset AWS_ACCESS_KEY_ID
+                    CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+                    export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                    export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                    export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                    cd others/dynamodb-scale
+                    source dynomoscaleenv/bin/activate
+                    echo "Running DynamoDB Auto Scaling Management Script" &&
+                    python3 manage_dynamodb_autoscaling.py \
+                    --tableName "${{ parameters.tableName }}" \
+                    --region "${{ parameters.region }}" \
+                    --readMode "${{ parameters.readMode }}" \
+                    --writeMode "${{ parameters.writeMode }}" \
+                    --minRead "${{ parameters.minRead }}" \
+                    --maxRead "${{ parameters.maxRead }}" \
+                    --targetRead "${{ parameters.targetRead }}" \
+                    --minWrite "${{ parameters.minWrite }}" \
+                    --maxWrite "${{ parameters.maxWrite }}" \
+                    --targetWrite "${{ parameters.targetWrite }}" \
+                    --checkGSI "${{ parameters.checkGSI }}" \
+                    ${{ if ne(parameters.maxReadUnits, null) }} --maxReadUnits "${{ parameters.maxReadUnits }}" ${{ endif }} \
+                    ${{ if ne(parameters.maxWriteUnits, null) }} --maxWriteUnits "${{ parameters.maxWriteUnits }}" ${{ endif }}
+                
+                  env:
+                    Build_SourcesDirectory: $(Build.SourcesDirectory)
+                    REPOSITORY_NAME: $(REPOSITORY_NAME)
+                  displayName: "Configure DynamoDB Auto Scaling"
               
-              # Build the command with conditional parameters
-              CMD="python3 manage_dynamodb_autoscaling.py \
-                --tableName \"${{ parameters.tableName }}\" \
-                --region \"${{ parameters.region }}\" \
-                --readMode \"${{ parameters.readMode }}\" \
-                --writeMode \"${{ parameters.writeMode }}\" \
-                --minRead \"${{ parameters.minRead }}\" \
-                --maxRead \"${{ parameters.maxRead }}\" \
-                --targetRead \"${{ parameters.targetRead }}\" \
-                --minWrite \"${{ parameters.minWrite }}\" \
-                --maxWrite \"${{ parameters.maxWrite }}\" \
-                --targetWrite \"${{ parameters.targetWrite }}\" \
-                --checkGSI \"${{ parameters.checkGSI }}\""
-              
-              # Add optional maxReadUnits parameter if provided
-              if [ -n "${{ parameters.maxReadUnits }}" ] && [ "${{ parameters.maxReadUnits }}" != "" ]; then
-                CMD="$CMD --maxReadUnits \"${{ parameters.maxReadUnits }}\""
-                echo "Adding maxReadUnits: ${{ parameters.maxReadUnits }}"
-              fi
-              
-              # Add optional maxWriteUnits parameter if provided
-              if [ -n "${{ parameters.maxWriteUnits }}" ] && [ "${{ parameters.maxWriteUnits }}" != "" ]; then
-                CMD="$CMD --maxWriteUnits \"${{ parameters.maxWriteUnits }}\""
-                echo "Adding maxWriteUnits: ${{ parameters.maxWriteUnits }}"
-              fi
-              
-              echo "Executing command: $CMD"
-              eval $CMD
-            env:
-              AZURE_DEVOPS_PAT: $(AZURE_DEVOPS_PAT)
-              Build_SourcesDirectory: $(Build.SourcesDirectory)
-              REPOSITORY_NAME: $(REPOSITORY_NAME)
-            displayName: "Run Autoscaling Script"
