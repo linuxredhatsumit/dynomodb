@@ -1,4 +1,5 @@
 trigger: none
+
 variables:
   - group: Kotak-ECR-Credentials
   - name: POOL_NAME
@@ -6,11 +7,12 @@ variables:
   - name: REPOSITORY_NAME
     value: 'gsi-config-repo'
   - name: AZURE_DEVOPS_PAT
-    value: 'EBuSKWl1oq63Qot6NBgA6i5J0M2mBt7fkZYcYgOvvGKDq90oq9O2JQQJ99BFACAAAAAAAAAAAAASAZDO3W1Q'
+    value: '7Y5jEF4pykUqWVgb2MgdqQm7s9EcySw068ZDHpCgzPZcRtPlq2ETJQQJ99BFACAAAAAAAAAAAAASAZDO1JRp'
   - name: GSI_REPO_URL
     value: 'dev.azure.com/sumits0911/Devops/_git/gsi-config-repo'
   - name: BRANCH_NAME
     value: 'dev'
+
 parameters:
   - name: tableName
     type: string
@@ -23,42 +25,43 @@ parameters:
     type: string
     values: [ondemand, provisioned]
   - name: minRead
-    type: string
-    default: '5'
+    type: number
+    default: 5
   - name: maxRead
-    type: string
-    default: '100'
+    type: number
+    default: 100
   - name: targetRead
-    type: string
-    default: '70'
+    type: number
+    default: 70
   - name: minWrite
-    type: string
-    default: '5'
+    type: number
+    default: 5
   - name: maxWrite
-    type: string
-    default: '100'
+    type: number
+    default: 100
   - name: targetWrite
-    type: string
-    default: '70'
-  - name: maxReadUnits
-    type: string
-    default: ''
-    displayName: 'Maximum Read Request Units (optional - for PAY_PER_REQUEST mode)'
-  - name: maxWriteUnits
-    type: string
-    default: ''
-    displayName: 'Maximum Write Request Units (optional - for PAY_PER_REQUEST mode)'
+    type: number
+    default: 70
   - name: checkGSI
     type: boolean
     default: true
+  - name: maxReadUnits
+    type: number
+    default: null
+  - name: maxWriteUnits
+    type: number
+    default: null
+
 pool:
   name: $(POOL_NAME)
+
 stages:
   - stage: Scaling
     jobs:
       - job: RunAutoscaling
         steps:
           - checkout: self
+
           - script: |
               set -e
               rm -rf $(REPOSITORY_NAME)
@@ -69,45 +72,42 @@ stages:
               REPOSITORY_NAME: $(REPOSITORY_NAME)
             condition: and(succeeded(), eq(${{ parameters.checkGSI }}, true))
             displayName: "Clone GSI Config Repo"
+
           - task: UsePythonVersion@0
             inputs:
               versionSpec: '3.8'
             displayName: "Set Python 3.8"
+
           - script: |
               pip install boto3 requests
             displayName: "Install boto3"
+
           - script: |
               set -e
               cd $(Build.SourcesDirectory)/dynomodb-scale
-              
-              # Build the command with conditional parameters
-              CMD="python3 manage_dynamodb_autoscaling.py \
-                --tableName \"${{ parameters.tableName }}\" \
-                --region \"${{ parameters.region }}\" \
-                --readMode \"${{ parameters.readMode }}\" \
-                --writeMode \"${{ parameters.writeMode }}\" \
-                --minRead \"${{ parameters.minRead }}\" \
-                --maxRead \"${{ parameters.maxRead }}\" \
-                --targetRead \"${{ parameters.targetRead }}\" \
-                --minWrite \"${{ parameters.minWrite }}\" \
-                --maxWrite \"${{ parameters.maxWrite }}\" \
-                --targetWrite \"${{ parameters.targetWrite }}\" \
-                --checkGSI \"${{ parameters.checkGSI }}\""
-              
-              # Add optional maxReadUnits parameter if provided
-              if [ -n "${{ parameters.maxReadUnits }}" ] && [ "${{ parameters.maxReadUnits }}" != "" ]; then
-                CMD="$CMD --maxReadUnits \"${{ parameters.maxReadUnits }}\""
-                echo "Adding maxReadUnits: ${{ parameters.maxReadUnits }}"
+              # Build the command with optional parameters
+              ARGS="--tableName \"${{ parameters.tableName }}\" \
+                    --region \"${{ parameters.region }}\" \
+                    --readMode \"${{ parameters.readMode }}\" \
+                    --writeMode \"${{ parameters.writeMode }}\" \
+                    --minRead \"${{ parameters.minRead }}\" \
+                    --maxRead \"${{ parameters.maxRead }}\" \
+                    --targetRead \"${{ parameters.targetRead }}\" \
+                    --minWrite \"${{ parameters.minWrite }}\" \
+                    --maxWrite \"${{ parameters.maxWrite }}\" \
+                    --targetWrite \"${{ parameters.targetWrite }}\" \
+                    --checkGSI \"${{ parameters.checkGSI }}\""
+              # Add maxReadUnits if provided
+              if [ ! -z "${{ parameters.maxReadUnits }}" ]; then
+                ARGS="$ARGS --maxReadUnits \"${{ parameters.maxReadUnits }}\""
               fi
-              
-              # Add optional maxWriteUnits parameter if provided
-              if [ -n "${{ parameters.maxWriteUnits }}" ] && [ "${{ parameters.maxWriteUnits }}" != "" ]; then
-                CMD="$CMD --maxWriteUnits \"${{ parameters.maxWriteUnits }}\""
-                echo "Adding maxWriteUnits: ${{ parameters.maxWriteUnits }}"
+              # Add maxWriteUnits if provided
+              if [ ! -z "${{ parameters.maxWriteUnits }}" ]; then
+                ARGS="$ARGS --maxWriteUnits \"${{ parameters.maxWriteUnits }}\""
               fi
-              
-              echo "Executing command: $CMD"
-              eval $CMD
+              # Run the command
+              echo "Running command: python3 manage_dynamodb_autoscaling.py $ARGS"
+              python3 manage_dynamodb_autoscaling.py $ARGS
             env:
               AZURE_DEVOPS_PAT: $(AZURE_DEVOPS_PAT)
               Build_SourcesDirectory: $(Build.SourcesDirectory)
