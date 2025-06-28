@@ -1,6 +1,146 @@
+trigger: none
 
-Encountered error(s) while parsing pipeline YAML:
-/others/dynamodb-scale/dynamodb-scale.yaml (Line: 69, Col: 14): The 'maxReadUnits' parameter is not a valid Number.
-/others/dynamodb-scale/dynamodb-scale.yaml (Line: 69, Col: 14): The 'maxReadUnits' parameter is not a valid Number.
-/others/dynamodb-scale/dynamodb-scale.yaml (Line: 72, Col: 14): The 'maxWriteUnits' parameter is not a valid Number.
-/others/dynamodb-scale/dynamodb-scale.yaml (Line: 72, Col: 14): The 'maxWriteUnits' parameter is not a valid Number.
+# pool and agent details.
+variables:
+  - group: Kotak-ECR-Credentials
+  # Agent pool details
+  - name: POOL_NAME
+    value: k811-devops
+    #value: k811-prod
+  - name: AGENT_IN_AGENTPOOL
+    value: 'Linux-Agent1'
+  # python version to use from _tool
+  - name: PYTHON_VERSION
+    value: '3.10'
+  - name: ROLE_NAME
+    value: EKS_Setup_Role
+  - name: SOURCE_ACCOUNT_NAME
+    value: NON_PROD
+  - name: AWS_ACCOUNT_ID
+    value: "483584640083"
+  - name: REPOSITORY_NAME
+    value: k811-ddb-index
+  # - name: BRANCH_NAME
+  #   value: development
+
+pool:
+  name: $(POOL_NAME)
+  demands:
+    - agent.name -equals $(AGENT_IN_AGENTPOOL)
+
+parameters:
+  - name: tableName
+    type: string
+  - name: region
+    type: string
+  - name: readMode
+    type: string
+    values: [ondemand, provisioned]
+  - name: writeMode
+    type: string
+    values: [ondemand, provisioned]
+  - name: minRead
+    type: number
+    default: 5
+  - name: maxRead
+    type: number
+    default: 100
+  - name: targetRead
+    type: number
+    default: 70
+  - name: minWrite
+    type: number
+    default: 5
+  - name: maxWrite
+    type: number
+    default: 100
+  - name: targetWrite
+    type: number
+    default: 70
+  - name: checkGSI
+    type: boolean
+    default: true
+  - name: BRANCH_NAME
+    displayName: BRANCH_NAME
+    type: string
+    default: development
+  - name: maxReadUnits
+    type: number
+  - name: maxWriteUnits
+    type: number
+
+stages:
+  - stage: DynamoDBOperation
+    jobs:
+      - deployment: ExecuteDynamoDBOperation
+        displayName: "Execute DynamoDB Operation"
+        environment: non-prod-Dynamodb-approval
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  displayName: 'Checkout repository'
+
+                - script: |
+                    set -e
+                    rm -rf $(REPOSITORY_NAME)
+                    git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b ${{ parameters.BRANCH_NAME }}
+                  env:
+                    Build_SourcesDirectory: $(Build.SourcesDirectory)
+                    REPOSITORY_NAME: $(REPOSITORY_NAME)
+                    PAT: $(PAT)  # Assuming PAT is in the variable group
+                  condition: and(succeeded(), eq(${{ parameters.checkGSI }}, true))
+                  displayName: "Clone GSI Config Repo"
+
+                - script: |
+                    unset AWS_SESSION_TOKEN
+                    unset AWS_SECRET_ACCESS_KEY
+                    unset AWS_ACCESS_KEY_ID
+                    CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+                    export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                    export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                    export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                    # Change to the dynamodb-scale directory
+                    cd others/dynamodb-scale &&
+                    echo "Setting up Python Environment"
+                    python3 -m venv dynomoscaleenv
+                    source dynomoscaleenv/bin/activate
+                    pip3 install boto3 requests --upgrade
+                  displayName: 'Execute Python Script for DynamoDB Operation'
+
+                - script: |
+                    set -e
+                    unset AWS_SESSION_TOKEN
+                    unset AWS_SECRET_ACCESS_KEY
+                    unset AWS_ACCESS_KEY_ID
+                    CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+                    export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                    export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                    export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                    cd others/dynamodb-scale
+                    source dynomoscaleenv/bin/activate
+                    echo "Running DynamoDB Auto Scaling Management Script"
+                    # Build the command with optional parameters
+                    ARGS="--tableName \"${{ parameters.tableName }}\" \
+                          --region \"${{ parameters.region }}\" \
+                          --readMode \"${{ parameters.readMode }}\" \
+                          --writeMode \"${{ parameters.writeMode }}\" \
+                          --minRead \"${{ parameters.minRead }}\" \
+                          --maxRead \"${{ parameters.maxRead }}\" \
+                          --targetRead \"${{ parameters.targetRead }}\" \
+                          --minWrite \"${{ parameters.minWrite }}\" \
+                          --maxWrite \"${{ parameters.maxWrite }}\" \
+                          --targetWrite \"${{ parameters.targetWrite }}\" \
+                          --checkGSI \"${{ parameters.checkGSI }}\""
+                    # Add maxReadUnits and maxWriteUnits only if both are provided
+                    if [ -n "${{ parameters.maxReadUnits }}" ] && [ -n "${{ parameters.maxWriteUnits }}" ]; then
+                      ARGS="$ARGS --maxReadUnits \"${{ parameters.maxReadUnits }}\" --maxWriteUnits \"${{ parameters.maxWriteUnits }}\""
+                    fi
+                    # Run the command with quoted ARGS
+                    echo "Running command: python3 manage_dynamodb_autoscaling.py $ARGS"
+                    python3 manage_dynamodb_autoscaling.py "$ARGS"
+                  env:
+                    Build_SourcesDirectory: $(Build.SourcesDirectory)
+                    REPOSITORY_NAME: $(REPOSITORY_NAME)
+                  displayName: "Configure DynamoDB Auto Scaling"
