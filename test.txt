@@ -1,101 +1,174 @@
-namespace: 811-uat
-env: uat
-deadlineSeconds: 600
-autoscaling:
-  minReplicas: 1
-  maxReplicas: 2
-  targetCPUUtilizationPercentage: 50
-  targetMemoryUtilizationPercentage: 50
-hpa:
-  enabled: true
-PodDisruptionBudget:
-  maxUnavailable: 1
-ssmParameter:
-  ssm_root: uat
-  service_name: k811-ms-kyc
-  common_key: COMMON_KEYS
-appconfig:
-  APPCONFIG_ENABLED: "true"
-  APPCONFIG_FEATURE_ENABLED: "true"
-  APPCONFIG_ENVIRONMENT: "uat"
-  APPCONFIG_APPLICATION: "onb-kyc"
-  APPCONFIG_PROFILE: "kyc-uat"
-  APPCONFIG_MAX_CONFIG_AGE: "900"
-  COM_APPCONFIG_APPLICATION: "811-services-appconfig"
-  COM_APPCONFIG_PROFILE: "common-appconfig-uat"
-  COM_APPCONFIG_MAX_CONFIG_AGE: "300"
-  FF_APPCONFIG_APPLICATION: "onb-kyc"
-  FF_APPCONFIG_PROFILE: "kyc-feature-flags-uat"
-  FF_APPCONFIG_MAX_CONFIG_AGE: "900"
-  PROJECT_NAME: "811_app_ms_kyc"
-  ENV: "uat"
-  OTEL_RESOURCE_ATTRIBUTES:  "application=k811-onb-uat"
-  OTEL_SERVICE_NAME:  "k811-ms-kyc"
-  OTEL_METRICS_EXPORTER: "none"
-  OTEL_TRACES_EXPORTER: "otlp_proto_http"
-  OTEL_EXPORTER_OTLP_ENDPOINT: "http://$(NODE):4318"
-  OTEL_PROPAGATORS: "b3,tracecontext,baggage"
-  OTEL_PYTHON_LOG_CORRELATION: "true"
-  OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_REQUEST: "x-platform-id,x-reg-id,x-request-id,x-session-id"
-  OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_RESPONSE: "x-platform-id,x-reg-id,x-request-id,x-session-id"
-  OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_REQUEST: "x-platform-id,x-reg-id,x-request-id,x-session-id"
-  OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_RESPONSE: "x-platform-id,x-reg-id,x-request-id,x-session-id"
-trafficip: 10.0.0.0/8
-node:
-  name: node
-  operator: In
-nodegroup:
-  labels: ["stateless-spot,stateless-ondemand"]
-probePath: kyc/health/
-image:
-  repository: 483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_kyc
-  tag: 811_app_ms_kyc-development-20230522.1
-  name: k811-kyc
-  pullPolicy: IfNotPresent  
-serviceaccount:
-  enabled: true
-  name: 811-onb-uat-sa-kyc
-  role: arn:aws:iam::483584640083:role/k811-onb-uat-eks-kyc-sa
-rolebinding: k811-kyc
-service:
-  name: k811-kyc 
-  type: ClusterIP
-  externalPort: 8080
-  internalPort: 8080
-  portName: k811-kyc
-  internalPort_cron: 8028  
-resources:
-  limits:
-    cpu: 1000m
-    memory: 2Gi
-  requests:
-    cpu: 500m
-    memory: 1024Mi
-gateways:    
-  gateway: gateway
-  prefix: "/kyc"
-  host: "*"
-  internalPort: 8080
-  weightvalue: 100
-cron_name: k811-ms-kyc-bitly-submit-cronjob  
-schedule: '"*/10 * * * *"'
-timezone: "Asia/Kolkata"
-restartPolicy: OnFailure
-arguments:
-  - sh
-  - -c
-  - |
-    echo "check the logs"
-    opentelemetry-instrument python3 /k811/app/cron_jobs/bitly_submit_retry.py
-isCustomIstio:
-  enabled: false
-  encryption: "dev/istio_codec/symmetric"
-  enc_path: .*
-  exclude_enc_path: $^
-  aws_region: ap-south-1    
-custom_istio_image:
-  repository: 483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_istio_proxy
-  istio_tag: 811_istio_proxy-development-20250210.1 
-spreadAz: true
-podAntiAffinity: "none" #Accepted values are none, soft and hard. If this variable not defined then takes hard scheduling by default
+trigger: none
 
+variables:
+  - name: ENV
+    value: prod
+  - name: SERVICE_NAME
+    value: k811-ms-cc-limit-correct-cronjob
+  # Pool details
+  - name: POOL_NAME
+    value: "k811-prod"
+  # For AWS Role Access
+  - name: AWS_ACCOUNT_ID
+    value: "718378052708"
+  - name: ROLE_NAME
+    value: EKS-Setup-Role-Kotak811
+  # Helm related variables
+  - name: HELM_CHARTS_PATH
+    value: helm-charts/k811-ms-cc-limit-correct-cronjob/
+  - name: HELM_S3BUCKET_URL
+    value: s3://k811-onb-helmcharts/prod/k811-ms-cc-limit-correct-cronjob/
+  - name: KUBE_CONFIG_PATH
+    value: /home/app_user/.kube/config-prod
+  - name: NAMESPACE
+    value: prod
+  - group: PROD-Static-Variables
+  - name: DR_HELM_S3BUCKET_URL
+    value: s3://k811-onb-helmcharts-dr/prod/k811-ms-cc-limit-correct-cronjob/
+  - name: DR_KUBE_CONFIG_PATH
+    value: /home/app_user/.kube/config-onb-dr
+  - name: DR_NAMESPACE
+    value: prod-dr
+  # prod ECR details
+  - name: AWS_REGION
+    value: ap-south-1
+  - name: ECR_FOLDER_NAME
+    value: 811prodonb
+  - name: ECR_REPO_NAME
+    value: k811_ms_cc_applications
+  # DR ECR details
+  - name: DR_AWS_REGION
+    value: ap-south-2
+  - name: DR_ECR_FOLDER_NAME
+    value: 811prodonb
+  - name: DR_ECR_REPO_NAME
+    value: k811_ms_cc_applications
+
+parameters:
+  - name: DeployPROD
+    displayName: "Deploy to prod"
+    type: boolean
+    default: true
+  - name: DeployDR
+    displayName: "Deploy to DR"
+    type: boolean
+    default: false
+  - name: Jira_URL
+    type: string
+    default: ""
+    displayName: "Jira URL"
+
+pool:
+  name: $(POOL_NAME)
+
+stages:
+  - template: ../templates/prod-cron-deploy.yaml
+  
+    parameters:
+      DeployPROD: ${{ parameters.DeployPROD }}
+      service: $(SERVICE_NAME)
+
+  - template: ../templates/prod-cron-deploy-dr.yaml
+    parameters:
+      DeployDR: ${{ parameters.DeployDR }}
+      service: $(SERVICE_NAME)
+
+
+
+below is 
+../templates/prod-cron-deploy.yaml
+
+parameters:
+  - name: DeployPROD
+    type: boolean
+    default: true
+  - name: service
+    type: string
+
+stages:
+  - ${{ if eq( parameters['DeployPROD'], true) }}:
+      - stage: PROD
+        displayName: "Build in PROD Environment"
+        jobs:
+          - job: UpdateHelmCharts
+            displayName: "Cronjob Update"
+            steps:
+              - script: |
+                  pwd
+                  # Get the latest image tag from PROD ECR
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  # version=$(aws ecr describe-images --repository-name $(ECR_FOLDER_NAME)/$(ECR_REPO_NAME) --region $(AWS_REGION) --query 'sort_by(imageDetails, &imagePushedAt)[-1].imageTags[0]' --output text)
+                  version=$(aws ecr describe-images --repository-name $(ECR_FOLDER_NAME)/$(ECR_REPO_NAME) --region "$AWS_REGION" --output json | jq -r '.imageDetails | sort_by(.imagePushedAt) | reverse | .[] | select(.imageTags != null) | .imageTags[]' | head -n1)
+                  echo "##vso[task.setvariable variable=version]$version"
+                  echo "Latest image tag in PROD ECR: $version"
+                displayName: "Get Latest Image Tag from PROD ECR"
+
+              - script: |
+                  pwd
+                  sed -i -e 's/name:.*/name: ${{ parameters.service }}/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+                  sed -i -e 's/appVersion:.*/appVersion: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+                  sed -i -e 's/version:.*/version: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+                  sed -i -e 's/tag:.*/tag: $(version)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(ENV)-values.yaml
+                displayName: "Updating Chart Values"
+
+              - script: |
+                  pwd
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  helm s3 init $(HELM_S3BUCKET_URL)
+                  helm repo add $(ENV)-${{ parameters.service }} $(HELM_S3BUCKET_URL)
+                  helm package $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/
+                  helm s3 push --force $(System.DefaultWorkingDirectory)/${{ parameters.service }}-1.$(Build.BuildNumber).tgz $(ENV)-${{ parameters.service }}
+                  aws s3 ls $(HELM_S3BUCKET_URL)
+                  helm repo update
+                  helm search repo $(ENV)-${{ parameters.service }}
+                displayName: "Charts Push To S3"
+
+              - script: |
+                  pwd
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  rm -rf $(System.DefaultWorkingDirectory)/*.tgz
+                  helm repo update
+                  helm fetch $(ENV)-${{ parameters.service }}/$(SERVICE_NAME)
+                  tar -xvf ${{ parameters.service }}-1.$(Build.BuildNumber).tgz
+                  echo "Starting the deployment in the namespace $(NAMESPACE)"
+                  helm upgrade --install $(ENV)-${{ parameters.service }} ${{ parameters.service }}/ -f ${{ parameters.service }}/$(ENV)-values.yaml --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) --wait --timeout 3m
+                displayName: "Helm Charts Deployment"
+               
+
+              - script: |
+                  pwd
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  sleep 10
+                  echo "########################## List of pods ########################################"
+                  kubectl get po --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i ${{ parameters.service }}
+                  echo "########################## List of deployed cronjobs ########################################"
+                  kubectl get cronjob --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i ${{ parameters.service }}
+                  echo "########################## Get logs of latest pod ########################################"
+                  kubectl logs $(kubectl get pods --sort-by=.metadata.creationTimestamp -l app=${{ parameters.service }} -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | tail -n 1 | awk '{print $1}') -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH)
+                displayName: "Application Status"
+                continueOnError: true
+                
