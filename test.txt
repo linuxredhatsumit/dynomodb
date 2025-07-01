@@ -1,8 +1,1 @@
-
-Parameter validation failed:
-Invalid length for parameter RoleSessionName, value: 1, valid min length: 2
-Checking if image exists in UAT ECR
-/home/app_user/workspace/Agent5/_work/_temp/e8450d8c-c762-4fe2-9105-3766c0fdd216.sh: line 20: syntax error near unexpected token `('
-/home/app_user/workspace/Agent5/_work/_temp/e8450d8c-c762-4fe2-9105-3766c0fdd216.sh: line 20: `  echo "Pulling image from Source (Dev) ECR"'
-##[error]Bash exited with code '2'.
-Finishing: Copy Image from Source (Dev) ECR to UAT ECR
+CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
