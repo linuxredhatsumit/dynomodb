@@ -1,57 +1,101 @@
-apiVersion: batch/v1
-kind: CronJob
-metadata:
-  namespace: {{ .Values.namespace }}
-  name: {{ .Values.cron_name }}
-  labels:
-    chart: "{{ .Values.cron_name }}-{{ .Chart.Version | replace "+" "_" }}"
-spec:
-  schedule: {{ .Values.schedule }}
-  timeZone: {{ .Values.timezone }}
-  concurrencyPolicy: Forbid  
-  successfulJobsHistoryLimit: 1
-  failedJobsHistoryLimit: 1
-  jobTemplate:
-    spec:
-      template:
-        metadata:
-          labels:
-            app: {{ .Values.cron_name }}
-            sidecar.istio.io/inject: "false"
-        spec:
-          serviceAccountName: {{ .Values.serviceaccount.name }}
-          {{- if eq .Values.namespace "dev"}}
-          affinity:
-            nodeAffinity:
-              requiredDuringSchedulingIgnoredDuringExecution:
-                nodeSelectorTerms:
-                - matchExpressions:
-                  - key: node
-                    operator: In
-                    values:
-                    - stateless-amd
-          tolerations:
-          - effect: NoSchedule
-            key: amd
-            operator: Equal
-            value: "yes"
-          {{- end }}          
-          restartPolicy: {{ .Values.restartPolicy }}          
-          containers:
-          - name: {{ .Values.cron_name }}
-            image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-            imagePullPolicy: {{ .Values.image.pullPolicy }}
-            args:
-            {{- toYaml .Values.arguments | nindent 12 }}
-            ports:
-            - containerPort: {{ .Values.service.internalPort_cron }}
-            envFrom:            
-            - configMapRef:
-                name: {{ .Chart.Name }}-configmap  
-            env:
-              - name: NODE
-                valueFrom:
-                  fieldRef:
-                    fieldPath: status.hostIP
-              - name: OTEL_EXPORTER_OTLP_ENDPOINT
-                value: {{ .Values.appconfig.OTEL_EXPORTER_OTLP_ENDPOINT }}                        
+namespace: 811-uat
+env: uat
+deadlineSeconds: 600
+autoscaling:
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPUUtilizationPercentage: 50
+  targetMemoryUtilizationPercentage: 50
+hpa:
+  enabled: true
+PodDisruptionBudget:
+  maxUnavailable: 1
+ssmParameter:
+  ssm_root: uat
+  service_name: k811-ms-kyc
+  common_key: COMMON_KEYS
+appconfig:
+  APPCONFIG_ENABLED: "true"
+  APPCONFIG_FEATURE_ENABLED: "true"
+  APPCONFIG_ENVIRONMENT: "uat"
+  APPCONFIG_APPLICATION: "onb-kyc"
+  APPCONFIG_PROFILE: "kyc-uat"
+  APPCONFIG_MAX_CONFIG_AGE: "900"
+  COM_APPCONFIG_APPLICATION: "811-services-appconfig"
+  COM_APPCONFIG_PROFILE: "common-appconfig-uat"
+  COM_APPCONFIG_MAX_CONFIG_AGE: "300"
+  FF_APPCONFIG_APPLICATION: "onb-kyc"
+  FF_APPCONFIG_PROFILE: "kyc-feature-flags-uat"
+  FF_APPCONFIG_MAX_CONFIG_AGE: "900"
+  PROJECT_NAME: "811_app_ms_kyc"
+  ENV: "uat"
+  OTEL_RESOURCE_ATTRIBUTES:  "application=k811-onb-uat"
+  OTEL_SERVICE_NAME:  "k811-ms-kyc"
+  OTEL_METRICS_EXPORTER: "none"
+  OTEL_TRACES_EXPORTER: "otlp_proto_http"
+  OTEL_EXPORTER_OTLP_ENDPOINT: "http://$(NODE):4318"
+  OTEL_PROPAGATORS: "b3,tracecontext,baggage"
+  OTEL_PYTHON_LOG_CORRELATION: "true"
+  OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_REQUEST: "x-platform-id,x-reg-id,x-request-id,x-session-id"
+  OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_RESPONSE: "x-platform-id,x-reg-id,x-request-id,x-session-id"
+  OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_REQUEST: "x-platform-id,x-reg-id,x-request-id,x-session-id"
+  OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_RESPONSE: "x-platform-id,x-reg-id,x-request-id,x-session-id"
+trafficip: 10.0.0.0/8
+node:
+  name: node
+  operator: In
+nodegroup:
+  labels: ["stateless-spot,stateless-ondemand"]
+probePath: kyc/health/
+image:
+  repository: 483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_kyc
+  tag: 811_app_ms_kyc-development-20230522.1
+  name: k811-kyc
+  pullPolicy: IfNotPresent  
+serviceaccount:
+  enabled: true
+  name: 811-onb-uat-sa-kyc
+  role: arn:aws:iam::483584640083:role/k811-onb-uat-eks-kyc-sa
+rolebinding: k811-kyc
+service:
+  name: k811-kyc 
+  type: ClusterIP
+  externalPort: 8080
+  internalPort: 8080
+  portName: k811-kyc
+  internalPort_cron: 8028  
+resources:
+  limits:
+    cpu: 1000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1024Mi
+gateways:    
+  gateway: gateway
+  prefix: "/kyc"
+  host: "*"
+  internalPort: 8080
+  weightvalue: 100
+cron_name: k811-ms-kyc-bitly-submit-cronjob  
+schedule: '"*/10 * * * *"'
+timezone: "Asia/Kolkata"
+restartPolicy: OnFailure
+arguments:
+  - sh
+  - -c
+  - |
+    echo "check the logs"
+    opentelemetry-instrument python3 /k811/app/cron_jobs/bitly_submit_retry.py
+isCustomIstio:
+  enabled: false
+  encryption: "dev/istio_codec/symmetric"
+  enc_path: .*
+  exclude_enc_path: $^
+  aws_region: ap-south-1    
+custom_istio_image:
+  repository: 483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_istio_proxy
+  istio_tag: 811_istio_proxy-development-20250210.1 
+spreadAz: true
+podAntiAffinity: "none" #Accepted values are none, soft and hard. If this variable not defined then takes hard scheduling by default
+
