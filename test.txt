@@ -1,2 +1,9 @@
-
-/uat-azure-pipelines/k811-ms-kyc-bitly-submit-new-cronjob.yaml (Line: 70, Col: 18): Unexpected parameter 'DeployUAT'
+########################## List of deployed cronjobs ########################################
+k811-ms-kyc-bitly-submit-new-cronjob           */10 * * * *          Asia/Kolkata   False     0        <none>          19s
+########################## Get logs of latest pod ########################################
+No resources found in 811-uat namespace.
+error: expected 'logs [-f] [-p] (POD | TYPE/NAME) [-c CONTAINER]'.
+POD or TYPE/NAME is a required argument for the logs command
+See 'kubectl logs -h' for help and examples
+##[error]Bash exited with code '1'.
+Finishing: Application Status
