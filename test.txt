@@ -32,21 +32,21 @@ stages:
                   unset AWS_SESSION_TOKEN
                   unset AWS_SECRET_ACCESS_KEY
                   unset AWS_ACCESS_KEY_ID
-                  CREDENTIALS=`aws sts assumeussion-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
                   export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
                   export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
                   export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-                  echo "Logging into Dev ECR"
-                  aws ecr get-login-password --region $(DEV_AWS_REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(DEV_AWS_REGION).amazonaws.com
+                  echo "Logging into Source (Dev) ECR"
+                  aws ecr get-login-password --region $(SOURCE_AWS_REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com
                   echo "Logging into UAT ECR"
                   aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
-                  echo "Pulling image from Dev ECR"
-                  docker pull $(AWS_ACCOUNT_ID).dkr.ecr.$(DEV_AWS_REGION).amazonaws.com/$(DEV_ECR_FOLDER_NAME)/$(DEV_ECR_REPO_NAME):${{ parameters.ImageTag }}
+                  echo "Pulling image from Source (Dev) ECR"
+                  docker pull $(AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }}
                   echo "Tagging image for UAT ECR"
-                  docker tag $(AWS_ACCOUNT_ID).dkr.ecr.$(DEV_AWS_REGION).amazonaws.com/$(DEV_ECR_FOLDER_NAME)/$(DEV_ECR_REPO_NAME):${{ parameters.ImageTag }} $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_FOLDER_NAME)/$(ECR_REPO_NAME):${{ parameters.ImageTag }}
+                  docker tag $(AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }} $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_FOLDER_NAME)/$(ECR_REPO_NAME):${{ parameters.ImageTag }}
                   echo "Pushing image to UAT ECR"
                   docker push $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_FOLDER_NAME)/$(ECR_REPO_NAME):${{ parameters.ImageTag }}
-                displayName: "Copy Image from Dev ECR to UAT ECR"
+                displayName: "Copy Image from Source (Dev) ECR to UAT ECR"
                 condition: and(succeeded(), ne('${{ parameters.ImageTag }}', ''))
 
               - script: |
