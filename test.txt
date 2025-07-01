@@ -1,99 +1,33 @@
-```yaml
-parameters:
-  - name: DeployUAT
-    type: boolean
-    default: true
-  - name: service
-    type: string
-  - name: ImageTag
-    type: string
-    default: ""
-
-stages:
-  - ${{ if eq( parameters['DeployUAT'], true) }}:
-      - stage: UAT
-        displayName: "Build in UAT Environment"
-        jobs:
-          - job: UpdateHelmCharts
-            displayName: "Cronjob Update"
-            steps:
-              - script: |
-                  pwd
-                  echo "AWS_ACCOUNT_ID: ${AWS_ACCOUNT_ID}"
-                  echo "SOURCE_AWS_REGION: ${SOURCE_AWS_REGION}"
-                  echo "AWS_REGION: ${AWS_REGION}"
-                  echo "SOURCE_ECR: ${SOURCE_ECR_FOLDER_NAME}/${SOURCE_ECR_REPO_NAME}"
-                  echo "UAT_ECR: ${ECR_FOLDER_NAME}/${ECR_REPO_NAME}"
-                  echo "ImageTag: ${{ parameters.ImageTag }}"
-                  echo "Build_DefinitionName: ${Build_DefinitionName}"
-                  echo "Build_BuildNumber: ${Build_BuildNumber}"
-                  echo "RoleSessionName: ${Build_DefinitionName}-${Build_BuildNumber}"
-                  env | grep -E 'AWS|Build|HELM' || echo "No matching environment variables"
-                displayName: "Debug Variables"
-
-              - script: |
-                  pwd
-                  if [ -z "${{ parameters.ImageTag }}" ]; then
-                    echo "Error: ImageTag parameter is required."
-                    exit 1
-                  fi
-                  echo "Using provided image tag: ${{ parameters.ImageTag }}"
-                  echo "##vso[task.setvariable variable=version]${{ parameters.ImageTag }}"
-                displayName: "Validate and Set Image Tag"
 
               - script: |
                   pwd
                   unset AWS_SESSION_TOKEN
                   unset AWS_SECRET_ACCESS_KEY
                   unset AWS_ACCESS_KEY_ID
-                  SESSION_NAME="${Build_DefinitionName}-${Build_BuildNumber}"
-                  if [ ${#SESSION_NAME} -lt 2 ] || [ -z "${SESSION_NAME}" ]; then
-                    SESSION_NAME="pipeline-$(date +%s)"
-                    echo "Warning: RoleSessionName '${Build_DefinitionName}-${Build_BuildNumber}' is invalid or too short, using fallback: ${SESSION_NAME}"
-                  fi
-                  CREDENTIALS=$(aws sts assume-role --role-arn arn:aws:iam::${AWS_ACCOUNT_ID}:role/${ROLE_NAME} --role-session-name "${SESSION_NAME}")
-                  if [ $? -ne 0 ]; then
-                    echo "Error: Failed to assume role with RoleSessionName: ${SESSION_NAME}"
-                    exit 1
-                  fi
-                  export AWS_SESSION_TOKEN=$(echo "${CREDENTIALS}" | jq -r '.Credentials.SessionToken')
-                  export AWS_SECRET_ACCESS_KEY=$(echo "${CREDENTIALS}" | jq -r '.Credentials.SecretAccessKey')
-                  export AWS_ACCESS_KEY_ID=$(echo "${CREDENTIALS}" | jq -r '.Credentials.AccessKeyId')
-                  echo "Checking if image exists in UAT ECR"
-                  IMAGE_EXISTS=$(aws ecr describe-images --repository-name ${ECR_FOLDER_NAME}/${ECR_REPO_NAME} --region ${AWS_REGION} --image-ids imageTag=${{ parameters.ImageTag }} --query 'imageDetails' --output text 2>/dev/null || echo "not_found")
-                  if [ "$IMAGE_EXISTS" != "not_found" ]; then
-                    echo "Image with tag ${{ parameters.ImageTag }} already exists in UAT ECR, skipping copy."
-                  else
-                    echo "Logging into Source ECR"
-                    aws ecr get-login-password --region ${SOURCE_AWS_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${SOURCE_AWS_REGION}.amazonaws.com
-                    echo "Logging into UAT ECR"
-                    aws ecr get-login-password --region ${AWS_REGION} | docker login --username AWS --password-stdin ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com
-                    echo "Pulling image from Source ECR"
-                    docker pull ${AWS_ACCOUNT_ID}.dkr.ecr.${SOURCE_AWS_REGION}.amazonaws.com/${SOURCE_ECR_FOLDER_NAME}/${SOURCE_ECR_REPO_NAME}:${{ parameters.ImageTag }}
-                    echo "Assigning UAT ECR repository URI for the image"
-                    docker tag ${AWS_ACCOUNT_ID}.dkr.ecr.${SOURCE_AWS_REGION}.amazonaws.com/${SOURCE_ECR_FOLDER_NAME}/${SOURCE_ECR_REPO_NAME}:${{ parameters.ImageTag }} ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_FOLDER_NAME}/${ECR_REPO_NAME}:${{ parameters.ImageTag }}
-                    echo "Pushing image to UAT ECR"
-                    docker push ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_FOLDER_NAME}/${ECR_REPO_NAME}:${{ parameters.ImageTag }}
-                  fi
-                displayName: "Copy Image from Source ECR to UAT ECR"
-                condition: and(succeeded(), ne('${{ parameters.ImageTag }}', ''))
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  image=$(kubectl get deployment $(SERVICE_NAME) -o jsonpath=''{$.spec.template.spec.containers[:1].image}'' -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH))
+                  echo "Below Image is for reference the Existing Docker Image:"
+                  echo $image
+                displayName: "Existing Docker image of $(SERVICE_NAME)"
 
               - script: |
                   pwd
-                  # Ensure Build_BuildNumber is set
-                  if [ -z "${Build_BuildNumber}" ] || ! echo "${Build_BuildNumber}" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
-                    echo "Warning: Build_BuildNumber '${Build_BuildNumber}' is unset or invalid, using fallback: 1"
-                    Build_BuildNumber="1"
+                  sed -i -e 's/name:.*/name: $(SERVICE_NAME)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+                  sed -i -e 's/appVersion:.*/appVersion: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+                  sed -i -e 's/version:.*/version: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+                  sed -i -e 's/tag:.*/tag: $(version)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(ENV)-values.yaml
+                  sed -i -e 's/istio_tag:.*/istio_tag: $(istio_image)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(ENV)-values.yaml
+                  if [[ ${{ parameters.ENABLE_ISTIO }} == "True" ]]; then
+                    echo "Custom Istio is enabled"
+                    awk '/isCustomIstio:/ { found=1 } found && /enabled:/ { sub(/false/, "true"); found=0 } { print }' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(ENV)-values.yaml > temp.yaml
+                    mv temp.yaml $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(ENV)-values.yaml
+                  else
+                    awk '/isCustomIstio:/ { found=1 } found && /enabled:/ { sub(/true/, "false"); found=0 } { print }' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(ENV)-values.yaml > temp.yaml
+                    mv temp.yaml $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(ENV)-values.yaml
                   fi
-                  sed -i -e 's/name:.*/name: ${{ parameters.service }}/' $(System.DefaultWorkingDirectory)/${HELM_CHARTS_PATH}/Chart.yaml
-                  sed -i -e 's/appVersion:.*/appVersion: 1.${Build_BuildNumber}.0/' $(System.DefaultWorkingDirectory)/${HELM_CHARTS_PATH}/Chart.yaml
-                  sed -i -e 's/version:.*/version: 1.${Build_BuildNumber}.0/' $(System.DefaultWorkingDirectory)/${HELM_CHARTS_PATH}/Chart.yaml
-                  sed -i -e 's|repository:.*|repository: ${AWS_ACCOUNT_ID}.dkr.ecr.${AWS_REGION}.amazonaws.com/${ECR_FOLDER_NAME}/${ECR_REPO_NAME}|' $(System.DefaultWorkingDirectory)/${HELM_CHARTS_PATH}/${ENV}-values.yaml
-                  sed -i -e 's/tag:.*/tag: ${{ parameters.ImageTag }}/' $(System.DefaultWorkingDirectory)/${HELM_CHARTS_PATH}/${ENV}-values.yaml
-                  echo "Chart.yaml contents:"
-                  cat $(System.DefaultWorkingDirectory)/${HELM_CHARTS_PATH}/Chart.yaml
-                  echo "Values file contents:"
-                  cat $(System.DefaultWorkingDirectory)/${HELM_CHARTS_PATH}/${ENV}-values.yaml
                 displayName: "Updating Chart Values"
 
               - script: |
@@ -101,65 +35,32 @@ stages:
                   unset AWS_SESSION_TOKEN
                   unset AWS_SECRET_ACCESS_KEY
                   unset AWS_ACCESS_KEY_ID
-                  SESSION_NAME="${Build_DefinitionName}-${Build_BuildNumber}"
-                  if [ ${#SESSION_NAME} -lt 2 ] || [ -z "${SESSION_NAME}" ]; then
-                    SESSION_NAME="pipeline-$(date +%s)"
-                    echo "Warning: RoleSessionName '${Build_DefinitionName}-${Build_BuildNumber}' is invalid or too short, using fallback: ${SESSION_NAME}"
-                  fi
-                  # Ensure Build_BuildNumber is set
-                  if [ -z "${Build_BuildNumber}" ] || ! echo "${Build_BuildNumber}" | grep -qE '^[0-9]+(\.[0-9]+)*$'; then
-                    echo "Warning: Build_BuildNumber '${Build_BuildNumber}' is unset or invalid, using fallback: 1"
-                    Build_BuildNumber="1"
-                  fi
-                  CREDENTIALS=$(aws sts assume-role --role-arn arn:aws:iam::${AWS_ACCOUNT_ID}:role/${ROLE_NAME} --role-session-name "${SESSION_NAME}")
-                  if [ $? -ne 0 ]; then
-                    echo "Error: Failed to assume role with RoleSessionName: ${SESSION_NAME}"
-                    exit 1
-                  fi
-                  export AWS_SESSION_TOKEN=$(echo "${CREDENTIALS}" | jq -r '.Credentials.SessionToken')
-                  export AWS_SECRET_ACCESS_KEY=$(echo "${CREDENTIALS}" | jq -r '.Credentials.SecretAccessKey')
-                  export AWS_ACCESS_KEY_ID=$(echo "${CREDENTIALS}" | jq -r '.Credentials.AccessKeyId')
-                  echo "Packaging Helm chart for local use"
-                  helm package $(System.DefaultWorkingDirectory)/${HELM_CHARTS_PATH}/ --version "1.${Build_BuildNumber}.0" || { echo "Error: Failed to package Helm chart"; exit 1; }
-                  echo "Listing packaged files"
-                  ls -l $(System.DefaultWorkingDirectory)/*.tgz || { echo "Error: No tgz files found"; exit 1; }
-                  echo "Extracting Helm chart"
-                  tar -xvf $(System.DefaultWorkingDirectory)/${{ parameters.service }}-1.${Build_BuildNumber}.0.tgz -C $(System.DefaultWorkingDirectory) || { echo "Error: Failed to extract Helm chart"; exit 1; }
-                  echo "Listing extracted files"
-                  ls -l $(System.DefaultWorkingDirectory)/${{ parameters.service }}/
-                  echo "Starting the deployment in namespace ${NAMESPACE}"
-                  helm upgrade --install ${ENV}-${{ parameters.service }} $(System.DefaultWorkingDirectory)/${{ parameters.service }}/ -f $(System.DefaultWorkingDirectory)/${{ parameters.service }}/${ENV}-values.yaml --namespace ${NAMESPACE} --kubeconfig ${KUBE_CONFIG_PATH} --wait --timeout 3m || { echo "Error: Helm deployment failed"; exit 1; }
-                displayName: "Helm Charts Deployment"
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  helm s3 init $(HELM_S3BUCKET_URL)
+                  helm repo add $(ENV)-$(SERVICE_NAME) $(HELM_S3BUCKET_URL) 
+                  helm package $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/
+                  helm s3 push --force $(System.DefaultWorkingDirectory)/$(SERVICE_NAME)-1.$(Build.BuildNumber).tgz $(ENV)-$(SERVICE_NAME)
+                  aws s3 ls $(HELM_S3BUCKET_URL) 
+                  helm repo update 
+                  helm search repo $(ENV)-$(SERVICE_NAME)
+                displayName: "Charts Push To S3"
 
               - script: |
                   pwd
                   unset AWS_SESSION_TOKEN
                   unset AWS_SECRET_ACCESS_KEY
                   unset AWS_ACCESS_KEY_ID
-                  SESSION_NAME="${Build_DefinitionName}-${Build_BuildNumber}"
-                  if [ ${#SESSION_NAME} -lt 2 ] || [ -z "${SESSION_NAME}" ]; then
-                    SESSION_NAME="pipeline-$(date +%s)"
-                    echo "Warning: RoleSessionName '${Build_DefinitionName}-${Build_BuildNumber}' is invalid or too short, using fallback: ${SESSION_NAME}"
-                  fi
-                  CREDENTIALS=$(aws sts assume-role --role-arn arn:aws:iam::${AWS_ACCOUNT_ID}:role/${ROLE_NAME} --role-session-name "${SESSION_NAME}")
-                  if [ $? -ne 0 ]; then
-                    echo "Error: Failed to assume role with RoleSessionName: ${SESSION_NAME}"
-                    exit 1
-                  fi
-                  export AWS_SESSION_TOKEN=$(echo "${CREDENTIALS}" | jq -r '.Credentials.SessionToken')
-                  export AWS_SECRET_ACCESS_KEY=$(echo "${CREDENTIALS}" | jq -r '.Credentials.SecretAccessKey')
-                  export AWS_ACCESS_KEY_ID=$(echo "${CREDENTIALS}" | jq -r '.Credentials.AccessKeyId')
-                  echo "########################## List of deployed cronjobs ########################################"
-                  kubectl get cronjob --namespace ${NAMESPACE} --kubeconfig ${KUBE_CONFIG_PATH} | grep -i ${{ parameters.service }} || echo "No cronjobs found for ${{ parameters.service }}"
-                  echo "########################## List of pods ########################################"
-                  kubectl get po --namespace ${NAMESPACE} --kubeconfig ${KUBE_CONFIG_PATH} | grep -i ${{ parameters.service }} || echo "No pods found for ${{ parameters.service }} in namespace ${NAMESPACE}"
-                  echo "########################## Get logs of latest pod ########################################"
-                  POD_NAME=$(kubectl get pods --sort-by=.metadata.creationTimestamp -l app=${{ parameters.service }} -n ${NAMESPACE} --kubeconfig ${KUBE_CONFIG_PATH} -o jsonpath='{.items[-1:].metadata.name}' 2>/dev/null)
-                  if [ -n "$POD_NAME" ]; then
-                    kubectl logs $POD_NAME -n ${NAMESPACE} --kubeconfig ${KUBE_CONFIG_PATH} || echo "Failed to retrieve logs for pod $POD_NAME"
-                  else
-                    echo "No pods found to retrieve logs for ${{ parameters.service }} in namespace ${NAMESPACE}"
-                  fi
-                displayName: "Application Status"
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  rm -rf $(System.DefaultWorkingDirectory)/*.tgz
+                  helm repo update
+                  helm fetch $(ENV)-$(SERVICE_NAME)/$(SERVICE_NAME)
+                  tar -xvf $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
+                  helm upgrade --install $(ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ -f $(SERVICE_NAME)/$(ENV)-values.yaml --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) --wait --timeout 3m
+                displayName: "Helm Charts Deployment"
                 continueOnError: true
-```
