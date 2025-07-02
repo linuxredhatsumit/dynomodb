@@ -1,22 +1,83 @@
+again error
+
+/templates/uat/uat-cron-deploy-tag.yaml (Line: 15, Col: 1):  While parsing a block mapping, did not find expected key.
+/uat-azure-pipelines/k811-ms-kyc-bitly-submit-new-cronjob.yaml: Object reference not set to an instance of an object.
+
+
+plz valide the yaml
+
+
+trigger: none
+
+variables:
+  - name: ENV
+    value: prod
+  - name: SERVICE_NAME
+    value: k811-ms-cc-limit-correct-cronjob
+  # Pool details
+  - name: POOL_NAME
+    value: "k811-prod"
+  # For AWS Role Access
+  - name: AWS_ACCOUNT_ID
+    value: "718378052708"
+  - name: ROLE_NAME
+    value: EKS-Setup-Role-Kotak811
+  # Helm related variables
+  - name: HELM_CHARTS_PATH
+    value: helm-charts/k811-ms-cc-limit-correct-cronjob/
+  - name: HELM_S3BUCKET_URL
+    value: s3://k811-onb-helmcharts/prod/k811-ms-cc-limit-correct-cronjob/
+  - name: KUBE_CONFIG_PATH
+    value: /home/app_user/.kube/config-prod
+  - name: NAMESPACE
+    value: prod
+  - group: PROD-Static-Variables
+  - name: DR_HELM_S3BUCKET_URL
+    value: s3://k811-onb-helmcharts-dr/prod/k811-ms-cc-limit-correct-cronjob/
+  - name: DR_KUBE_CONFIG_PATH
+    value: /home/app_user/.kube/config-onb-dr
+  - name: DR_NAMESPACE
+    value: prod-dr
+  # prod ECR details
+  - name: AWS_REGION
+    value: ap-south-1
+  - name: ECR_FOLDER_NAME
+    value: 811prodonb
+  - name: ECR_REPO_NAME
+    value: k811_ms_cc_applications
+  # DR ECR details
+  - name: DR_AWS_REGION
+    value: ap-south-2
+  - name: DR_ECR_FOLDER_NAME
+    value: 811prodonb
+  - name: DR_ECR_REPO_NAME
+    value: k811_ms_cc_applications
+
 parameters:
-  - name: DeployUAT
+  - name: DeployPROD
+    displayName: "Deploy to prod"
     type: boolean
     default: true
   - name: DeployDR
+    displayName: "Deploy to DR"
     type: boolean
     default: false
-  - name: ImageTag
+  - name: Jira_URL
     type: string
-    default: ''
+    default: ""
+    displayName: "Jira URL"
 
-# =============================================
-# ============== UAT SECTION ==================
-# =============================================
-- ${{ if eq(parameters.DeployUAT, true) }}:
-  - script: |
-      pwd
-      sed -i -e 's/name:.*/name: $(SERVICE_NAME)/' $(HELM_CHARTS_PATH)/Chart.yaml
-      sed -i -e 's/appVersion:.*/appVersion: ${{ parameters.ImageTag }}/' $(HELM_CHARTS_PATH)/Chart.yaml
-      sed -i -e 's/version:.*/version: ${{ parameters.ImageTag }}/' $(HELM_CHARTS_PATH)/Chart.yaml
-    displayName: "UAT: Update Helm Chart Metadata"
-    workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
+pool:
+  name: $(POOL_NAME)
+
+stages:
+  - template: ../templates/prod-cron-deploy.yaml
+  
+    parameters:
+      DeployPROD: ${{ parameters.DeployPROD }}
+      service: $(SERVICE_NAME)
+
+  - template: ../templates/prod-cron-deploy-dr.yaml
+    parameters:
+      DeployDR: ${{ parameters.DeployDR }}
+      service: $(SERVICE_NAME)
