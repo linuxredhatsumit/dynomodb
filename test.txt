@@ -1,2 +1,8 @@
-
-/templates/uat/uat-cron-deploy-tag.yaml (Line: 217, Col: 21): The directive 'if' is not allowed in this context. Directives are not supported for expressions that are embedded within a string. Directives are only supported when the entire value is an expression.
+- ${{ if eq(parameters.DeployUAT, true) }}:
+  - script: |
+      pwd
+      sed -i -e 's/name:.*/name: $(SERVICE_NAME)/' $(HELM_CHARTS_PATH)/Chart.yaml
+      sed -i -e 's/appVersion:.*/appVersion: $(ImageTag)/' $(HELM_CHARTS_PATH)/Chart.yaml
+      sed -i -e 's/version:.*/version: $(ImageTag)/' $(HELM_CHARTS_PATH)/Chart.yaml
+    displayName: "UAT: Update Helm Chart Metadata"
+    workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
