@@ -1,73 +1,16 @@
-parameters:
-  - name: DeployUAT
-    type: boolean
-    default: true
-  - name: ImageTag
-    type: string
-    default: ''
-
-jobs:
-- job: Deploy_UAT
-  condition: and(succeeded(), eq('${{ parameters.DeployUAT }}', 'true'))
-  displayName: "UAT Deployment Job"
-  steps:
-    - script: |
-        echo "Updating Helm Chart Metadata"
-        pwd
-        sed -i -e 's/name:.*/name: $(SERVICE_NAME)/' $(Build.SourcesDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
-        sed -i -e 's/appVersion:.*/appVersion: ${{ parameters.ImageTag }}/' $(Build.SourcesDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
-        sed -i -e 's/version:.*/version: ${{ parameters.ImageTag }}/' $(Build.SourcesDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
-      displayName: "UAT: Update Helm Chart Metadata"
-      
-    - script: |
-        echo "Assuming AWS Role for UAT"
-        unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
-        CREDS=$(aws sts assume-role \
-          --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) \
-          --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
-        export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
-        export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
-        export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
-        helm s3 init $(HELM_S3BUCKET_URL)
-        helm repo add $(ENV)-$(SERVICE_NAME) $(HELM_S3BUCKET_URL)
-        cd $(Build.SourcesDirectory)/$(HELM_CHARTS_PATH)
-        helm package .
-        mv *.tgz $(Build.SourcesDirectory)
-        helm s3 push --force $(Build.SourcesDirectory)/$(SERVICE_NAME)-${{ parameters.ImageTag }}.tgz $(ENV)-$(SERVICE_NAME)
-        helm repo update
-      displayName: "UAT: Push Helm Chart to S3"
-
-    - script: |
-        echo "Deploying Helm Chart to UAT"
-        unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
-        CREDS=$(aws sts assume-role \
-          --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) \
-          --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
-        export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
-        export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
-        export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
-        cd $(Build.SourcesDirectory)
-        helm pull $(ENV)-$(SERVICE_NAME)/$(SERVICE_NAME) --version ${{ parameters.ImageTag }}
-        tar -xvf $(SERVICE_NAME)-${{ parameters.ImageTag }}.tgz
-        helm upgrade --install $(ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ \
-          -f $(SERVICE_NAME)/$(ENV)-values.yaml \
-          --namespace $(NAMESPACE) \
-          --kubeconfig $(KUBE_CONFIG_PATH) \
-          --wait --timeout 3m
-      displayName: "UAT: Helm Upgrade or Install"
-
-    - script: |
-        echo "Verifying Deployment"
-        unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
-        CREDS=$(aws sts assume-role \
-          --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) \
-          --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
-        export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
-        export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
-        export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
-        sleep 10
-        echo "==== Pods ===="
-        kubectl get pods -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME) || true
-        echo "==== Deployments ===="
-        kubectl get deployment -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME) || true
-      displayName: "UAT: Post Deployment Status"
+Assuming AWS Role for UAT
+Initialized empty repository at s3://kotak811-helmcharts/uat/k811-ms-kyc-bitly-submit-new-cronjob/
+"uat-k811-ms-kyc-bitly-submit-new-cronjob" already exists with the same configuration, skipping
+Error: validation: chart.metadata.version "811_app_ms_kyc-sf_acqui_integration_with_retry-20250624.1" is invalid
+mv: cannot stat '*.tgz': No such file or directory
+Error: failed to load chart file: stat k811-ms-kyc-bitly-submit-new-cronjob-811_app_ms_kyc-sf_acqui_integration_with_retry-20250624.1.tgz: no such file or directory
+Error: plugin "s3" exited with error
+Hang tight while we grab the latest from your chart repositories...
+...Successfully got an update from the "dev-agent-assisted-portal" chart repository
+...Successfully got an update from the "dev-k811-customer-data" chart repository
+...Successfully got an update from the "secrets-store-csi-driver" chart repository
+...Successfully got an update from the "dev-k811-frm" chart repository
+...Successfully got an update from the "apache-airflow" chart repository
+...Successfully got an update from the "dev-arm-aadhaar-vault" chart repository
+...Successfully got an update from the "clickhouse-operator" chart repository
+...Successfully got an update from the "uat-dr-k811-cc-consumer" chart repo
