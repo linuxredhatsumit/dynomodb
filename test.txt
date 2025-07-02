@@ -4,6 +4,7 @@ metadata:
   namespace: {{ .Values.namespace }}
   name: {{ .Values.cron_name }}
   labels:
+    app: {{ .Values.cron_name }}
     chart: "{{ .Values.cron_name }}-{{ .Chart.Version | replace "+" "_" }}"
 spec:
   schedule: {{ .Values.schedule }}
@@ -20,38 +21,38 @@ spec:
             sidecar.istio.io/inject: "false"
         spec:
           serviceAccountName: {{ .Values.serviceaccount.name }}
-          {{- if eq .Values.namespace "dev"}}
+          {{- if eq .Values.namespace "dev" }}
           affinity:
             nodeAffinity:
               requiredDuringSchedulingIgnoredDuringExecution:
                 nodeSelectorTerms:
-                - matchExpressions:
-                  - key: node
-                    operator: In
-                    values:
-                    - stateless-amd
+                  - matchExpressions:
+                      - key: node
+                        operator: In
+                        values:
+                          - stateless-amd
           tolerations:
-          - effect: NoSchedule
-            key: amd
-            operator: Equal
-            value: "yes"
-          {{- end }}          
-          restartPolicy: {{ .Values.restartPolicy }}          
+            - effect: NoSchedule
+              key: amd
+              operator: Equal
+              value: "yes"
+          {{- end }}
+          restartPolicy: {{ .Values.restartPolicy }}
           containers:
-          - name: {{ .Values.cron_name }}
-            image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-            imagePullPolicy: {{ .Values.image.pullPolicy }}
-            args:
-            {{- toYaml .Values.arguments | nindent 12 }}
-            ports:
-            - containerPort: {{ .Values.service.internalPort_cron }}
-            envFrom:            
-            - configMapRef:
-                name: {{ .Chart.Name }}-configmap  
-            env:
-              - name: NODE
-                valueFrom:
-                  fieldRef:
-                    fieldPath: status.hostIP
-              - name: OTEL_EXPORTER_OTLP_ENDPOINT
-                value: {{ .Values.appconfig.OTEL_EXPORTER_OTLP_ENDPOINT }}                        
+            - name: {{ .Values.cron_name }}
+              image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+              imagePullPolicy: {{ .Values.image.pullPolicy }}
+              args:
+              {{- toYaml .Values.arguments | nindent 16 }}
+              ports:
+                - containerPort: {{ .Values.service.internalPort_cron }}
+              envFrom:
+                - configMapRef:
+                    name: {{ .Chart.Name }}-configmap
+              env:
+                - name: NODE
+                  valueFrom:
+                    fieldRef:
+                      fieldPath: status.hostIP
+                - name: OTEL_EXPORTER_OTLP_ENDPOINT
+                  value: {{ .Values.appconfig.OTEL_EXPORTER_OTLP_ENDPOINT }}
