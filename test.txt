@@ -1,12 +1,12 @@
 echo "Checking if image already exists in UAT ECR..."
-          if ! aws ecr describe-images --repository-name $(SERVICE_NAME) --image-ids imageTag=${{ parameters.ImageTag }} --region ap-south-1 > /dev/null 2>&1; then
-            echo "Image not found in UAT. Copying from Dev..."
-            aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com
-            aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com
+if ! aws ecr describe-images --repository-name $(SERVICE_NAME) --image-ids imageTag=${{ parameters.ImageTag }} --region ap-south-1 > /dev/null 2>&1; then
+  echo "Image not found in UAT. Copying from Dev..."
+  aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com
+  aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com
 
-            docker pull $source_image
-            docker tag $source_image $target_image
-            docker push $target_image
-          else
-            echo "Image already exists in UAT ECR. Skipping push."
-          fi
+  docker pull $source_image
+  docker tag $source_image $target_image
+  docker push $target_image
+else
+  echo "Image already exists in UAT ECR. Skipping push."
+fi
