@@ -1,128 +1,94 @@
-trigger: none
+parameters:
+  - name: DeployUAT
+    type: boolean
+    default: true
+  - name: DeployDR
+    type: boolean
+    default: false
+  - name: ImageTag
+    type: string
+    default: ''
 
 variables:
-  - name: ENV
-    value: prod
-  - name: SERVICE_NAME
-    value: k811-dc-charging-atptfile-cronjob
-  #Access Details
-  - name: AWS_ACCOUNT_ID
-    value: "718378052708"
-  - name: ROLE_NAME
-    value: EKS-Setup-Role-Kotak811
-  #pool details
-  - name: POOL_NAME
-    value: "k811-prod"
-  # helm related variables
-  - name: HELM_CHARTS_PATH
-    value: helm-charts/k811-dc-charging-consumer-atptfile-cronjob/charts
-  - name: HELM_S3BUCKET_URL
-    value: s3://k811-onb-helmcharts/prod/k811-dc-charging-consumer-atptfile-cronjob/
-  - name: KUBE_CONFIG_PATH
-    value: /home/app_user/.kube/config-prod
-  - name: NAMESPACE
-    value: prod
-  # DR Values
-  - name: DR_ENV
-    value: prod-dr
-  - name: DR_HELM_S3BUCKET_URL
-    value: s3://k811-onb-helmcharts-dr/prod/k811-dc-charging-consumer-atptfile-cronjob/
-  - name: DR_KUBE_CONFIG_PATH
-    value: /home/app_user/.kube/config-onb-dr
+  - name: ImageTag
+    value: ${{ parameters.ImageTag }}
 
-pool:
-  name: $(POOL_NAME)
+# =============================================
+# ============== UAT SECTION ==================
+# =============================================
+- ${{ if eq(parameters.DeployUAT, true) }}:
+  - script: |
+      pwd
+      sed -i -e 's/name:.*/name: $(SERVICE_NAME)/' $(HELM_CHARTS_PATH)/Chart.yaml
+      sed -i -e 's/appVersion:.*/appVersion: $(ImageTag)/' $(HELM_CHARTS_PATH)/Chart.yaml
+      sed -i -e 's/version:.*/version: $(ImageTag)/' $(HELM_CHARTS_PATH)/Chart.yaml
+    displayName: "UAT: Update Helm Chart Metadata"
+    workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
 
-stages:
-  - stage: Dev
-    displayName: "Build in Dev Environment"
-    jobs:
-      - job: BuildAndDeploy
-        displayName: "Application Build and deploy"
-        steps:
-          - script: |
-              pwd
-              sed -i -e 's/name:.*/name: $(SERVICE_NAME)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
-              sed -i -e 's/appVersion:.*/appVersion: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
-              sed -i -e 's/version:.*/version: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
-            displayName: "Updating Chart Values"
+  - script: |
+      # assume UAT role
+      export CREDENTIALS=$(aws sts assume-role --role-arn arn:aws:iam::$(UAT_AWS_ACCOUNT_ID):role/$(UAT_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber))
+      export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r '.Credentials.SessionToken')
+      export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey')
+      export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId')
 
-          - script: |
-              pwd
-              unset AWS_SESSION_TOKEN
-              unset AWS_SECRET_ACCESS_KEY
-              unset AWS_ACCESS_KEY_ID
-              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
-              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-              helm s3 init $(HELM_S3BUCKET_URL)
-              helm repo add $(ENV)-$(SERVICE_NAME) $(HELM_S3BUCKET_URL) 
-              helm package $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/
-              helm s3 push --force $(System.DefaultWorkingDirectory)/$(SERVICE_NAME)-1.$(Build.BuildNumber).tgz $(ENV)-$(SERVICE_NAME)
-              aws s3 ls $(HELM_S3BUCKET_URL) 
-              helm repo update 
-              helm search repo $(ENV)-$(SERVICE_NAME)
-            displayName: "Charts Push To S3"
+      helm s3 init $(HELM_S3BUCKET_URL)
+      helm repo add uat-$(SERVICE_NAME) $(HELM_S3BUCKET_URL)
+      helm package $(HELM_CHARTS_PATH)/
+      helm s3 push --force $(SERVICE_NAME)-$(ImageTag).tgz uat-$(SERVICE_NAME)
+    displayName: "UAT: Push Helm Chart to S3"
+    workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
 
-          - script: |
-              pwd
-              unset AWS_SESSION_TOKEN
-              unset AWS_SECRET_ACCESS_KEY
-              unset AWS_ACCESS_KEY_ID
-              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
-              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-              rm -rf $(System.DefaultWorkingDirectory)/*.tgz
-              helm repo update
-              helm fetch $(ENV)-$(SERVICE_NAME)/$(SERVICE_NAME)
-              tar -xvf $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
-              echo "Starting the deployment in the namespace $(NAMESPACE)"
-              helm upgrade --install $(ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ -f $(SERVICE_NAME)/$(ENV)-values.yaml --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH)
-            displayName: "Helm Charts Deployment"
+  - script: |
+      # deploy chart to UAT
+      helm repo update
+      helm fetch uat-$(SERVICE_NAME)/$(SERVICE_NAME)
+      tar -xvf $(SERVICE_NAME)-$(ImageTag).tgz
+      helm upgrade --install uat-$(SERVICE_NAME) $(SERVICE_NAME)/ -f $(SERVICE_NAME)/uat-values.yaml --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) --wait --timeout 3m
+    displayName: "UAT: Helm Deployment"
+    workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
 
-      - job: BuildAndDeployDR
-        displayName: "Application Build and deploy for DR"
-        steps:
-          - script: |
-              pwd
-              sed -i -e 's/name:.*/name: $(SERVICE_NAME)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
-              sed -i -e 's/appVersion:.*/appVersion: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
-              sed -i -e 's/version:.*/version: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
-            displayName: "Updating Chart Values"
+  - script: |
+      echo "########## UAT STATUS ##########"
+      kubectl get po -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME)
+      kubectl get deployment -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME)
+    displayName: "UAT: Deployment Status"
 
-          - script: |
-              pwd
-              unset AWS_SESSION_TOKEN
-              unset AWS_SECRET_ACCESS_KEY
-              unset AWS_ACCESS_KEY_ID
-              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
-              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-              helm s3 init $(DR_HELM_S3BUCKET_URL)
-              helm repo add $(DR_ENV)-$(SERVICE_NAME) $(DR_HELM_S3BUCKET_URL) 
-              helm package $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/
-              helm s3 push --force $(System.DefaultWorkingDirectory)/$(SERVICE_NAME)-1.$(Build.BuildNumber).tgz $(DR_ENV)-$(SERVICE_NAME)
-              aws s3 ls $(DR_HELM_S3BUCKET_URL) 
-              helm repo update 
-              helm search repo $(DR_ENV)-$(SERVICE_NAME)
-            displayName: "Charts Push To S3"
+# =============================================
+# ============== DR SECTION ===================
+# =============================================
+- ${{ if eq(parameters.DeployDR, true) }}:
+  - script: |
+      sed -i -e 's/name:.*/name: $(SERVICE_NAME)/' $(HELM_CHARTS_PATH)/Chart.yaml
+      sed -i -e 's/appVersion:.*/appVersion: $(ImageTag)/' $(HELM_CHARTS_PATH)/Chart.yaml
+      sed -i -e 's/version:.*/version: $(ImageTag)/' $(HELM_CHARTS_PATH)/Chart.yaml
+    displayName: "DR: Update Helm Chart Metadata"
+    workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
 
-          - script: |
-              pwd
-              unset AWS_SESSION_TOKEN
-              unset AWS_SECRET_ACCESS_KEY
-              unset AWS_ACCESS_KEY_ID
-              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
-              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-              rm -rf $(System.DefaultWorkingDirectory)/*.tgz
-              helm repo update
-              helm fetch $(DR_ENV)-$(SERVICE_NAME)/$(SERVICE_NAME)
-              tar -xvf $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
-              echo "Starting the deployment in the namespace $(NAMESPACE)"
-              helm upgrade --install $(DR_ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ -f $(SERVICE_NAME)/$(DR_ENV)-values.yaml --namespace $(NAMESPACE) --kubeconfig $(DR_KUBE_CONFIG_PATH)
-            displayName: "Helm Charts Deployment"
+  - script: |
+      # assume DR role
+      export CREDENTIALS=$(aws sts assume-role --role-arn arn:aws:iam::$(DR_AWS_ACCOUNT_ID):role/$(DR_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber))
+      export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r '.Credentials.SessionToken')
+      export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey')
+      export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId')
+
+      helm s3 init $(HELM_S3BUCKET_URL)
+      helm repo add dr-$(SERVICE_NAME) $(HELM_S3BUCKET_URL)
+      helm package $(HELM_CHARTS_PATH)/
+      helm s3 push --force $(SERVICE_NAME)-$(ImageTag).tgz dr-$(SERVICE_NAME)
+    displayName: "DR: Push Helm Chart to S3"
+    workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
+
+  - script: |
+      helm repo update
+      helm fetch dr-$(SERVICE_NAME)/$(SERVICE_NAME)
+      tar -xvf $(SERVICE_NAME)-$(ImageTag).tgz
+      helm upgrade --install dr-$(SERVICE_NAME) $(SERVICE_NAME)/ -f $(SERVICE_NAME)/dr-values.yaml --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) --wait --timeout 3m
+    displayName: "DR: Helm Deployment"
+    workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
+
+  - script: |
+      echo "########## DR STATUS ##########"
+      kubectl get po -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME)
+      kubectl get deployment -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME)
+    displayName: "DR: Deployment Status"
