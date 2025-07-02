@@ -1,9 +1,74 @@
-/usr/bin/bash --noprofile --norc /home/app_user/workspace/Agent8/_work/_temp/440c0af7-07f4-491b-b89c-c17959601414.sh
-Deploying Helm Chart to UAT
-Error: chart "k811-ms-kyc-bitly-submit-new-cronjob" matching 811_app_ms_kyc-sf_acqui_integration_with_retry-20250624.1 not found in uat-k811-ms-kyc-bitly-submit-new-cronjob index. (try 'helm repo update'): no chart name found
-tar: k811-ms-kyc-bitly-submit-new-cronjob-811_app_ms_kyc-sf_acqui_integration_with_retry-20250624.1.tgz: Cannot open: No such file or directory
-tar: Error is not recoverable: exiting now
-Error: failed to download "k811-ms-kyc-bitly-submit-new-cronjob/" (hint: running `helm repo update` may help)
+parameters:
+  - name: DeployUAT
+    type: boolean
+    default: true
+  - name: ImageTag
+    type: string
+    default: ''
 
-##[error]Bash exited with code '1'.
-Finishing: UAT: Helm Upgrade or Install
+jobs:
+- ${{ if eq(parameters.DeployUAT, true) }}:
+  - job: Deploy_UAT
+    displayName: "UAT Deployment Job"
+    steps:
+    - ${{ if eq(parameters.DeployUAT, true) }}:
+      - script: |
+          pwd
+          sed -i -e 's/name:.*/name: $(SERVICE_NAME)/' $(HELM_CHARTS_PATH)/Chart.yaml
+          sed -i -e 's/appVersion:.*/appVersion: $(ImageTag)/' $(HELM_CHARTS_PATH)/Chart.yaml
+          sed -i -e 's/version:.*/version: $(ImageTag)/' $(HELM_CHARTS_PATH)/Chart.yaml
+        displayName: "UAT: Update Helm Chart Metadata"
+        
+
+      - script: |
+          echo "Assuming AWS Role for UAT"
+          unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+          CREDS=$(aws sts assume-role \
+            --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) \
+            --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+          export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+          export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+          export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+          helm s3 init $(HELM_S3BUCKET_URL)
+          helm repo add $(ENV)-$(SERVICE_NAME) $(HELM_S3BUCKET_URL)
+          helm package $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/
+          helm s3 push --force $(SERVICE_NAME)-${{ parameters.ImageTag }}.tgz $(ENV)-$(SERVICE_NAME)
+          helm repo update
+        displayName: "UAT: Push Helm Chart to S3"
+        
+
+      - script: |
+          echo "Deploying Helm Chart to UAT"
+          unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+          CREDS=$(aws sts assume-role \
+            --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) \
+            --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+          export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+          export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+          export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+          rm -rf *.tgz
+          helm fetch $(ENV)-$(SERVICE_NAME)/$(SERVICE_NAME) --version ${{ parameters.ImageTag }}
+          tar -xvf $(SERVICE_NAME)-${{ parameters.ImageTag }}.tgz
+          helm upgrade --install $(ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ \
+            -f $(SERVICE_NAME)/$(ENV)-values.yaml \
+            --namespace $(NAMESPACE) \
+            --kubeconfig $(KUBE_CONFIG_PATH) \
+            --wait --timeout 3m
+        displayName: "UAT: Helm Upgrade or Install"
+       
+
+      - script: |
+          echo "Verifying Deployment"
+          unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+          CREDS=$(aws sts assume-role \
+            --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) \
+            --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+          export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+          export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+          export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+          sleep 10
+          echo "==== Pods ===="
+          kubectl get pods -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME)
+          echo "==== Deployments ===="
+          kubectl get deployment -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME)
+        displayName: "UAT: Post Deployment Status"
