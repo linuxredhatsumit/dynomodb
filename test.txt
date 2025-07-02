@@ -1,8 +1,18 @@
-========================== Starting Command Output ===========================
-/usr/bin/bash --noprofile --norc /home/app_user/workspace/Agent1/_work/_temp/17d002e8-a55c-43df-a9e8-f53effc7659b.sh
-Verifying Deployment
-==== Pods ====
-==== Deployments ====
+- script: |
+    echo "Verifying Deployment"
+    unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+    CREDS=$(aws sts assume-role \
+      --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) \
+      --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+    export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+    export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+    export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
 
-##[error]Bash exited with code '1'.
-Finishing: UAT: Post Deployment Status
+    echo "==== CronJobs ===="
+    kubectl get cronjobs -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME) || echo "CronJob not found"
+
+    echo "==== Jobs (last 5) ===="
+    kubectl get jobs -n $(NAMESPACE) --sort-by=.metadata.creationTimestamp --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME) | tail -5 || echo "No jobs found"
+
+    echo "Post-deploy check completed"
+  displayName: "UAT: Post Deployment Status"
