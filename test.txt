@@ -1,4 +1,10 @@
 parameters:
+  - name: DeployUAT
+    type: boolean
+    default: true
+  - name: DeployDR
+    type: boolean
+    default: false
   - name: service
     type: string
   - name: ImageTag
@@ -19,6 +25,7 @@ parameters:
 stages:
   - stage: CRON_DEPLOY_TAG_AND_TRIGGER
     displayName: "CRON Deploy Image Tag and Trigger PROD+DR"
+    condition: or(eq('${{ parameters.DeployUAT }}', true), eq('${{ parameters.DeployDR }}', true))
     jobs:
       - job: ECR_IMAGE_PUSH
         displayName: "Push Tagged Image to PROD ECR and Update Helm"
@@ -27,24 +34,28 @@ stages:
               echo "Using ImageTag: ${{ parameters.ImageTag }}"
             displayName: "Print Image Tag"
 
-          - script: |
-              echo "Login to source and prod ECR"
-              aws ecr get-login-password --region $(SOURCE_AWS_REGION) | docker login --username AWS --password-stdin $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com
-              docker pull $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }}
-              docker tag $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }} $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-${{ parameters.ImageTag }}
+          - ${{ if eq(parameters.DeployUAT, true) }}:
+              - script: |
+                  echo "Login to source and prod ECR"
+                  aws ecr get-login-password --region $(SOURCE_AWS_REGION) | docker login --username AWS --password-stdin $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com
+                  docker pull $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }}
+                  docker tag $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }} $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-${{ parameters.ImageTag }}
 
-              aws ecr get-login-password --region $(PROD_AWS_REGION) | docker login --username AWS --password-stdin $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com
-              docker push $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-${{ parameters.ImageTag }}
-            displayName: "Tag and Push Docker Image"
+                  aws ecr get-login-password --region $(PROD_AWS_REGION) | docker login --username AWS --password-stdin $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com
+                  docker push $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-${{ parameters.ImageTag }}
+                displayName: "Tag and Push Docker Image"
 
           - script: |
               git clone https://$(PAT)@dev.azure.com/kmbl-devops/Kotak%20811%20Onboarding%20App/_git/${{ parameters.REPOSITORY_NAME }} -b ${{ parameters.BRANCH_NAME }}
             displayName: "Clone Helm Repository"
 
           - script: |
-              sed -i -e 's/tag:.*/tag: $(PROD_PREFIX)-${{ parameters.ImageTag }}/' ${{ parameters.HELM_CHARTS_PATH }}/${{ parameters.ENV }}-values.yaml
-              sed -i -e 's/tag:.*/tag: $(PROD_PREFIX)-${{ parameters.ImageTag }}/' ${{ parameters.HELM_CHARTS_PATH }}/${{ parameters.DR_ENV }}-values.yaml
-            displayName: "Update Helm Image Tag"
+              ${{ if eq(parameters.DeployUAT, true) }} \
+              && sed -i -e 's/tag:.*/tag: $(PROD_PREFIX)-${{ parameters.ImageTag }}/' ${{ parameters.HELM_CHARTS_PATH }}/${{ parameters.ENV }}-values.yaml
+
+              ${{ if eq(parameters.DeployDR, true) }} \
+              && sed -i -e 's/tag:.*/tag: $(PROD_PREFIX)-${{ parameters.ImageTag }}/' ${{ parameters.HELM_CHARTS_PATH }}/${{ parameters.DR_ENV }}-values.yaml
+            displayName: "Update Helm Chart Image Tags"
             workingDirectory: $(System.DefaultWorkingDirectory)/${{ parameters.REPOSITORY_NAME }}
 
           - script: |
@@ -56,91 +67,3 @@ stages:
               git push origin ${{ parameters.BRANCH_NAME }}
             displayName: "Commit and Push Helm Changes"
             workingDirectory: $(System.DefaultWorkingDirectory)/${{ parameters.REPOSITORY_NAME }}
-
-
-
-#################################################
-
-
-# cron-ecr-deploy.yaml
-variables:
-  - name: ENV
-    value: uat
-  - name: SERVICE_NAME
-    value: k811-ms-kyc-bitly-submit-new-cronjob
-
-  # Access Details
-  - name: AWS_ACCOUNT_ID
-    value: "483584640083"
-  - name: ROLE_NAME
-    value: EKS_Setup_Role
-
-  # Pool Details
-  - name: POOL_NAME
-    value: "K811-DevOps"
-
-  # Helm related
-  - name: HELM_CHARTS_PATH
-    value: helm-charts/k811-ms-kyc-bitly-submit-new-cronjob/charts
-  - name: HELM_S3BUCKET_URL
-    value: s3://kotak811-helmcharts/uat/k811-ms-kyc-bitly-submit-new-cronjob/
-  - name: KUBE_CONFIG_PATH
-    value: /home/app_user/.kube/config-uat
-  - name: NAMESPACE
-    value: 811-uat
-
-  - group: UAT-Static-Variables
-
-  # DR bucket
-  - name: DR_HELM_S3BUCKET_URL
-    value: s3://kotak811-helmcharts-dr/uat/k811-ms-kyc-bitly-submit-new-cronjob/
-
-  # Source (UAT)
-  - name: SOURCE_ECR_FOLDER_NAME
-    value: 811devonb
-  - name: SOURCE_ECR_REPO_NAME
-    value: k811_ms_kyc
-  - name: SOURCE_AWS_REGION
-    value: ap-south-1
-
-  # Docker (target ECR)
-  - name: AWS_REGION
-    value: ap-south-1
-  - name: ECR_FOLDER_NAME
-    value: 811uatonb
-  - name: ECR_REPO_NAME
-    value: k811_ms_kyc
-
-parameters:
-  - name: DeployUAT
-    displayName: "Deploy to PROD"
-    type: boolean
-    default: true
-  - name: DeployDR
-    displayName: "Deploy to DR"
-    type: boolean
-    default: false
-  - name: Jira_URL
-    type: string
-    default: ""
-    displayName: "Jira URL"
-  - name: ImageTag
-    type: string
-    default: ""
-    displayName: "Image Tag for Deployment"
-
-pool:
-  name: $(POOL_NAME)
-
-stages:
-  - template: ../templates/uat/uat-cron-deploy-tag.yaml
-    parameters:
-      DeployUAT: ${{ parameters.DeployUAT }}
-      service: $(SERVICE_NAME)
-      ImageTag: ${{ parameters.ImageTag }}
-
-# Optional DR deploy logic if required later
-# - template: ../templates/prod-cron-deploy-dr.yaml
-#   parameters:
-#     DeployDR: ${{ parameters.DeployDR }}
-#     service: $(SERVICE_NAME)
