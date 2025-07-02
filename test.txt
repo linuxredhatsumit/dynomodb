@@ -1,11 +1,3 @@
-
-/templates/uat/uat-cron-deploy-tag.yaml (Line: 13, Col: 1): Unexpected value 'variables'
-/templates/uat/uat-cron-deploy-tag.yaml (Line: 20, Col: 1):  While parsing a block mapping, did not find expected key.
-/uat-azure-pipelines/k811-ms-kyc-bitly-submit-new-cronjob.yaml: Object reference not set to an instance of an object.
-
-
-below is code
-
 parameters:
   - name: DeployUAT
     type: boolean
@@ -17,10 +9,6 @@ parameters:
     type: string
     default: ''
 
-variables:
-  - name: ImageTag
-    value: ${{ parameters.ImageTag }}
-
 # =============================================
 # ============== UAT SECTION ==================
 # =============================================
@@ -28,7 +16,7 @@ variables:
   - script: |
       pwd
       sed -i -e 's/name:.*/name: $(SERVICE_NAME)/' $(HELM_CHARTS_PATH)/Chart.yaml
-      sed -i -e 's/appVersion:.*/appVersion: $(ImageTag)/' $(HELM_CHARTS_PATH)/Chart.yaml
-      sed -i -e 's/version:.*/version: $(ImageTag)/' $(HELM_CHARTS_PATH)/Chart.yaml
+      sed -i -e 's/appVersion:.*/appVersion: ${{ parameters.ImageTag }}/' $(HELM_CHARTS_PATH)/Chart.yaml
+      sed -i -e 's/version:.*/version: ${{ parameters.ImageTag }}/' $(HELM_CHARTS_PATH)/Chart.yaml
     displayName: "UAT: Update Helm Chart Metadata"
     workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
