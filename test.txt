@@ -1,69 +1,75 @@
-parameters:
-  - name: DeployUAT
-    type: boolean
-    default: true
-  - name: DeployDR
-    type: boolean
-    default: false
-  - name: service
-    type: string
-  - name: ImageTag
-    type: string
-  - name: REPOSITORY_NAME
-    type: string
-  - name: BRANCH_NAME
-    type: string
-  - name: ENV
-    type: string
-    default: prod
-  - name: DR_ENV
-    type: string
-    default: dr
-  - name: HELM_CHARTS_PATH
-    type: string
 
-stages:
-  - stage: CRON_DEPLOY_TAG_AND_TRIGGER
-    displayName: "CRON Deploy Image Tag and Trigger PROD+DR"
-    condition: or(eq('${{ parameters.DeployUAT }}', true), eq('${{ parameters.DeployDR }}', true))
-    jobs:
-      - job: ECR_IMAGE_PUSH
-        displayName: "Push Tagged Image to PROD ECR and Update Helm"
-        steps:
-          - script: |
-              echo "Using ImageTag: ${{ parameters.ImageTag }}"
-            displayName: "Print Image Tag"
+/templates/uat/uat-cron-deploy-tag.yaml (Line: 217, Col: 21): The directive 'if' is not allowed in this context. Directives are not supported for expressions that are embedded within a string. Directives are only supported when the entire value is an expression.
 
-          - ${{ if eq(parameters.DeployUAT, true) }}:
-              - script: |
-                  echo "Login to source and prod ECR"
-                  aws ecr get-login-password --region $(SOURCE_AWS_REGION) | docker login --username AWS --password-stdin $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com
-                  docker pull $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }}
-                  docker tag $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }} $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-${{ parameters.ImageTag }}
+do u wanna try below way?
+steps:
+  - script: |
+      pwd
+      sed -i -e 's/name:.*/name: $(SERVICE_NAME)/' $(HELM_CHARTS_PATH)/Chart.yaml
+      sed -i -e 's/appVersion:.*/appVersion: 1.$(Build.BuildNumber)/' $(HELM_CHARTS_PATH)/Chart.yaml
+      sed -i -e 's/version:.*/version: 1.$(Build.BuildNumber)/' $(HELM_CHARTS_PATH)/Chart.yaml
+    displayName: "Production replace helm charts"
+    workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
 
-                  aws ecr get-login-password --region $(PROD_AWS_REGION) | docker login --username AWS --password-stdin $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com
-                  docker push $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-${{ parameters.ImageTag }}
-                displayName: "Tag and Push Docker Image"
+  - script: |
+      pwd
+      unset AWS_SESSION_TOKEN
+      unset AWS_SECRET_ACCESS_KEY
+      unset AWS_ACCESS_KEY_ID
+      CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+      export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+      export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+      export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+      helm s3 init $(HELM_S3BUCKET_URL)
+      helm repo add $(ENV)-$(SERVICE_NAME) $(HELM_S3BUCKET_URL) 
+      helm package $(HELM_CHARTS_PATH)/
+      helm s3 push --force $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz $(ENV)-$(SERVICE_NAME)
+      aws s3 ls $(HELM_S3BUCKET_URL) 
+      helm repo update 
+      helm search repo $(ENV)-$(SERVICE_NAME)
+    displayName: "Production Charts Push To S3"
+    workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
 
-          - script: |
-              git clone https://$(PAT)@dev.azure.com/kmbl-devops/Kotak%20811%20Onboarding%20App/_git/${{ parameters.REPOSITORY_NAME }} -b ${{ parameters.BRANCH_NAME }}
-            displayName: "Clone Helm Repository"
+  - script: |
+      pwd
+      unset AWS_SESSION_TOKEN
+      unset AWS_SECRET_ACCESS_KEY
+      unset AWS_ACCESS_KEY_ID
+      CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+      export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+      export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+      export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+      rm -rf $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/*.tgz
+      helm repo update
+      helm fetch $(ENV)-$(SERVICE_NAME)/$(SERVICE_NAME)
+      tar -xvf $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
+      helm upgrade --install $(ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ -f $(SERVICE_NAME)/$(ENV)-values.yaml --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH)  --wait --timeout 3m
+    displayName: "Production Helm Charts Deployment"
 
-          - script: |
-              ${{ if eq(parameters.DeployUAT, true) }} \
-              && sed -i -e 's/tag:.*/tag: $(PROD_PREFIX)-${{ parameters.ImageTag }}/' ${{ parameters.HELM_CHARTS_PATH }}/${{ parameters.ENV }}-values.yaml
+  - script: |
+      pwd
+      unset AWS_SESSION_TOKEN
+      unset AWS_SECRET_ACCESS_KEY
+      unset AWS_ACCESS_KEY_ID
+      CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+      export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+      export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+      export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+      sleep 10
+      echo "########################## list of pods ########################################"
+      kubectl get po --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME)
+      echo "########################## list of deployed services ########################################"
+      kubectl get deployment --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME)
+    displayName: "Production Application Status"
+# $(ENV)-$(SERVICE_NAME) = devopstest
 
-              ${{ if eq(parameters.DeployDR, true) }} \
-              && sed -i -e 's/tag:.*/tag: $(PROD_PREFIX)-${{ parameters.ImageTag }}/' ${{ parameters.HELM_CHARTS_PATH }}/${{ parameters.DR_ENV }}-values.yaml
-            displayName: "Update Helm Chart Image Tags"
-            workingDirectory: $(System.DefaultWorkingDirectory)/${{ parameters.REPOSITORY_NAME }}
+# helm fetch devopstest-test/devopstest  --> it will download latest devopstest-1.20221128.12.tgz
 
-          - script: |
-              git config --global user.email "pipeline@kotak.com"
-              git config --global user.name "Pipeline"
-              git add -A
-              git commit -m "CRON updated imageTag to ${{ parameters.ImageTag }}"
-              git pull --rebase
-              git push origin ${{ parameters.BRANCH_NAME }}
-            displayName: "Commit and Push Helm Changes"
-            workingDirectory: $(System.DefaultWorkingDirectory)/${{ parameters.REPOSITORY_NAME }}
+# helm repo list
+# helm history $(ENV)-$(SERVICE_NAME) -n test
+
+# ROll back commands
+# helm rollback <charts_name> 1 -n <namespace>  --> Roll back to a previous version. here 1 is vision number
+
+# helm get values --revision=2 <charts_name> -n <namespace> --> Review the details for a specific revision.
+
