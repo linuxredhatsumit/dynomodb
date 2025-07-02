@@ -1,2 +1,2 @@
 
-/uat-azure-pipelines/k811-ms-kyc-bitly-submit-new-cronjob.yaml (Line: 78, Col: 20): Unexpected parameter 'service'
+/templates/uat/uat-cron-deploy-tag.yaml (Line: 217, Col: 21): The directive 'if' is not allowed in this context. Directives are not supported for expressions that are embedded within a string. Directives are only supported when the entire value is an expression.
