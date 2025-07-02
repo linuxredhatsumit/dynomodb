@@ -1,3 +1,20 @@
+parameters:
+  - name: DeployUAT
+    displayName: "Deploy to PROD"
+    type: boolean
+    default: true
+  - name: DeployDR
+    displayName: "Deploy to DR"
+    type: boolean
+    default: false
+  - name: Jira_URL
+    type: string
+    default: ""
+    displayName: "Jira URL"
+  - name: ImageTag
+    type: string
+    default: ""
+    displayName: "Image Tag for Deployment"
 
 variables:
   - name: ENV
@@ -47,24 +64,6 @@ variables:
   - name: ECR_REPO_NAME
     value: k811_ms_kyc
 
-parameters:
-  - name: DeployUAT
-    displayName: "Deploy to PROD"
-    type: boolean
-    default: true
-  - name: DeployDR
-    displayName: "Deploy to DR"
-    type: boolean
-    default: false
-  - name: Jira_URL
-    type: string
-    default: ""
-    displayName: "Jira URL"
-  - name: ImageTag
-    type: string
-    default: ""
-    displayName: "Image Tag for Deployment"
-
 pool:
   name: $(POOL_NAME)
 
@@ -72,5 +71,6 @@ stages:
   - template: ../templates/uat/uat-cron-deploy-tag.yaml
     parameters:
       DeployUAT: ${{ parameters.DeployUAT }}
+      DeployDR: ${{ parameters.DeployDR }}
       service: $(SERVICE_NAME)
       ImageTag: ${{ parameters.ImageTag }}
