@@ -1,8 +1,1 @@
-- ${{ if eq(parameters.DeployUAT, true) }}:
-  - script: |
-      pwd
-      sed -i -e 's/name:.*/name: $(SERVICE_NAME)/' $(HELM_CHARTS_PATH)/Chart.yaml
-      sed -i -e 's/appVersion:.*/appVersion: $(ImageTag)/' $(HELM_CHARTS_PATH)/Chart.yaml
-      sed -i -e 's/version:.*/version: $(ImageTag)/' $(HELM_CHARTS_PATH)/Chart.yaml
-    displayName: "UAT: Update Helm Chart Metadata"
-    workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
+/uat-azure-pipelines/k811-ms-kyc-bitly-submit-new-cronjob.yaml: File /templates/uat/uat-cron-deploy-tag-dr.yaml not found in repository https://dev.azure.com/kmbl-devops/Kotak%20811%20Onboarding%20App/_git/Kotak-811-DevOps-Pipelines branch refs/heads/master version 45ee1acc51eeb911d67fec8d11e8fde13ebf3851.
