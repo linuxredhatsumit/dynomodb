@@ -1,23 +1,80 @@
-Assuming AWS Role for UAT
-Initialized empty repository at s3://kotak811-helmcharts/uat/k811-ms-kyc-bitly-submit-new-cronjob/
-"uat-k811-ms-kyc-bitly-submit-new-cronjob" has been added to your repositories
-Successfully packaged chart and saved it to: /home/app_user/workspace/Agent1/_work/383/s/k811-ms-kyc-bitly-submit-new-cronjob-1.0.1448663.tgz
--rw-r--r-- 1 app_user app_user 1.5K Jul  2 12:55 k811-ms-kyc-bitly-submit-new-cronjob-1.0.1448663.tgz
-Successfully uploaded the chart to the repository.
-Hang tight while we grab the latest from your chart repositories...
-...Successfully got an update from the "dev-arm-k811-transfer-funds" chart repository
-...Successfully got an update from the "dev-personalloan-portal" chart repository
-...Successfully got an update from the "uat-dr-k811-cc-applications-cronjob" chart repository
-...Successfully got an update from the "uat-k811-super-user" chart repository
-...Successfully got an update from the "uat-k811-ms-cc-limit-correct-cronjob" chart repos
+parameters:
+  - name: DeployUAT
+    type: boolean
+    default: true
+  - name: ImageTag
+    type: string
+    default: ''
 
-UAT: upgarde
-/usr/bin/bash --noprofile --norc /home/app_user/workspace/Agent1/_work/_temp/3ddd1e32-a101-4cda-8f82-9c8c33de8f4f.sh
-Deploying Helm Chart to UAT
-Error: chart "k811-ms-kyc-bitly-submit-new-cronjob" matching 811_app_ms_kyc-sf_acqui_integration_with_retry-20250624.1 not found in uat-k811-ms-kyc-bitly-submit-new-cronjob index. (try 'helm repo update'): improper constraint: 811_app_ms_kyc-sf_acqui_integration_with_retry-20250624.1
-tar: k811-ms-kyc-bitly-submit-new-cronjob-811_app_ms_kyc-sf_acqui_integration_with_retry-20250624.1.tgz: Cannot open: No such file or directory
-tar: Error is not recoverable: exiting now
-Error: repo k811-ms-kyc-bitly-submit-new-cronjob not found
+jobs:
+- ${{ if eq(parameters.DeployUAT, true) }}:
+  - job: Deploy_UAT
+    displayName: "UAT Deployment Job"
+    steps:
+      - checkout: self
 
-##[error]Bash exited with code '1'.
-Finishing: UAT: Helm Upgrade or Install
+      - script: |
+          echo "Preparing Helm Chart Metadata"
+          VERSION_TAG="1.$(Build.BuildNumber)"
+          echo "Chart version will be: $VERSION_TAG"
+          sed -i -e "s/^version:.*/version: $VERSION_TAG/" $(HELM_CHARTS_PATH)/Chart.yaml
+          sed -i -e "s/^appVersion:.*/appVersion: $VERSION_TAG/" $(HELM_CHARTS_PATH)/Chart.yaml
+          sed -i -e "s/^name:.*/name: $(SERVICE_NAME)/" $(HELM_CHARTS_PATH)/Chart.yaml
+          sed -i -e "s/^  tag:.*/  tag: '${{ parameters.ImageTag }}'/" $(HELM_CHARTS_PATH)/uat-values.yaml
+        displayName: "UAT: Update Helm Chart Metadata and Image Tag"
+
+      - script: |
+          echo "Assuming AWS Role for UAT"
+          unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+          CREDS=$(aws sts assume-role \
+            --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) \
+            --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+          export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+          export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+          export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+
+          echo "Packaging Helm chart..."
+          helm s3 init $(HELM_S3BUCKET_URL)
+          helm repo add $(ENV)-$(SERVICE_NAME) $(HELM_S3BUCKET_URL)
+          helm package $(HELM_CHARTS_PATH)
+          mv $(SERVICE_NAME)-*.tgz $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
+          helm s3 push --force $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz $(ENV)-$(SERVICE_NAME)
+          helm repo update
+        displayName: "UAT: Push Helm Chart to S3"
+
+      - script: |
+          echo "Deploying Helm Chart to UAT"
+          unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+          CREDS=$(aws sts assume-role \
+            --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) \
+            --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+          export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+          export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+          export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+
+          rm -rf *.tgz
+          helm fetch $(ENV)-$(SERVICE_NAME)/$(SERVICE_NAME) --version 1.$(Build.BuildNumber)
+          tar -xvf $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
+          helm upgrade --install $(ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ \
+            -f $(SERVICE_NAME)/$(ENV)-values.yaml \
+            --namespace $(NAMESPACE) \
+            --kubeconfig $(KUBE_CONFIG_PATH) \
+            --wait --timeout 3m
+        displayName: "UAT: Helm Upgrade or Install"
+
+      - script: |
+          echo "Verifying Deployment"
+          unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+          CREDS=$(aws sts assume-role \
+            --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) \
+            --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+          export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+          export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+          export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+
+          sleep 10
+          echo "==== Pods ===="
+          kubectl get pods -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME)
+          echo "==== Deployments ===="
+          kubectl get deployment -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME)
+        displayName: "UAT: Post Deployment Status"
