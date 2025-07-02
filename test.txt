@@ -1,17 +1,73 @@
-          - script: |
-              pwd
-              unset AWS_SESSION_TOKEN
-              unset AWS_SECRET_ACCESS_KEY
-              unset AWS_ACCESS_KEY_ID
-              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
-              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-              helm s3 init $(HELM_S3BUCKET_URL)
-              helm repo add $(ENV)-$(SERVICE_NAME) $(HELM_S3BUCKET_URL) 
-              helm package $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/
-              helm s3 push --force $(System.DefaultWorkingDirectory)/$(SERVICE_NAME)-1.$(Build.BuildNumber).tgz $(ENV)-$(SERVICE_NAME)
-              aws s3 ls $(HELM_S3BUCKET_URL) 
-              helm repo update 
-              helm search repo $(ENV)-$(SERVICE_NAME)
-            displayName: "Charts Push To S3"
+parameters:
+  - name: DeployUAT
+    type: boolean
+    default: true
+  - name: ImageTag
+    type: string
+    default: ''
+
+jobs:
+- job: Deploy_UAT
+  condition: and(succeeded(), eq('${{ parameters.DeployUAT }}', 'true'))
+  displayName: "UAT Deployment Job"
+  steps:
+    - script: |
+        echo "Updating Helm Chart Metadata"
+        pwd
+        sed -i -e 's/name:.*/name: $(SERVICE_NAME)/' $(Build.SourcesDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+        sed -i -e 's/appVersion:.*/appVersion: ${{ parameters.ImageTag }}/' $(Build.SourcesDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+        sed -i -e 's/version:.*/version: ${{ parameters.ImageTag }}/' $(Build.SourcesDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+      displayName: "UAT: Update Helm Chart Metadata"
+      
+    - script: |
+        echo "Assuming AWS Role for UAT"
+        unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+        CREDS=$(aws sts assume-role \
+          --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) \
+          --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+        export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+        export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+        export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+        helm s3 init $(HELM_S3BUCKET_URL)
+        helm repo add $(ENV)-$(SERVICE_NAME) $(HELM_S3BUCKET_URL)
+        cd $(Build.SourcesDirectory)/$(HELM_CHARTS_PATH)
+        helm package .
+        mv *.tgz $(Build.SourcesDirectory)
+        helm s3 push --force $(Build.SourcesDirectory)/$(SERVICE_NAME)-${{ parameters.ImageTag }}.tgz $(ENV)-$(SERVICE_NAME)
+        helm repo update
+      displayName: "UAT: Push Helm Chart to S3"
+
+    - script: |
+        echo "Deploying Helm Chart to UAT"
+        unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+        CREDS=$(aws sts assume-role \
+          --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) \
+          --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+        export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+        export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+        export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+        cd $(Build.SourcesDirectory)
+        helm pull $(ENV)-$(SERVICE_NAME)/$(SERVICE_NAME) --version ${{ parameters.ImageTag }}
+        tar -xvf $(SERVICE_NAME)-${{ parameters.ImageTag }}.tgz
+        helm upgrade --install $(ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ \
+          -f $(SERVICE_NAME)/$(ENV)-values.yaml \
+          --namespace $(NAMESPACE) \
+          --kubeconfig $(KUBE_CONFIG_PATH) \
+          --wait --timeout 3m
+      displayName: "UAT: Helm Upgrade or Install"
+
+    - script: |
+        echo "Verifying Deployment"
+        unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+        CREDS=$(aws sts assume-role \
+          --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) \
+          --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+        export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+        export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+        export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+        sleep 10
+        echo "==== Pods ===="
+        kubectl get pods -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME) || true
+        echo "==== Deployments ===="
+        kubectl get deployment -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME) || true
+      displayName: "UAT: Post Deployment Status"
