@@ -1,147 +1,18 @@
-trigger: none
+/usr/bin/bash --noprofile --norc /home/app_user/workspace/Agent7/_work/_temp/03f31e26-cf18-49d3-b437-54f9e656cee0.sh
+WARNING! Your password will be stored unencrypted in /home/app_user/.docker/config.json.
+Configure a credential helper to remove this warning. See
+https://docs.docker.com/engine/reference/commandline/login/#credentials-store
 
-parameters:
-  - name: ImageTag
-    displayName: "Docker Image Tag to promote"
-    type: string
-    default: ""
+Login Succeeded
+Error response from daemon: pull access denied for 483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_kyc_bitly_submit_cronjob, repository does not exist or may require 'docker login': denied: User: arn:aws:sts::483584640083:assumed-role/AWS-EC2-Role/i-06950af8d81d0affc is not authorized to perform: ecr:BatchGetImage on resource: arn:aws:ecr:ap-south-1:483584640083:repository/811uatonb/k811_ms_kyc_bitly_submit_cronjob because no identity-based policy allows the ecr:BatchGetImage action
+Error response from daemon: No such image: 483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_kyc_bitly_submit_cronjob:811_app_ms_kyc-development-20250702.2
+WARNING! Your password will be stored unencrypted in /home/app_user/.docker/config.json.
+Configure a credential helper to remove this warning. See
+https://docs.docker.com/engine/reference/commandline/login/#credentials-store
 
-variables:
-  - group: Kotak-ECR-Credentials
-  - name: SERVICE_NAME
-    value: k811-ms-kyc-bitly-submit-cronjob
-  - name: ENV
-    value: prod
-  - name: DR-ENV
-    value: prod-dr
-  - name: BRANCH_NAME
-    value: master
-  - name: REPOSITORY_NAME
-    value: kotak-811-devops-prod
+Login Succeeded
+The push refers to repository [718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_cronjob_kyc_bitly_submit]
+An image does not exist locally with the tag: 718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_cronjob_kyc_bitly_submit
 
-  # Agent pools
-  - name: UAT_POOL_NAME
-    value: K811-DevOps
-  - name: PROD_POOL_NAME
-    value: k811-prod
-
-  # Docker and ECR
-  - name: PROD_PREFIX
-    value: stable
-  - name: PROD_AWS_REGION
-    value: ap-south-1
-  - name: PROD_AWS_ACCOUNT_ID
-    value: "$(PROD_AWS_ACCOUNT_ID)"  # Must be defined in variable group
-  - name: PROD_ECR_FOLDER_NAME
-    value: 811prodonb
-  - name: PROD_ECR_REPO_NAME
-    value: k811_cronjob_kyc_bitly_submit
-
-  - name: SOURCE_AWS_REGION
-    value: ap-south-1
-  - name: SOURCE_AWS_ACCOUNT_ID
-    value: "$(UAT_AWS_ACCOUNT_ID)"   # Must be defined in variable group
-  - name: SOURCE_ECR_FOLDER_NAME
-    value: 811uatonb
-  - name: SOURCE_ECR_REPO_NAME
-    value: k811_ms_kyc_bitly_submit_cronjob
-
-  - name: HELM_CHARTS_PATH
-    value: helm-charts/k811-ms-kyc-bitly-submit-cronjob/charts
-  - name: HELM_S3BUCKET_URL
-    value: s3://k811-onb-helmcharts/prod/k811-ms-kyc-bitly-submit-cronjob/
-  - name: DR_HELM_S3BUCKET_URL
-    value: s3://k811-onb-helmcharts-dr/prod/k811-ms-kyc-bitly-submit-cronjob/
-
-  - name: KUBE_CONFIG_PATH
-    value: /home/app_user/.kube/config-prod
-  - name: NAMESPACE
-    value: prod
-  - name: DR_KUBE_CONFIG_PATH
-    value: /home/app_user/.kube/config-onb-dr
-
-stages:
-  - stage: ECR_AND_HELM_UPDATE
-    displayName: "Docker Pull & Push, Helm values update"
-    pool:
-      name: $(UAT_POOL_NAME)
-    jobs:
-      - job: UAT_IMAGE_AND_HELM
-        steps:
-          - script: |
-              aws ecr get-login-password --region $(SOURCE_AWS_REGION) | docker login --username AWS --password-stdin $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com
-              docker pull $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }}
-              docker tag $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }} $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-${{ parameters.ImageTag }}
-              aws ecr get-login-password --region $(PROD_AWS_REGION) | docker login --username AWS --password-stdin $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com
-              docker push $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-${{ parameters.ImageTag }}
-            displayName: "Pull from UAT, Push to PROD ECR"
-
-          - script: |
-              git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
-            displayName: "Clone Helm repo"
-
-          - script: |
-              sed -i -e 's/tag:.*/tag: $(PROD_PREFIX)-${{ parameters.ImageTag }}/' $(HELM_CHARTS_PATH)/$(ENV)-values.yaml
-              sed -i -e 's/tag:.*/tag: $(PROD_PREFIX)-${{ parameters.ImageTag }}/' $(HELM_CHARTS_PATH)/$(DR-ENV)-values.yaml
-            displayName: "Update tag in values.yaml"
-            workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
-
-          - script: |
-              git config --global user.email "pipeline@kotak.com"
-              git config --global user.name "Pipeline"
-              git add -A
-              git commit -m "Update prod & dr values.yaml for tag $(PROD_PREFIX)-${{ parameters.ImageTag }}"
-              git pull --rebase
-              git push origin $(BRANCH_NAME)
-            displayName: "Commit updated Helm values"
-            workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
-
-  - stage: PROD_DEPLOYMENT
-    displayName: "Package Helm, Deploy to PROD & DR"
-    pool:
-      name: $(PROD_POOL_NAME)
-    jobs:
-      - job: DEPLOY
-        steps:
-          - script: |
-              git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
-            displayName: "Clone repo on PROD agent"
-
-          - script: |
-              sed -i -e 's/name:.*/name: $(SERVICE_NAME)/' $(HELM_CHARTS_PATH)/Chart.yaml
-              sed -i -e 's/appVersion:.*/appVersion: 1.$(Build.BuildNumber)/' $(HELM_CHARTS_PATH)/Chart.yaml
-              sed -i -e 's/version:.*/version: 1.$(Build.BuildNumber)/' $(HELM_CHARTS_PATH)/Chart.yaml
-            displayName: "Update Chart.yaml"
-            workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
-
-          - script: |
-              helm s3 init $(HELM_S3BUCKET_URL)
-              helm repo add $(ENV)-$(SERVICE_NAME) $(HELM_S3BUCKET_URL)
-              helm package $(HELM_CHARTS_PATH)/
-              helm s3 push --force $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz $(ENV)-$(SERVICE_NAME)
-              helm repo update
-            displayName: "Push Helm chart to S3"
-            workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
-
-          - script: |
-              rm -rf *.tgz
-              helm fetch $(ENV)-$(SERVICE_NAME)/$(SERVICE_NAME)
-              tar -xvf $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
-              helm upgrade --install $(ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ -f $(SERVICE_NAME)/$(ENV)-values.yaml --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) --wait --timeout 3m
-            displayName: "Deploy to PROD"
-            workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
-
-          - script: |
-              rm -rf *.tgz
-              helm fetch $(ENV)-$(SERVICE_NAME)/$(SERVICE_NAME)
-              tar -xvf $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
-              helm upgrade --install $(DR-ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ -f $(SERVICE_NAME)/$(DR-ENV)-values.yaml --namespace $(NAMESPACE) --kubeconfig $(DR_KUBE_CONFIG_PATH) --wait --timeout 3m
-            displayName: "Deploy to DR"
-            workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
-
-          - script: |
-              echo "PROD CronJob Status:"
-              kubectl get cronjob -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME)
-              echo "DR CronJob Status:"
-              kubectl get cronjob -n $(NAMESPACE) --kubeconfig $(DR_KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME)
-            displayName: "Verify Deployments"
+##[error]Bash exited with code '1'.
+Finishing: Pull from UAT, Push to PROD ECR
