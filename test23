@@ -1,0 +1,104 @@
+trigger: none
+variables:
+  - group: Kotak-ECR-Credentials
+  - name: SERVICE_NAME
+    value: k811-ms-kyc-bitly-submit-cronjob
+  - name: ENV
+    value: prod
+  - name: DR-ENV
+    value: prod-dr
+  # For AWS Role Access
+  - name: PROD_ROLE_NAME
+    value: EKS-Setup-Role-Kotak811
+  - name: SOURCE_ROLE_NAME
+    value: EKS_Setup_Role
+  # details for prod repo to update pro-values.yaml
+  - name: BRANCH_NAME
+    value: master
+  - name: REPOSITORY_NAME
+    value: kotak-811-devops-prod
+
+  # Agent pool details
+  - name: DEVOPS_POOL_NAME
+    value: "K811-DevOps"
+  - name: PROD_POOL_NAME
+    value: k811-prod
+  - name: PROD_AGENT_IN_AGENTPOOL
+    value: Linux-Agent3
+  # docker details to push to prod ECR
+  - name: PROD_PREFIX
+    value: stable
+  - name: PROD_AWS_REGION
+    value: ap-south-1
+  - name: PROD_AWS_ACCOUNT_ID
+    value: "718378052708"
+  - name: PROD_ECR_FOLDER_NAME
+    value: 811prodonb
+  - name: PROD_ECR_REPO_NAME
+    value: k811_kyc
+
+  # source Enviornmnet details
+  - name: SOURCE_SERVICE_NAME
+    value: k811-token-mandate-instructions
+  - name: SOURCE_AWS_REGION
+    value: ap-south-1
+  - name: SOURCE_AWS_ACCOUNT_ID
+    value: "483584640083"
+  - name: SOURCE_ECR_FOLDER_NAME
+    value: 811uatonb
+  - name: SOURCE_ECR_REPO_NAME
+    value: k811_ms_kyc
+  - name: SOURCE_KUBE_CONFIG_PATH
+    value: /home/app_user/.kube/config-uat
+  - name: SOURCE_NAMESPACE
+    value: 811-uat
+  # helm related variables
+  - name: HELM_CHARTS_PATH
+    value: helm-charts/k811-ms-kyc-bitly-submit-cronjob/charts
+  - name: HELM_S3BUCKET_URL
+    value: s3://k811-onb-helmcharts/prod/k811-ms-kyc-bitly-submit-cronjob/
+  - name: KUBE_CONFIG_PATH
+    value: /home/app_user/.kube/config-prod
+  - name: NAMESPACE
+    value: prod
+  - name: DR_KUBE_CONFIG_PATH
+    value: /home/app_user/.kube/config-onb-dr
+  - name: DR_HELM_S3BUCKET_URL
+    value: s3://k811-onb-helmcharts-dr/prod/k811-ms-kyc-bitly-submit-cronjob/
+  - name: PROD_AGENT_IN_AGENTPOOL
+########################
+
+
+parameters:
+  - name: DeployPROD
+    displayName: "Deploy to PROD"
+    type: boolean
+    default: true
+  - name: DeployDR
+    displayName: "Deploy to DR"
+    type: boolean
+    default: false
+  - name: Jira_URL
+    type: string
+    default: ""
+  - name: ImageTag
+    type: string
+    default: "1.20240625.1"
+
+
+
+
+stages:
+  - stage: DeployPROD
+    condition: eq('${{ parameters.DeployPROD }}', 'true')
+    jobs:
+      - template: ../templates/prod-cron-deploy-tag.yaml
+        parameters:
+          ImageTag: ${{ parameters.ImageTag }}
+
+  # - stage: DeployDR
+  #   condition: eq('${{ parameters.DeployDR }}', 'true')
+  #   jobs:
+  #     - template: ../templates/prod-cron-deploy-tag-dr.yaml
+  #       parameters:
+  #         ImageTag: ${{ parameters.ImageTag }}
