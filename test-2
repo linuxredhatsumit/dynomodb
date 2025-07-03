@@ -1,18 +1,4 @@
-/usr/bin/bash --noprofile --norc /home/app_user/workspace/Agent7/_work/_temp/03f31e26-cf18-49d3-b437-54f9e656cee0.sh
-WARNING! Your password will be stored unencrypted in /home/app_user/.docker/config.json.
-Configure a credential helper to remove this warning. See
-https://docs.docker.com/engine/reference/commandline/login/#credentials-store
-
-Login Succeeded
-Error response from daemon: pull access denied for 483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_kyc_bitly_submit_cronjob, repository does not exist or may require 'docker login': denied: User: arn:aws:sts::483584640083:assumed-role/AWS-EC2-Role/i-06950af8d81d0affc is not authorized to perform: ecr:BatchGetImage on resource: arn:aws:ecr:ap-south-1:483584640083:repository/811uatonb/k811_ms_kyc_bitly_submit_cronjob because no identity-based policy allows the ecr:BatchGetImage action
-Error response from daemon: No such image: 483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_kyc_bitly_submit_cronjob:811_app_ms_kyc-development-20250702.2
-WARNING! Your password will be stored unencrypted in /home/app_user/.docker/config.json.
-Configure a credential helper to remove this warning. See
-https://docs.docker.com/engine/reference/commandline/login/#credentials-store
-
-Login Succeeded
-The push refers to repository [718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_cronjob_kyc_bitly_submit]
-An image does not exist locally with the tag: 718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_cronjob_kyc_bitly_submit
-
-##[error]Bash exited with code '1'.
-Finishing: Pull from UAT, Push to PROD ECR
+aws ecr describe-images \
+  --repository-name 811uatonb/k811_ms_kyc_bitly_submit_cronjob \
+  --region ap-south-1 \
+  --query 'imageDetails[].imageTags'
