@@ -1,45 +1,24 @@
 trigger: none
 
-# resources:
-#   pipelines:
-#   - pipeline: kotak-811-devops-helmcharts-frm-junit
-#     source: kotak-811-devops-helmcharts-frm-junit
-#     project: Kotak 811 Onboarding App
-#     trigger:
-#       branches:
-#         include:
-#           - master
-
-# pass varibale to build.yaml file.
+# ===================================================================
+# == GLOBAL VARIABLES & PARAMETERS
+# ===================================================================
 variables:
   - group: Kotak-ECR-Credentials
   - name: SERVICE_NAME
-    value: k811-kyc
+    value: k811-ms-kyc-bitly-submit-cronjob
   - name: ENV
     value: prod
   - name: DR-ENV
     value: prod-dr
-  # For AWS Role Access
   - name: PROD_ROLE_NAME
     value: EKS-Setup-Role-Kotak811
-  - name: UAT_ROLE_NAME
+  - name: SOURCE_ROLE_NAME
     value: EKS_Setup_Role
-  # details for prod repo to update pro-values.yaml
-  - name: BRANCH_NAME
-    value: master
-  - name: REPOSITORY_NAME
-    value: kotak-811-devops-prod
-
-  # Agent pool details
   - name: DEVOPS_POOL_NAME
     value: "K811-DevOps"
   - name: PROD_POOL_NAME
     value: k811-prod
-  - name: PROD_AGENT_IN_AGENTPOOL
-    value: Linux-Agent3
-  # docker details to push to prod ECR
-  - name: PROD_PREFIX
-    value: stable
   - name: PROD_AWS_REGION
     value: ap-south-1
   - name: PROD_AWS_ACCOUNT_ID
@@ -47,11 +26,7 @@ variables:
   - name: PROD_ECR_FOLDER_NAME
     value: 811prodonb
   - name: PROD_ECR_REPO_NAME
-    value: k811_kyc
-
-  # source Enviornmnet details
-  - name: SOURCE_SERVICE_NAME
-    value: k811-kyc
+    value: k811_kyc # Note: Should this be specific to the cronjob?
   - name: SOURCE_AWS_REGION
     value: ap-south-1
   - name: SOURCE_AWS_ACCOUNT_ID
@@ -59,204 +34,163 @@ variables:
   - name: SOURCE_ECR_FOLDER_NAME
     value: 811uatonb
   - name: SOURCE_ECR_REPO_NAME
-    value: k811_ms_kyc
-  - name: SOURCE_KUBE_CONFIG_PATH
-    value: /home/app_user/.kube/config-uat
-  - name: SOURCE_NAMESPACE
-    value: 811-uat
-  # helm related variables
+    value: k811_ms_kyc # Note: Should this be specific to the cronjob?
   - name: HELM_CHARTS_PATH
-    value: helm-charts/k811-kyc/charts
+    value: helm-charts/k811-ms-kyc-bitly-submit-cronjob
   - name: HELM_S3BUCKET_URL
-    value: s3://k811-onb-helmcharts/prod/k811-kyc/
+    value: s3://k811-onb-helmcharts/prod/k811-ms-kyc-bitly-submit-cronjob/
   - name: KUBE_CONFIG_PATH
     value: /home/app_user/.kube/config-prod
   - name: NAMESPACE
     value: prod
-  - name: DR_KUBE_CONFIG_PATH
-    value: /home/app_user/.kube/config-onb-dr
-  - name: DR_HELM_S3BUCKET_URL
-    value: s3://k811-onb-helmcharts-dr/prod/k811-kyc/
-  - name: PROD_AGENT_IN_AGENTPOOL
-    value: Linux-Agent3
+  # Add DR variables if you re-enable the DR stage
+  # - name: DR_KUBE_CONFIG_PATH
+  #   value: /home/app_user/.kube/config-onb-dr
+  # - name: DR_HELM_S3BUCKET_URL
+  #   value: s3://k811-onb-helmcharts-dr/prod/k811-ms-kyc-bitly-submit-cronjob/
 
-# Parameter to input Jira Ticket
 parameters:
+  - name: ImageTag
+    type: string
+    displayName: "Image Tag to Deploy"
+    default: "1.20240625.1"
+  - name: DeployPROD
+    displayName: "Deploy to PROD Environment"
+    type: boolean
+    default: true
+  - name: DeployDR
+    displayName: "Deploy to DR Environment"
+    type: boolean
+    default: false
   - name: Jira_URL
     type: string
+    displayName: "Jira Ticket URL"
     default: ""
-    displayName: "Jira URL"
 
+# ===================================================================
+# == PIPELINE STAGES
+# ===================================================================
 stages:
-  - stage: ECR_CLONE
+- stage: Prepare_And_Promote_Image
+  displayName: "Prepare & Promote Artifacts"
+  jobs:
+  - job: PREPARE_ARTIFACTS
+    displayName: "Update Chart & Promote Docker Image"
     pool:
       name: $(DEVOPS_POOL_NAME)
-    jobs:
-      - deployment: PRODDeployment
-        displayName: PRODDeployment
-        environment: prod-pipeline-approvals
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - script: |
-                    echo "approved to deploy UAT Image to PROD"
-                  displayName: Approve UAT image to depoly in PROD
-      - job: ECR_IMAGE_PUSH_FROM_UAT_TO_PROD
-        steps:
-          - script: |
-              pwd
-              unset AWS_SESSION_TOKEN
-              unset AWS_SECRET_ACCESS_KEY
-              unset AWS_ACCESS_KEY_ID
-              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(SOURCE_AWS_ACCOUNT_ID):role/$(UAT_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
-              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-              version=$(kubectl get deployment $(SOURCE_SERVICE_NAME) -o jsonpath=''{$.spec.template.spec.containers[:1].image}'' -n $(SOURCE_NAMESPACE) --kubeconfig $(SOURCE_KUBE_CONFIG_PATH) | cut -d ':' -f 2)
-              echo "##vso[task.setvariable variable=version]$version"
-            displayName: "$(SOURCE_SERVICE_NAME) Tag value in UAT environment ."
+    steps:
+      - checkout: self
+        displayName: "Checkout Source Code"
 
-          - script: |
-              echo $(version)
-            displayName: UAT Environment Docker image of $(SOURCE_SERVICE_NAME)
+      - script: |
+          echo "Updating Helm chart files with new version and image tag..."
+          CHART_VERSION="1.$(Build.BuildNumber)"
+          echo "Setting chart version to $CHART_VERSION and image tag to ${{ parameters.ImageTag }}"
+          
+          # Modify Chart.yaml
+          sed -i -e "s/^version:.*/version: $CHART_VERSION/" $(HELM_CHARTS_PATH)/charts/Chart.yaml
+          sed -i -e "s/^appVersion:.*/appVersion: ${{ parameters.ImageTag }}/" $(HELM_CHARTS_PATH)/charts/Chart.yaml
+          
+          # Modify prod-values.yaml
+          sed -i -e "s/tag:.*/tag: ${{ parameters.ImageTag }}/" $(HELM_CHARTS_PATH)/charts/prod-values.yaml
+          
+          echo "Chart files updated."
+        displayName: "Update Helm Chart Metadata"
 
-          - script: |
-              pwd
-              unset AWS_SESSION_TOKEN
-              unset AWS_SECRET_ACCESS_KEY
-              unset AWS_ACCESS_KEY_ID
-              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(SOURCE_AWS_ACCOUNT_ID):role/$(UAT_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
-              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-              aws ecr get-login-password --region $(SOURCE_AWS_REGION) | docker login --username AWS --password-stdin $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com
-              docker pull $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version)
-              docker tag $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version) $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-$(version)
-              aws ecr get-login-password --region $(PROD_AWS_REGION) | docker login --username AWS --password-stdin $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com
-              docker push $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-$(version)
-            displayName: "Login, Docker and Push"
+      - script: |
+          echo "--- Promoting Image from UAT to PROD ECR ---"
+          
+          echo "Step 1: Assume UAT role and pull image"
+          CREDS_UAT=$(aws sts assume-role --role-arn arn:aws:iam::$(SOURCE_AWS_ACCOUNT_ID):role/$(SOURCE_ROLE_NAME) --role-session-name "UAT-Pull-$(Build.BuildNumber)")
+          export AWS_ACCESS_KEY_ID=$(echo $CREDS_UAT | jq -r '.Credentials.AccessKeyId')
+          export AWS_SECRET_ACCESS_KEY=$(echo $CREDS_UAT | jq -r '.Credentials.SecretAccessKey')
+          export AWS_SESSION_TOKEN=$(echo $CREDS_UAT | jq -r '.Credentials.SessionToken')
+          
+          aws ecr get-login-password --region $(SOURCE_AWS_REGION) | docker login --username AWS --password-stdin $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com
+          
+          SRC_IMG="$(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }}"
+          docker pull $SRC_IMG
 
-          - script: |
-              git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
-            displayName: "clone repository"
+          echo "Step 2: Assume PROD role and push image"
+          CREDS_PROD=$(aws sts assume-role --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) --role-session-name "PROD-Push-$(Build.BuildNumber)")
+          export AWS_ACCESS_KEY_ID=$(echo $CREDS_PROD | jq -r '.Credentials.AccessKeyId')
+          export AWS_SECRET_ACCESS_KEY=$(echo $CREDS_PROD | jq -r '.Credentials.SecretAccessKey')
+          export AWS_SESSION_TOKEN=$(echo $CREDS_PROD | jq -r '.Credentials.SessionToken')
+          
+          aws ecr get-login-password --region $(PROD_AWS_REGION) | docker login --username AWS --password-stdin $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com
 
-          - script: |
-              pwd
-              git pull 
-              sed -i -e 's/tag:.*/tag: $(PROD_PREFIX)-$(version)/'  $(HELM_CHARTS_PATH)/$(ENV)-values.yaml
-              sed -i -e 's/tag:.*/tag: $(PROD_PREFIX)-$(version)/'  $(HELM_CHARTS_PATH)/$(DR-ENV)-values.yaml
-            displayName: "replace helm charts"
-            workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
+          TGT_IMG="$(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):${{ parameters.ImageTag }}"
 
-          - script: |
-              git config --global user.email "pipeline@kotak.com"
-              git config --global user.name "Pipeline"
-              git add -A
-              git status
-              git commit -m "azure pipeline commited to updated prod-values.yaml in helm charts"
-              echo "Pushing now!!!"
-              git pull
-              git push -u origin $(BRANCH_NAME)
-            displayName: "Updating Chart Values"
-            workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
+          if ! aws ecr describe-images --repository-name $(PROD_ECR_REPO_NAME) --image-ids imageTag=${{ parameters.ImageTag }} --region $(PROD_AWS_REGION) > /dev/null 2>&1; then
+            echo "Image not found in PROD ECR. Tagging and pushing..."
+            docker tag $SRC_IMG $TGT_IMG
+            docker push $TGT_IMG
+          else
+            echo "Image ${{ parameters.ImageTag }} already exists in PROD ECR. Skipping push."
+          fi
+        displayName: "Promote Docker Image to PROD ECR"
+      
+      - task: PublishPipelineArtifact@1
+        displayName: "Publish updated Helm Chart as artifact"
+        inputs:
+          targetPath: '$(HELM_CHARTS_PATH)/charts'
+          artifactName: 'helm-chart-prod'
 
-  - stage: PROD
+- stage: DeployPROD
+  displayName: "Deploy to PROD"
+  dependsOn: Prepare_And_Promote_Image
+  condition: and(succeeded(), eq('${{ parameters.DeployPROD }}', 'true'))
+  jobs:
+  - deployment: DeployHelmChartPROD
+    displayName: "Deploy Helm Chart to PROD"
     pool:
       name: $(PROD_POOL_NAME)
-      # demands:
-      #   - agent.name -equals $(PROD_AGENT_IN_AGENTPOOL)
-    displayName: "Build in PROD Environment"
-    jobs:
-      # - deployment: PRODDeployment
-      #   displayName: PRODDeployment
-      #   environment: devops-test-approval
-      #   strategy:
-      #     runOnce:
-      #       deploy:
-      #         steps:
-      #         - script: |
-      #             echo "approved to deploy UAT Image to PROD"
-      #           displayName: Approve UAT image to depoly in PROD
-      - job: Service_deployment_in_PROD
-        displayName: "Service deployment in PROD"
-        steps:
-          - script: |
-              git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
-            displayName: "clone repository"
-          - template: build.yaml
-          - template: dr-build.yaml
-below is build.yaml:
-steps:
-  - script: |
-      pwd
-      sed -i -e 's/name:.*/name: $(SERVICE_NAME)/' $(HELM_CHARTS_PATH)/Chart.yaml
-      sed -i -e 's/appVersion:.*/appVersion: 1.$(Build.BuildNumber)/' $(HELM_CHARTS_PATH)/Chart.yaml
-      sed -i -e 's/version:.*/version: 1.$(Build.BuildNumber)/' $(HELM_CHARTS_PATH)/Chart.yaml
-    displayName: "Production replace helm charts"
-    workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
+    environment: 'PROD' # Optional: Link to an Azure DevOps Environment for approvals and tracking
+    strategy:
+      runOnce:
+        deploy:
+          steps:
+            - task: DownloadPipelineArtifact@2
+              displayName: "Download Helm Chart artifact"
+              inputs:
+                artifactName: 'helm-chart-prod'
+                downloadPath: '$(System.ArtifactsDirectory)/helm-chart'
+            
+            - script: |
+                echo "--- Deploying Helm chart to PROD ---"
+                
+                echo "Step 1: Assume PROD role"
+                CREDS=$(aws sts assume-role --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) --role-session-name "PROD-Deploy-$(Build.BuildNumber)")
+                export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+                export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+                export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
 
-  - script: |
-      pwd
-      unset AWS_SESSION_TOKEN
-      unset AWS_SECRET_ACCESS_KEY
-      unset AWS_ACCESS_KEY_ID
-      CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
-      export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-      export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-      export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-      helm s3 init $(HELM_S3BUCKET_URL)
-      helm repo add $(ENV)-$(SERVICE_NAME) $(HELM_S3BUCKET_URL) 
-      helm package $(HELM_CHARTS_PATH)/
-      helm s3 push --force $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz $(ENV)-$(SERVICE_NAME)
-      aws s3 ls $(HELM_S3BUCKET_URL) 
-      helm repo update 
-      helm search repo $(ENV)-$(SERVICE_NAME)
-    displayName: "Production Charts Push To S3"
-    workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
+                CHART_DIR="$(System.ArtifactsDirectory)/helm-chart"
+                CHART_VERSION="1.$(Build.BuildNumber)"
 
-  - script: |
-      pwd
-      unset AWS_SESSION_TOKEN
-      unset AWS_SECRET_ACCESS_KEY
-      unset AWS_ACCESS_KEY_ID
-      CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
-      export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-      export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-      export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-      rm -rf $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/*.tgz
-      helm repo update
-      helm fetch $(ENV)-$(SERVICE_NAME)/$(SERVICE_NAME)
-      tar -xvf $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
-      helm upgrade --install $(ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ -f $(SERVICE_NAME)/$(ENV)-values.yaml --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH)  --wait --timeout 3m
-    displayName: "Production Helm Charts Deployment"
+                echo "Step 2: Package and push chart to S3 Helm repo"
+                helm s3 init $(HELM_S3BUCKET_URL) || true
+                helm repo add prod-helm $(HELM_S3BUCKET_URL) || true
+                
+                helm package $CHART_DIR
+                helm s3 push --force $(SERVICE_NAME)-$CHART_VERSION.tgz prod-helm
 
-  - script: |
-      pwd
-      unset AWS_SESSION_TOKEN
-      unset AWS_SECRET_ACCESS_KEY
-      unset AWS_ACCESS_KEY_ID
-      CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
-      export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-      export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-      export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-      sleep 10
-      echo "########################## list of pods ########################################"
-      kubectl get po --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME)
-      echo "########################## list of deployed services ########################################"
-      kubectl get deployment --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME)
-    displayName: "Production Application Status"
-# $(ENV)-$(SERVICE_NAME) = devopstest
+                echo "Step 3: Deploy chart using helm upgrade"
+                helm repo update
+                helm upgrade --install $(ENV)-$(SERVICE_NAME) prod-helm/$(SERVICE_NAME) \
+                  --version $CHART_VERSION \
+                  --namespace $(NAMESPACE) \
+                  --kubeconfig $(KUBE_CONFIG_PATH) \
+                  --wait --timeout 5m
+              displayName: "Package, Push, and Deploy Helm Chart"
 
-# helm fetch devopstest-test/devopstest  --> it will download latest devopstest-1.20221128.12.tgz
+            - script: |
+                echo "--- Verifying PROD Deployment ---"
+                CREDS=$(aws sts assume-role --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) --role-session-name "PROD-Verify-$(Build.BuildNumber)")
+                export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+                export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+                export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
 
-# helm repo list
-# helm history $(ENV)-$(SERVICE_NAME) -n test
-
-# ROll back commands
-# helm rollback <charts_name> 1 -n <namespace>  --> Roll back to a previous version. here 1 is vision number
-
-# helm get values --revision=2 <charts_name> -n <namespace> --> Review the details for a specific revision.
-
-
-
+                echo "Looking for CronJob: $(SERVICE_NAME)"
+                kubectl get cronjob $(SERVICE_NAME) -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH)
+              displayName: "Post Deployment Status Check"
