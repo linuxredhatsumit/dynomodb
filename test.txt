@@ -1,1 +1,64 @@
-/templates/prod-cron-deploy-tag.yaml (Line: 23, Col: 1): Unexpected value 'stages'
+tarting: PROD: Promote Docker Image from UAT to PROD
+==============================================================================
+Task         : Command line
+Description  : Run a command line script using Bash on Linux and macOS and cmd.exe on Windows
+Version      : 2.250.1
+Author       : Microsoft Corporation
+Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/command-line
+==============================================================================
+Generating script.
+========================== Starting Command Output ===========================
+/usr/bin/bash --noprofile --norc /home/app_user/workspace/Agent7/_work/_temp/ded30d14-4921-4d9d-acd7-c8b65337c215.sh
+Assuming UAT role to access UAT ECR
+Logging into UAT ECR
+WARNING! Your password will be stored unencrypted in /home/app_user/.docker/config.json.
+Configure a credential helper to remove this warning. See
+https://docs.docker.com/engine/reference/commandline/login/#credentials-store
+
+Login Succeeded
+Pulling image from UAT ECR
+811_app_ms_kyc-development-20250702.2: Pulling from 811uatonb/k811_ms_kyc
+43c4264eed91: Already exists
+95e03b2f0c1a: Already exists
+
+
+e7a0cdb0db4: Pull complete
+Digest: sha256:b537a99345d346cf6f3983c97904d594d2dfb7ce7ff467bbf1c9cf995344c35c
+Status: Downloaded newer image for 483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_kyc:811_app_ms_kyc-development-20250702.2
+483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_kyc:811_app_ms_kyc-development-20250702.2
+Assuming PROD role to push to PROD ECR
+
+An error occurred (AccessDenied) when calling the AssumeRole operation: User: arn:aws:sts::483584640083:assumed-role/AWS-EC2-Role/i-06950af8d81d0affc is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::718378052708:role/EKS-Setup-Role-Kotak811
+Logging into PROD ECR
+WARNING! Your password will be stored unencrypted in /home/app_user/.docker/config.json.
+Configure a credential helper to remove this warning. See
+https://docs.docker.com/engine/reference/commandline/login/#credentials-store
+
+Checking if image exists in PROD ECR
+Image not found in PROD ECR. Pushing...
+The push refers to repository [718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_kyc]
+08d00990453d: Preparing
+d7258737a97c: Preparing
+4e9bab9b2ade: Preparing
+f7d7c33dc116: Preparing
+a8a8acedd62d: Preparing
+e52e9af076ad: Preparing
+b17b63edca77: Preparing
+7d1bbfed2e41: Preparing
+c37a78303182: Preparing
+0f600007906e: Preparing
+ddd506a4f5e8: Preparing
+67a8e7f57a95: Preparing
+63ca1fbb43ae: Preparing
+0f600007906e: Waiting
+c37a78303182: Waiting
+ddd506a4f5e8: Waiting
+67a8e7f57a95: Waiting
+63ca1fbb43ae: Waiting
+e52e9af076ad: Waiting
+b17b63edca77: Waiting
+7d1bbfed2e41: Waiting
+denied: User: arn:aws:sts::483584640083:assumed-role/AWS-EC2-Role/i-06950af8d81d0affc is not authorized to perform: ecr:InitiateLayerUpload on resource: arn:aws:ecr:ap-south-1:718378052708:repository/811prodonb/k811_kyc because no identity-based policy allows the ecr:InitiateLayerUpload action
+
+##[error]Bash exited with code '1'.
+Finishing: PROD: Promote Docker Image from UAT to PROD
