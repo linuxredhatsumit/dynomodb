@@ -1,4 +1,127 @@
-aws ecr describe-images \
-  --repository-name 811uatonb/k811_ms_kyc_bitly_submit_cronjob \
-  --region ap-south-1 \
-  --query 'imageDetails[].imageTags'
+trigger: none
+
+parameters:
+  - name: ImageTag
+    displayName: "Docker Image Tag to promote"
+    type: string
+    default: ""
+
+variables:
+  serviceName: "k811-ms-kyc-bitly-submit-cronjob"
+  serviceEcrName: "k811_cronjob_kyc_bitly_submit"
+  uatEcrRepo: "811uatonb/k811_ms_kyc_bitly_submit_cronjob"
+  prodEcrRepo: "811prodonb/k811_cronjob_kyc_bitly_submit"
+  helmChartName: "k811-ms-kyc-bitly-submit-cronjob"
+  helmS3Bucket: "s3://helm-k8s-prod/k811"
+  uatAssumeRole: "arn:aws:iam::483584640083:role/prod-helm-deploy"
+  prodAssumeRole: "arn:aws:iam::718378052708:role/prod-helm-deploy"
+
+stages:
+  - stage: UAT
+    displayName: UAT - GitOps Update
+    jobs:
+      - job: Update_Helm_Values
+        displayName: Update values.yaml with image tag
+        pool: uat-linux-infra-pool
+        steps:
+          - checkout: self
+            persistCredentials: true
+
+          - task: Bash@3
+            name: AssumeRoleUAT
+            inputs:
+              targetType: inline
+              script: |
+                echo "Assuming UAT role..."
+                CREDS=$(aws sts assume-role \
+                  --role-arn "${{ variables.uatAssumeRole }}" \
+                  --role-session-name "uatSession")
+                export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+                export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+                export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+                echo "##vso[task.setvariable variable=AWS_ACCESS_KEY_ID;issecret=true]$AWS_ACCESS_KEY_ID"
+                echo "##vso[task.setvariable variable=AWS_SECRET_ACCESS_KEY;issecret=true]$AWS_SECRET_ACCESS_KEY"
+                echo "##vso[task.setvariable variable=AWS_SESSION_TOKEN;issecret=true]$AWS_SESSION_TOKEN"
+
+          - script: |
+              echo "Updating image tag in Helm values.yaml"
+              sed -i "s|tag:.*|tag: '${{ parameters.ImageTag }}'|g" helm/${{ variables.helmChartName }}/values.yaml
+              git config user.name "azure-pipeline"
+              git config user.email "azure-pipeline@example.com"
+              git add helm/${{ variables.helmChartName }}/values.yaml
+              git commit -m "Update image tag to ${{ parameters.ImageTag }}"
+              git push
+            displayName: Update Helm values.yaml
+
+  - stage: PROD
+    displayName: Promote to PROD and DR
+    dependsOn: UAT
+    jobs:
+      - job: PromoteDockerImage
+        displayName: Pull from UAT, Push to PROD ECR
+        pool: prod-linux-infra-pool
+        steps:
+          - task: Bash@3
+            name: AssumeRolePROD
+            inputs:
+              targetType: inline
+              script: |
+                echo "Assuming PROD role..."
+                CREDS=$(aws sts assume-role \
+                  --role-arn "${{ variables.prodAssumeRole }}" \
+                  --role-session-name "prodSession")
+                export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+                export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+                export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+                echo "##vso[task.setvariable variable=AWS_ACCESS_KEY_ID;issecret=true]$AWS_ACCESS_KEY_ID"
+                echo "##vso[task.setvariable variable=AWS_SECRET_ACCESS_KEY;issecret=true]$AWS_SECRET_ACCESS_KEY"
+                echo "##vso[task.setvariable variable=AWS_SESSION_TOKEN;issecret=true]$AWS_SESSION_TOKEN"
+
+          - script: |
+              echo "Login to UAT ECR"
+              aws ecr get-login-password --region ap-south-1 | \
+                docker login --username AWS --password-stdin 483584640083.dkr.ecr.ap-south-1.amazonaws.com
+
+              echo "Login to PROD ECR"
+              aws ecr get-login-password --region ap-south-1 | \
+                docker login --username AWS --password-stdin 718378052708.dkr.ecr.ap-south-1.amazonaws.com
+
+              echo "Pulling image from UAT ECR"
+              docker pull 483584640083.dkr.ecr.ap-south-1.amazonaws.com/${{ variables.uatEcrRepo }}:${{ parameters.ImageTag }}
+
+              echo "Tagging image for PROD ECR"
+              docker tag 483584640083.dkr.ecr.ap-south-1.amazonaws.com/${{ variables.uatEcrRepo }}:${{ parameters.ImageTag }} \
+                718378052708.dkr.ecr.ap-south-1.amazonaws.com/${{ variables.prodEcrRepo }}:${{ parameters.ImageTag }}
+
+              echo "Pushing to PROD ECR"
+              docker push 718378052708.dkr.ecr.ap-south-1.amazonaws.com/${{ variables.prodEcrRepo }}:${{ parameters.ImageTag }}
+            displayName: Docker Pull & Push
+
+      - job: HelmPackageAndDeploy
+        displayName: Helm Package, Upload to S3, Deploy to PROD and DR
+        dependsOn: PromoteDockerImage
+        pool: prod-linux-infra-pool
+        steps:
+          - checkout: self
+
+          - script: |
+              echo "Packaging Helm chart"
+              cd helm/${{ variables.helmChartName }}
+              helm dependency update
+              helm package . --destination ../package/
+
+              echo "Uploading chart to S3"
+              aws s3 cp ../package/${{ variables.helmChartName }}-*.tgz ${{ variables.helmS3Bucket }}/
+            displayName: Helm package & S3 upload
+
+          - script: |
+              echo "Deploying to PROD"
+              helm upgrade --install ${{ variables.helmChartName }} oci://${{ variables.helmS3Bucket }} \
+                --namespace prod-kyc --version ${{ parameters.ImageTag }} --wait
+            displayName: Deploy to PROD
+
+          - script: |
+              echo "Deploying to DR"
+              helm upgrade --install ${{ variables.helmChartName }} oci://${{ variables.helmS3Bucket }} \
+                --namespace dr-kyc --version ${{ parameters.ImageTag }} --wait
+            displayName: Deploy to DR
