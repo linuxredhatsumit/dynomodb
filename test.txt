@@ -24,47 +24,48 @@ jobs:
         displayName: "PROD: Update Helm Chart Metadata and Image Tag"
 
       - script: |
-          echo "Assuming AWS Role for PROD"
+          echo "Assuming UAT role and pulling image"
           unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
           CREDS=$(aws sts assume-role \
-            --role-arn arn:aws:iam::$(PROD_ECR_REPO_NAME):role/$(PROD_ROLE_NAME) \
-            --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+            --role-arn arn:aws:iam::$(SOURCE_AWS_ACCOUNT_ID):role/$(UAT_ROLE_NAME) \
+            --role-session-name "PullFromUAT-$(Build.BuildNumber)")
           export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
           export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
           export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
 
-          echo "Promoting Docker Image from Dev ECR to PROD ECR"
+          aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com
 
-          source_image=$(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }}
-          target_image=$(PROD_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):${{ parameters.ImageTag }}
-
-          echo "Source image: $source_image"
-          echo "Target image: $target_image"
-
-          echo "Checking if image already exists in PROD ECR..."
-          if ! aws ecr describe-images --repository-name $(SERVICE_NAME) --image-ids imageTag=${{ parameters.ImageTag }} --region ap-south-1 > /dev/null 2>&1; then
-            echo "Image not found in PROD. Copying from Dev..."
-            aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com
-            aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin $(PROD_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com
-
-            docker pull $source_image
-            docker tag $source_image $target_image
-            docker push $target_image
-          else
-            echo "Image already exists in PROD ECR. Skipping push."
-          fi
-        displayName: "PROD: Promote Docker Image if Not Present"
+          SOURCE_IMAGE=$(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }}
+          docker pull $SOURCE_IMAGE
+        displayName: "Assume UAT role and pull image"
 
       - script: |
-          echo "Assuming AWS Role for PROD"
+          echo "Tag and push image to PROD ECR"
           unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
           CREDS=$(aws sts assume-role \
             --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) \
-            --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+            --role-session-name "PushToPROD-$(Build.BuildNumber)")
           export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
           export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
           export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
-          echo "Packaging Helm chart..."
+
+          aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin $(PROD_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com
+
+          TARGET_IMAGE=$(PROD_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):${{ parameters.ImageTag }}
+          docker tag $SOURCE_IMAGE $TARGET_IMAGE
+          docker push $TARGET_IMAGE
+        displayName: "Tag and push image to PROD ECR"
+
+      - script: |
+          echo "Packaging Helm chart and pushing to S3"
+          unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+          CREDS=$(aws sts assume-role \
+            --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) \
+            --role-session-name "HelmPush-$(Build.BuildNumber)")
+          export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+          export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+          export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+
           helm s3 init $(HELM_S3BUCKET_URL)
           helm repo add $(ENV)-$(SERVICE_NAME) $(HELM_S3BUCKET_URL)
           helm package $(HELM_CHARTS_PATH)
@@ -78,7 +79,7 @@ jobs:
           unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
           CREDS=$(aws sts assume-role \
             --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) \
-            --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+            --role-session-name "DeployToPROD-$(Build.BuildNumber)")
           export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
           export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
           export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
@@ -86,8 +87,9 @@ jobs:
           rm -rf *.tgz
           helm fetch $(ENV)-$(SERVICE_NAME)/$(SERVICE_NAME) --version 1.$(Build.BuildNumber)
           tar -xvf $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
+
           helm upgrade --install $(ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ \
-            -f $(SERVICE_NAME)/$(ENV)-values.yaml \
+            -f $(SERVICE_NAME)/prod-values.yaml \
             --namespace $(NAMESPACE) \
             --kubeconfig $(KUBE_CONFIG_PATH) \
             --wait --timeout 3m
@@ -98,7 +100,7 @@ jobs:
           unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
           CREDS=$(aws sts assume-role \
             --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) \
-            --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+            --role-session-name "PostCheck-$(Build.BuildNumber)")
           export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
           export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
           export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
