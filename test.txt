@@ -97,3 +97,38 @@ stages:
               kubectl get cronjobs -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME) || echo "CronJob not found"
               kubectl get jobs -n $(NAMESPACE) --sort-by=.metadata.creationTimestamp --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME) | tail -5 || echo "No recent jobs found"
             displayName: "Post Deployment Status"
+
+
+########error
+
+2025-07-03T10:16:30.1246536Z ##[section]Starting: Push Image to PROD ECR
+2025-07-03T10:16:30.1261508Z ==============================================================================
+2025-07-03T10:16:30.1261761Z Task         : Command line
+2025-07-03T10:16:30.1261906Z Description  : Run a command line script using Bash on Linux and macOS and cmd.exe on Windows
+2025-07-03T10:16:30.1262380Z Version      : 2.250.1
+2025-07-03T10:16:30.1262501Z Author       : Microsoft Corporation
+2025-07-03T10:16:30.1262647Z Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/command-line
+2025-07-03T10:16:30.1262853Z ==============================================================================
+2025-07-03T10:16:30.4452932Z Generating script.
+2025-07-03T10:16:30.4467258Z ========================== Starting Command Output ===========================
+2025-07-03T10:16:30.4491634Z [command]/usr/bin/bash --noprofile --norc /home/app_user/workspace/Agent2/_work/_temp/6472daf7-b392-4ac1-8552-bbefc8cdfd22.sh
+2025-07-03T10:16:31.8069415Z 
+2025-07-03T10:16:31.8071370Z An error occurred (AccessDenied) when calling the AssumeRole operation: User: arn:aws:sts::483584640083:assumed-role/AWS-EC2-Role/i-0fa41ed9bb282035c is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::718378052708:role/EKS-Setup-Role-Kotak811
+2025-07-03T10:16:32.1178297Z Logging into source (UAT) and target (PROD) ECR and pushing image
+2025-07-03T10:16:33.7060057Z WARNING! Your password will be stored unencrypted in /home/app_user/.docker/config.json.
+2025-07-03T10:16:33.7060848Z Configure a credential helper to remove this warning. See
+2025-07-03T10:16:33.7061780Z https://docs.docker.com/engine/reference/commandline/login/#credentials-store
+2025-07-03T10:16:33.7061940Z 
+2025-07-03T10:16:33.7070003Z Login Succeeded
+2025-07-03T10:16:35.2985381Z WARNING! Your password will be stored unencrypted in /home/app_user/.docker/config.json.
+2025-07-03T10:16:35.2986782Z Configure a credential helper to remove this warning. See
+2025-07-03T10:16:35.2988068Z https://docs.docker.com/engine/reference/commandline/login/#credentials-store
+2025-07-03T10:16:35.2988309Z 
+2025-07-03T10:16:35.2996651Z Login Succeeded
+2025-07-03T10:16:35.4702128Z Error response from daemon: pull access denied for 483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_kyc, repository does not exist or may require 'docker login': denied: User: arn:aws:sts::483584640083:assumed-role/AWS-EC2-Role/i-0fa41ed9bb282035c is not authorized to perform: ecr:BatchGetImage on resource: arn:aws:ecr:ap-south-1:483584640083:repository/811uatonb/k811_ms_kyc because no identity-based policy allows the ecr:BatchGetImage action
+2025-07-03T10:16:35.5004465Z Error response from daemon: No such image: 483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_kyc:811_app_ms_kyc-development-20250702.2
+2025-07-03T10:16:35.5395759Z The push refers to repository [718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_kyc]
+2025-07-03T10:16:35.5398582Z An image does not exist locally with the tag: 718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_kyc
+2025-07-03T10:16:35.5469104Z 
+2025-07-03T10:16:35.5558875Z ##[error]Bash exited with code '1'.
+2025-07-03T10:16:35.5588293Z ##[section]Finishing: Push Image to PROD ECR
