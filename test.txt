@@ -1,3 +1,36 @@
+Assuming AWS Role for PROD
+
+An error occurred (AccessDenied) when calling the AssumeRole operation: User: arn:aws:sts::718378052708:assumed-role/EC2_SSM_+_Admin_Access/i-07d0eb0b1b340b40f is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::k811_kyc:role/EKS-Setup-Role-Kotak811
+Promoting Docker Image from Dev ECR to PROD ECR
+Source image: 483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_kyc:811_app_ms_kyc-development-20250702.2
+Target image: 718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_kyc:811_app_ms_kyc-development-20250702.2
+Checking if image already exists in PROD ECR...
+Image not found in PROD. Copying from Dev...
+
+WARNING! Your credentials are stored unencrypted in '/home/app_user/.docker/config.json'.
+Configure a credential helper to remove this warning. See
+https://docs.docker.com/go/credential-store/
+
+Login Succeeded
+
+WARNING! Your credentials are stored unencrypted in '/home/app_user/.docker/config.json'.
+Configure a credential helper to remove this warning. See
+https://docs.docker.com/go/credential-store/
+
+Login Succeeded
+Error response from daemon: pull access denied for 483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_kyc, repository does not exist or may require 'docker login': denied: User: arn:aws:sts::718378052708:assumed-role/EC2_SSM_+_Admin_Access/i-07d0eb0b1b340b40f is not authorized to perform: ecr:BatchGetImage on resource: arn:aws:ecr:ap-south-1:483584640083:repository/811uatonb/k811_ms_kyc because no resource-based policy allows the ecr:BatchGetImage action
+Error response from daemon: No such image: 483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_kyc:811_app_ms_kyc-development-20250702.2
+The push refers to repository [718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_kyc]
+An image does not exist locally with the tag: 718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_kyc
+
+########
+getting above error in my cronjob pipeline, can u take refrence from service pipline how they are acessing it uat staff and can suggest
+parameters:
+  - name: Jira_URL
+    type: string
+    default: ""
+    displayName: "Jira URL"
+
 stages:
   - stage: ECR_CLONE
     pool:
@@ -55,8 +88,8 @@ stages:
           - script: |
               pwd
               git pull 
-              sed -i -e 's/tag:.*/tag: $(PROD_PREFIX)-$(version)/' $(HELM_CHARTS_PATH)/$(ENV)-values.yaml
-              sed -i -e 's/tag:.*/tag: $(PROD_PREFIX)-$(version)/' $(HELM_CHARTS_PATH)/$(DR-ENV)-values.yaml
+              sed -i -e 's/tag:.*/tag: $(PROD_PREFIX)-$(version)/'  $(HELM_CHARTS_PATH)/$(ENV)-values.yaml
+              sed -i -e 's/tag:.*/tag: $(PROD_PREFIX)-$(version)/'  $(HELM_CHARTS_PATH)/$(DR-ENV)-values.yaml
             displayName: "replace helm charts"
             workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
 
@@ -75,6 +108,8 @@ stages:
   - stage: PROD
     pool:
       name: $(PROD_POOL_NAME)
+      # demands:
+      #   - agent.name -equals $(PROD_AGENT_IN_AGENTPOOL)
     displayName: "Build in PROD Environment"
     jobs:
       # - deployment: PRODDeployment
