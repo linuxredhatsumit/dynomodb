@@ -1,16 +1,23 @@
-/usr/bin/bash --noprofile --norc /home/app_user/workspace/Agent7/_work/_temp/6344794e-87df-4cfe-9961-96c9b563bf14.sh
-Assuming UAT role to access UAT ECR
-/home/app_user/workspace/Agent7/_work/_temp/6344794e-87df-4cfe-9961-96c9b563bf14.sh: line 5: SOURCE_ROLE_NAME: command not found
-
-An error occurred (AccessDenied) when calling the AssumeRole operation: User: arn:aws:sts::483584640083:assumed-role/AWS-EC2-Role/i-06950af8d81d0affc is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::483584640083:role/
-Logging into UAT ECR
-WARNING! Your password will be stored unencrypted in /home/app_user/.docker/config.json.
-Configure a credential helper to remove this warning. See
-https://docs.docker.com/engine/reference/commandline/login/#credentials-store
-
 Login Succeeded
 Pulling image from UAT ECR
-Error response from daemon: pull access denied for 483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_kyc, repository does not exist or may require 'docker login': denied: User: arn:aws:sts::483584640083:assumed-role/AWS-EC2-Role/i-06950af8d81d0affc is not authorized to perform: ecr:BatchGetImage on resource: arn:aws:ecr:ap-south-1:483584640083:repository/811uatonb/k811_ms_kyc because no identity-based policy allows the ecr:BatchGetImage action
+811_app_ms_kyc-development-20250702.2: Pulling from 811uatonb/k811_ms_kyc
+43c4264eed91: Already exists
+95e03b2f0c1a: Already exists
+75bffa3f6a2d: Already exists
+5c440c83b4d2: Already exists
+b852311cd915: Already exists
+d7c4b29f69a2: Pulling fs layer
+8cf7a731139d: Pulling fs layer
+6ed6896a2cc5: Pulling fs layer
+e98afa42fc34: Pulling fs layer
+6de2e61c2638: Pulling fs layer
+66214472a6b8: Pulling fs layer
+65663d8b7898: Pulling fs layer
+be7a0cdb0db4: Pulling fs layer
+e98afa42fc34: Waiting
+6de2e61c2638: Waiting
+66214472a6b8: Waiting
+
 Assuming PROD role to push to PROD ECR
 
 An error occurred (AccessDenied) when calling the AssumeRole operation: User: arn:aws:sts::483584640083:assumed-role/AWS-EC2-Role/i-06950af8d81d0affc is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::718378052708:role/EKS-Setup-Role-Kotak811
@@ -22,9 +29,11 @@ https://docs.docker.com/engine/reference/commandline/login/#credentials-store
 Login Succeeded
 Checking if image exists in PROD ECR
 Image not found in PROD ECR. Pushing...
-Error response from daemon: No such image: 483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_kyc:811_app_ms_kyc-development-20250702.2
 The push refers to repository [718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_kyc]
-An image does not exist locally with the tag: 718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_kyc
+08d00990453d: Preparing
+b17b63edca77: Waiting
+7d1bbfed2e41: Waiting
+denied: User: arn:aws:sts::483584640083:assumed-role/AWS-EC2-Role/i-06950af8d81d0affc is not authorized to perform: ecr:InitiateLayerUpload on resource: arn:aws:ecr:ap-south-1:718378052708:repository/811prodonb/k811_kyc because no identity-based policy allows the ecr:InitiateLayerUpload action
 
 ##[error]Bash exited with code '1'.
 Finishing: PROD: Promote Docker Image from UAT to PROD
