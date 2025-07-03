@@ -1,49 +1,96 @@
-stages:
-  - stage: ECR_CLONE
-    pool:
-      name: $(DEVOPS_POOL_NAME)
-    jobs:
-      - deployment: PRODDeployment
-        displayName: PRODDeployment
-        environment: prod-pipeline-approvals
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - script: |
-                    echo "approved to deploy UAT Image to PROD"
-                  displayName: Approve UAT image to depoly in PROD
-      - job: ECR_IMAGE_PUSH_FROM_UAT_TO_PROD
-        steps:
-          - script: |
-              pwd
-              unset AWS_SESSION_TOKEN
-              unset AWS_SECRET_ACCESS_KEY
-              unset AWS_ACCESS_KEY_ID
-              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(SOURCE_AWS_ACCOUNT_ID):role/$(UAT_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
-              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-              version=$(kubectl get deployment $(SOURCE_SERVICE_NAME) -o jsonpath=''{$.spec.template.spec.containers[:1].image}'' -n $(SOURCE_NAMESPACE) --kubeconfig $(SOURCE_KUBE_CONFIG_PATH) | cut -d ':' -f 2)
-              echo "##vso[task.setvariable variable=version]$version"
-            displayName: "$(SOURCE_SERVICE_NAME) Tag value in UAT environment ."
+- job: PROD_DEPLOY
+  displayName: "PROD: Push Image + Helm Deploy"
+  dependsOn: UAT_PREP
+  pool:
+    name: $(PROD_POOL_NAME)
+  steps:
+    - checkout: self
 
-          - script: |
-              echo $(version)
-            displayName: UAT Environment Docker image of $(SOURCE_SERVICE_NAME)
+    - script: |
+        echo "=== STEP 1: Assume UAT Role ==="
+        unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+        UAT_CREDS=$(aws sts assume-role \
+          --role-arn arn:aws:iam::$(SOURCE_AWS_ACCOUNT_ID):role/$(UAT_ROLE_NAME) \
+          --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+        export AWS_ACCESS_KEY_ID=$(echo $UAT_CREDS | jq -r '.Credentials.AccessKeyId')
+        export AWS_SECRET_ACCESS_KEY=$(echo $UAT_CREDS | jq -r '.Credentials.SecretAccessKey')
+        export AWS_SESSION_TOKEN=$(echo $UAT_CREDS | jq -r '.Credentials.SessionToken')
 
-          - script: |
-              pwd
-              unset AWS_SESSION_TOKEN
-              unset AWS_SECRET_ACCESS_KEY
-              unset AWS_ACCESS_KEY_ID
-              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(SOURCE_AWS_ACCOUNT_ID):role/$(UAT_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
-              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-              aws ecr get-login-password --region $(SOURCE_AWS_REGION) | docker login --username AWS --password-stdin $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com
-              docker pull $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version)
-              docker tag $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version) $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-$(version)
-              aws ecr get-login-password --region $(PROD_AWS_REGION) | docker login --username AWS --password-stdin $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com
-              docker push $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-$(version)
-            displayName: "Login, Docker and Push"
+        echo "Logging in to UAT ECR"
+        aws ecr get-login-password --region $(SOURCE_AWS_REGION) | docker login --username AWS --password-stdin $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com
+
+        echo "Pulling UAT Image"
+        SRC_IMG=$(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }}
+        docker pull $SRC_IMG
+
+        echo "=== STEP 2: Assume PROD Role ==="
+        unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+        PROD_CREDS=$(aws sts assume-role \
+          --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) \
+          --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+        export AWS_ACCESS_KEY_ID=$(echo $PROD_CREDS | jq -r '.Credentials.AccessKeyId')
+        export AWS_SECRET_ACCESS_KEY=$(echo $PROD_CREDS | jq -r '.Credentials.SecretAccessKey')
+        export AWS_SESSION_TOKEN=$(echo $PROD_CREDS | jq -r '.Credentials.SessionToken')
+
+        echo "Logging in to PROD ECR"
+        aws ecr get-login-password --region $(PROD_AWS_REGION) | docker login --username AWS --password-stdin $(PROD_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com
+
+        TGT_IMG=$(PROD_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):${{ parameters.ImageTag }}
+        echo "Tagging and pushing to PROD"
+        docker tag $SRC_IMG $TGT_IMG
+        docker push $TGT_IMG
+      displayName: "Assume UAT + PROD Roles, Push Image"
+
+    - script: |
+        echo "Assume PROD Role again for Helm"
+        unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+        CREDS=$(aws sts assume-role \
+          --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) \
+          --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+        export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+        export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+        export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+
+        echo "Packaging and pushing Helm chart"
+        helm repo add prod-helm $(HELM_S3BUCKET_URL) || true
+        helm s3 init $(HELM_S3BUCKET_URL)
+        helm package $(HELM_CHARTS_PATH)
+        mv $(SERVICE_NAME)-*.tgz $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
+        helm s3 push --force $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz prod-helm
+      displayName: "Push Helm Chart to S3"
+
+    - script: |
+        echo "Assume PROD Role again for Helm Deploy"
+        unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+        CREDS=$(aws sts assume-role \
+          --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) \
+          --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+        export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+        export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+        export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+
+        helm repo update
+        helm fetch prod-helm/$(SERVICE_NAME) --version 1.$(Build.BuildNumber)
+        tar -xvf $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
+        helm upgrade --install $(ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ \
+          -f $(SERVICE_NAME)/prod-values.yaml \
+          --namespace $(NAMESPACE) \
+          --kubeconfig $(KUBE_CONFIG_PATH) \
+          --wait --timeout 3m
+      displayName: "Helm Upgrade/Install to PROD"
+
+    - script: |
+        echo "Verifying Deployment"
+        unset AWS_ACCESS_KEY_ID AWS_SECRET_ACCESS_KEY AWS_SESSION_TOKEN
+        CREDS=$(aws sts assume-role \
+          --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) \
+          --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+        export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+        export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+        export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+
+        echo "==== CronJobs ===="
+        kubectl get cronjobs -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME) || echo "CronJob not found"
+        echo "==== Jobs (last 5) ===="
+        kubectl get jobs -n $(NAMESPACE) --sort-by=.metadata.creationTimestamp --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME) | tail -5 || echo "No jobs found"
+      displayName: "Post Deployment Status Check"
