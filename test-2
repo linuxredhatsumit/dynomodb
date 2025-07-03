@@ -1,12 +1,14 @@
- displayName: "Pull from UAT, Push to PROD ECR"
-displayName: "Clone Helm repo"
-displayName: "Update tag in values.yaml"
-   displayName: "Commit updated Helm values"
-  - stage: PROD_DEPLOYMENT
- displayName: "Package Helm, Deploy to PROD & DR"
- displayName: "Clone repo on PROD agent"
-displayName: "Update Chart.yaml"
- displayName: "Push Helm chart to S3"
-   displayName: "Deploy to PROD"
- displayName: "Deploy to DR"
-displayName: "Verify Deployments"
+in uat pool
+
+- script: |
+              git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
+            displayName: "Clone Helm repo"
+
+in prod pool
+     name: $(PROD_POOL_NAME)
+    jobs:
+      - job: DEPLOY
+        steps:
+          - script: |
+              git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
+            displayName: "Clone repo on PROD agent"
