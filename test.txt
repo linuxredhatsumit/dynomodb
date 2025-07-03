@@ -1,134 +1,95 @@
 parameters:
-  - name: DeployPROD
-    type: boolean
-    default: true
   - name: ImageTag
     type: string
-    default: ''
 
-stages:
-- ${{ if eq(parameters.DeployPROD, true) }}:
-  - stage: UAT_PREP
-    displayName: "UAT Prep Stage"
+jobs:
+  - job: UAT_PREP
+    displayName: "UAT: Update Helm Chart Metadata and Push to PROD ECR"
     pool:
-      name: $(UAT_POOL_NAME)
-    jobs:
-      - job: PromoteAndPrepare
-        displayName: "Promote Image and Push Helm Chart"
-        steps:
-          - checkout: self
+      name: $(DEVOPS_POOL_NAME)
+    steps:
+      - checkout: self
+      - script: |
+          echo "Updating Chart version and image tag in prod-values.yaml"
+          VERSION_TAG="1.$(Build.BuildNumber)"
+          sed -i -e "s/^version:.*/version: $VERSION_TAG/" $(HELM_CHARTS_PATH)/Chart.yaml
+          sed -i -e "s/^appVersion:.*/appVersion: $VERSION_TAG/" $(HELM_CHARTS_PATH)/Chart.yaml
+          sed -i -e "s/^name:.*/name: $(SERVICE_NAME)/" $(HELM_CHARTS_PATH)/Chart.yaml
+          sed -i -e "s/^  tag:.*/  tag: '${{ parameters.ImageTag }}'/" $(HELM_CHARTS_PATH)/prod-values.yaml
+        displayName: "Update Helm Chart Metadata"
 
-          - script: |
-              echo "Updating Helm Chart Metadata"
-              VERSION_TAG="1.$(Build.BuildNumber)"
-              sed -i -e "s/^version:.*/version: $VERSION_TAG/" $(HELM_CHARTS_PATH)/Chart.yaml
-              sed -i -e "s/^appVersion:.*/appVersion: $VERSION_TAG/" $(HELM_CHARTS_PATH)/Chart.yaml
-              sed -i -e "s/^name:.*/name: $(SERVICE_NAME)/" $(HELM_CHARTS_PATH)/Chart.yaml
-              sed -i -e "s/^  tag:.*/  tag: '${{ parameters.ImageTag }}'/" $(HELM_CHARTS_PATH)/prod-values.yaml
-            displayName: "Update Helm Chart Metadata"
+      - script: |
+          echo "Logging into source (UAT) and target (PROD) ECR and pushing image"
+          aws ecr get-login-password --region $(SOURCE_AWS_REGION) | docker login --username AWS --password-stdin $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com
+          aws ecr get-login-password --region $(PROD_AWS_REGION) | docker login --username AWS --password-stdin $(PROD_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com
 
-          - script: |
-              echo "Assuming UAT role to pull image"
-              CREDS=$(aws sts assume-role \
-                --role-arn arn:aws:iam::$(SOURCE_AWS_ACCOUNT_ID):role/$(UAT_ROLE_NAME) \
-                --role-session-name "UATPull-$(Build.BuildNumber)")
-              export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
-              export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
-              export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
-              aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com
-              docker pull $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }}
-            displayName: "Pull Image from UAT ECR"
+          SRC_IMG=$(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }}
+          TGT_IMG=$(PROD_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):${{ parameters.ImageTag }}
 
-          - script: |
-              echo "Assuming PROD role to push image"
-              CREDS=$(aws sts assume-role \
-                --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) \
-                --role-session-name "PRODPush-$(Build.BuildNumber)")
-              export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
-              export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
-              export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
-              aws ecr get-login-password --region ap-south-1 | docker login --username AWS --password-stdin $(PROD_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com
+          docker pull $SRC_IMG
+          docker tag $SRC_IMG $TGT_IMG
+          docker push $TGT_IMG
+        displayName: "Push Image to PROD ECR"
 
-              docker tag $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }} \
-                        $(PROD_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):${{ parameters.ImageTag }}
-              docker push $(PROD_AWS_ACCOUNT_ID).dkr.ecr.ap-south-1.amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):${{ parameters.ImageTag }}
-            displayName: "Push Image to PROD ECR"
-
-          - script: |
-              echo "Push Helm Chart to S3"
-              helm s3 init $(HELM_S3BUCKET_URL)
-              helm repo add $(ENV)-$(SERVICE_NAME) $(HELM_S3BUCKET_URL)
-              helm package $(HELM_CHARTS_PATH)
-              mv $(SERVICE_NAME)-*.tgz $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
-              helm s3 push --force $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz $(ENV)-$(SERVICE_NAME)
-              helm repo update
-            displayName: "Package and Push Helm Chart"
-
-  - stage: PROD_DEPLOY
-    displayName: "PROD Deployment Stage"
+  - job: PROD_DEPLOY
+    displayName: "PROD: Helm Deploy"
     dependsOn: UAT_PREP
-    condition: succeeded()
     pool:
       name: $(PROD_POOL_NAME)
-    jobs:
-      - job: DeployToPROD
-        displayName: "Helm Install/Upgrade"
-        steps:
-          - script: |
-              echo "Assuming PROD Role for Deployment"
-              CREDS=$(aws sts assume-role \
-                --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) \
-                --role-session-name "PRODDeploy-$(Build.BuildNumber)")
-              export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
-              export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
-              export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+    steps:
+      - checkout: self
 
-              helm fetch $(ENV)-$(SERVICE_NAME)/$(SERVICE_NAME) --version 1.$(Build.BuildNumber)
-              tar -xvf $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
-              helm upgrade --install $(ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ \
-                -f $(SERVICE_NAME)/prod-values.yaml \
-                --namespace $(NAMESPACE) \
-                --kubeconfig $(KUBE_CONFIG_PATH) \
-                --wait --timeout 3m
-            displayName: "Helm Upgrade or Install"
+      - script: |
+          echo "Assuming AWS Role for PROD"
+          unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+          CREDS=$(aws sts assume-role \
+            --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) \
+            --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+          export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+          export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+          export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
 
-          - script: |
-              echo "Verifying Deployment in PROD"
-              kubectl get cronjobs -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME) || echo "CronJob not found"
-              kubectl get jobs -n $(NAMESPACE) --sort-by=.metadata.creationTimestamp --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME) | tail -5 || echo "No recent jobs found"
-            displayName: "Post Deployment Status"
+          echo "Packaging and pushing Helm chart"
+          helm repo add prod-helm $(HELM_S3BUCKET_URL) || true
+          helm s3 init $(HELM_S3BUCKET_URL)
+          helm package $(HELM_CHARTS_PATH)
+          mv $(SERVICE_NAME)-*.tgz $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
+          helm s3 push --force $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz prod-helm
+        displayName: "Push Helm Chart to S3"
 
+      - script: |
+          echo "Deploying Helm Chart to PROD"
+          unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+          CREDS=$(aws sts assume-role \
+            --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) \
+            --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+          export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+          export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+          export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
 
-########error
+          helm repo update
+          helm fetch prod-helm/$(SERVICE_NAME) --version 1.$(Build.BuildNumber)
+          tar -xvf $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
+          helm upgrade --install $(ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ \
+            -f $(SERVICE_NAME)/prod-values.yaml \
+            --namespace $(NAMESPACE) \
+            --kubeconfig $(KUBE_CONFIG_PATH) \
+            --wait --timeout 3m
+        displayName: "Helm Upgrade/Install to PROD"
 
-2025-07-03T10:16:30.1246536Z ##[section]Starting: Push Image to PROD ECR
-2025-07-03T10:16:30.1261508Z ==============================================================================
-2025-07-03T10:16:30.1261761Z Task         : Command line
-2025-07-03T10:16:30.1261906Z Description  : Run a command line script using Bash on Linux and macOS and cmd.exe on Windows
-2025-07-03T10:16:30.1262380Z Version      : 2.250.1
-2025-07-03T10:16:30.1262501Z Author       : Microsoft Corporation
-2025-07-03T10:16:30.1262647Z Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/command-line
-2025-07-03T10:16:30.1262853Z ==============================================================================
-2025-07-03T10:16:30.4452932Z Generating script.
-2025-07-03T10:16:30.4467258Z ========================== Starting Command Output ===========================
-2025-07-03T10:16:30.4491634Z [command]/usr/bin/bash --noprofile --norc /home/app_user/workspace/Agent2/_work/_temp/6472daf7-b392-4ac1-8552-bbefc8cdfd22.sh
-2025-07-03T10:16:31.8069415Z 
-2025-07-03T10:16:31.8071370Z An error occurred (AccessDenied) when calling the AssumeRole operation: User: arn:aws:sts::483584640083:assumed-role/AWS-EC2-Role/i-0fa41ed9bb282035c is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::718378052708:role/EKS-Setup-Role-Kotak811
-2025-07-03T10:16:32.1178297Z Logging into source (UAT) and target (PROD) ECR and pushing image
-2025-07-03T10:16:33.7060057Z WARNING! Your password will be stored unencrypted in /home/app_user/.docker/config.json.
-2025-07-03T10:16:33.7060848Z Configure a credential helper to remove this warning. See
-2025-07-03T10:16:33.7061780Z https://docs.docker.com/engine/reference/commandline/login/#credentials-store
-2025-07-03T10:16:33.7061940Z 
-2025-07-03T10:16:33.7070003Z Login Succeeded
-2025-07-03T10:16:35.2985381Z WARNING! Your password will be stored unencrypted in /home/app_user/.docker/config.json.
-2025-07-03T10:16:35.2986782Z Configure a credential helper to remove this warning. See
-2025-07-03T10:16:35.2988068Z https://docs.docker.com/engine/reference/commandline/login/#credentials-store
-2025-07-03T10:16:35.2988309Z 
-2025-07-03T10:16:35.2996651Z Login Succeeded
-2025-07-03T10:16:35.4702128Z Error response from daemon: pull access denied for 483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_kyc, repository does not exist or may require 'docker login': denied: User: arn:aws:sts::483584640083:assumed-role/AWS-EC2-Role/i-0fa41ed9bb282035c is not authorized to perform: ecr:BatchGetImage on resource: arn:aws:ecr:ap-south-1:483584640083:repository/811uatonb/k811_ms_kyc because no identity-based policy allows the ecr:BatchGetImage action
-2025-07-03T10:16:35.5004465Z Error response from daemon: No such image: 483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_kyc:811_app_ms_kyc-development-20250702.2
-2025-07-03T10:16:35.5395759Z The push refers to repository [718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_kyc]
-2025-07-03T10:16:35.5398582Z An image does not exist locally with the tag: 718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_kyc
-2025-07-03T10:16:35.5469104Z 
-2025-07-03T10:16:35.5558875Z ##[error]Bash exited with code '1'.
-2025-07-03T10:16:35.5588293Z ##[section]Finishing: Push Image to PROD ECR
+      - script: |
+          echo "Verifying Deployment"
+          unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+          CREDS=$(aws sts assume-role \
+            --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) \
+            --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
+          export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+          export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+          export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+
+          echo "==== CronJobs ===="
+          kubectl get cronjobs -n $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME) || echo "CronJob not found"
+
+          echo "==== Jobs (last 5) ===="
+          kubectl get jobs -n $(NAMESPACE) --sort-by=.metadata.creationTimestamp --kubeconfig $(KUBE_CONFIG_PATH) | grep -i $(SERVICE_NAME) | tail -5 || echo "No jobs found"
+        displayName: "Post Deployment Status Check"
