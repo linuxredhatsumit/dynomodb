@@ -1,4 +1,5 @@
 trigger: none
+
 variables:
   - group: Kotak-ECR-Credentials
   - name: SERVICE_NAME
@@ -7,25 +8,20 @@ variables:
     value: prod
   - name: DR-ENV
     value: prod-dr
-  # For AWS Role Access
   - name: PROD_ROLE_NAME
     value: EKS-Setup-Role-Kotak811
   - name: SOURCE_ROLE_NAME
     value: EKS_Setup_Role
-  # details for prod repo to update pro-values.yaml
   - name: BRANCH_NAME
     value: master
   - name: REPOSITORY_NAME
     value: kotak-811-devops-prod
-
-  # Agent pool details
   - name: DEVOPS_POOL_NAME
     value: "K811-DevOps"
   - name: PROD_POOL_NAME
     value: k811-prod
   - name: PROD_AGENT_IN_AGENTPOOL
     value: Linux-Agent3
-  # docker details to push to prod ECR
   - name: PROD_PREFIX
     value: stable
   - name: PROD_AWS_REGION
@@ -36,8 +32,6 @@ variables:
     value: 811prodonb
   - name: PROD_ECR_REPO_NAME
     value: k811_kyc
-
-  # source Enviornmnet details
   - name: SOURCE_SERVICE_NAME
     value: k811-token-mandate-instructions
   - name: SOURCE_AWS_REGION
@@ -52,7 +46,6 @@ variables:
     value: /home/app_user/.kube/config-uat
   - name: SOURCE_NAMESPACE
     value: 811-uat
-  # helm related variables
   - name: HELM_CHARTS_PATH
     value: helm-charts/k811-ms-kyc-bitly-submit-cronjob/charts
   - name: HELM_S3BUCKET_URL
@@ -65,9 +58,6 @@ variables:
     value: /home/app_user/.kube/config-onb-dr
   - name: DR_HELM_S3BUCKET_URL
     value: s3://k811-onb-helmcharts-dr/prod/k811-ms-kyc-bitly-submit-cronjob/
-  - name: PROD_AGENT_IN_AGENTPOOL
-########################
-
 
 parameters:
   - name: DeployPROD
@@ -85,17 +75,99 @@ parameters:
     type: string
     default: "1.20240625.1"
 
+stages:
+  - stage: PREPARE_HELM
+    displayName: Update Helm Charts and Push Image to PROD ECR
+    pool:
+      name: $(DEVOPS_POOL_NAME)
+    jobs:
+      - job: Prepare
+        steps:
+          - script: |
+              git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
+            displayName: "Clone Helm Repo"
 
+          - script: |
+              sed -i -e 's/tag:.*/tag: $(PROD_PREFIX)-${{ parameters.ImageTag }}/' $(HELM_CHARTS_PATH)/$(ENV)-values.yaml
+              sed -i -e 's/tag:.*/tag: $(PROD_PREFIX)-${{ parameters.ImageTag }}/' $(HELM_CHARTS_PATH)/$(DR-ENV)-values.yaml
+            displayName: "Update Helm Chart Image Tags"
+            workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)
 
+          - script: |
+              git config --global user.email "pipeline@kotak.com"
+              git config --global user.name "Pipeline"
+              git add .
+              git commit -m "Updating helm values with image tag $(PROD_PREFIX)-${{ parameters.ImageTag }}"
+              git pull
+              git push origin $(BRANCH_NAME)
+            displayName: "Commit Helm Changes"
+            workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)
 
-jobs:
-      - template: ../templates/prod-cron-deploy-tag.yaml
-        parameters:
-          ImageTag: ${{ parameters.ImageTag }}
+  - stage: DEPLOY_PROD
+    displayName: "Deploy to PROD/DR"
+    dependsOn: PREPARE_HELM
+    condition: and(succeeded(), eq(${{ parameters.DeployPROD }}, true))
+    pool:
+      name: $(PROD_POOL_NAME)
+    jobs:
+      - job: HelmPackageDeploy
+        steps:
+          - script: |
+              git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
+            displayName: "Clone Helm Repo"
 
-  # - stage: DeployDR
-  #   condition: eq('${{ parameters.DeployDR }}', 'true')
-  #   jobs:
-  #     - template: ../templates/prod-cron-deploy-tag-dr.yaml
-  #       parameters:
-  #         ImageTag: ${{ parameters.ImageTag }}
+          - script: |
+              sed -i -e 's/name:.*/name: $(SERVICE_NAME)/' $(HELM_CHARTS_PATH)/Chart.yaml
+              sed -i -e 's/appVersion:.*/appVersion: ${{ parameters.ImageTag }}/' $(HELM_CHARTS_PATH)/Chart.yaml
+              sed -i -e 's/version:.*/version: ${{ parameters.ImageTag }}/' $(HELM_CHARTS_PATH)/Chart.yaml
+            displayName: "Update Chart Metadata"
+            workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)
+
+          - script: |
+              unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+              CREDS=$(aws sts assume-role --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) --role-session-name prod-deploy)
+              export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+              export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+              export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+
+              helm s3 init $(HELM_S3BUCKET_URL)
+              helm repo add $(ENV)-$(SERVICE_NAME) $(HELM_S3BUCKET_URL)
+              helm package $(HELM_CHARTS_PATH)/
+              helm s3 push --force $(SERVICE_NAME)-${{ parameters.ImageTag }}.tgz $(ENV)-$(SERVICE_NAME)
+              helm repo update
+              helm search repo $(ENV)-$(SERVICE_NAME)
+            displayName: "Push Helm Chart to S3"
+            workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)
+
+          - script: |
+              unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+              CREDS=$(aws sts assume-role --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) --role-session-name prod-install)
+              export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+              export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+              export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+
+              rm -f $(SERVICE_NAME)-${{ parameters.ImageTag }}.tgz
+              helm fetch $(ENV)-$(SERVICE_NAME)/$(SERVICE_NAME)
+              tar -xzf $(SERVICE_NAME)-${{ parameters.ImageTag }}.tgz
+              helm upgrade --install $(ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ -f $(SERVICE_NAME)/$(ENV)-values.yaml --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) --wait --timeout 3m
+            displayName: "Deploy to PROD"
+            workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)
+
+      - job: DeployDR
+        displayName: "Deploy to DR"
+        dependsOn: HelmPackageDeploy
+        condition: and(succeeded(), eq(${{ parameters.DeployDR }}, true))
+        steps:
+          - script: |
+              unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+              CREDS=$(aws sts assume-role --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) --role-session-name dr-deploy)
+              export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+              export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+              export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+
+              helm repo update
+              helm fetch $(ENV)-$(SERVICE_NAME)/$(SERVICE_NAME)
+              tar -xzf $(SERVICE_NAME)-${{ parameters.ImageTag }}.tgz
+              helm upgrade --install $(DR-ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ -f $(SERVICE_NAME)/$(DR-ENV)-values.yaml --namespace $(NAMESPACE) --kubeconfig $(DR_KUBE_CONFIG_PATH) --wait --timeout 3m
+            displayName: "Deploy to DR"
+            workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)
