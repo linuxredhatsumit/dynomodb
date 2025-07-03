@@ -7,121 +7,63 @@ parameters:
     default: ""
 
 variables:
-  serviceName: "k811-ms-kyc-bitly-submit-cronjob"
-  serviceEcrName: "k811_cronjob_kyc_bitly_submit"
-  uatEcrRepo: "811uatonb/k811_ms_kyc_bitly_submit_cronjob"
-  prodEcrRepo: "811prodonb/k811_cronjob_kyc_bitly_submit"
-  helmChartName: "k811-ms-kyc-bitly-submit-cronjob"
-  helmS3Bucket: "s3://helm-k8s-prod/k811"
-  uatAssumeRole: "arn:aws:iam::483584640083:role/prod-helm-deploy"
-  prodAssumeRole: "arn:aws:iam::718378052708:role/prod-helm-deploy"
+  - group: Kotak-ECR-Credentials
+  - name: SERVICE_NAME
+    value: k811-ms-kyc-bitly-submit-cronjob
+  - name: ENV
+    value: prod
+  - name: DR-ENV
+    value: prod-dr
+  - name: BRANCH_NAME
+    value: master
+  - name: REPOSITORY_NAME
+    value: kotak-811-devops-prod
+
+  # Agent pools
+  - name: UAT_POOL_NAME
+    value: K811-DevOps
+  - name: PROD_POOL_NAME
+    value: k811-prod
+
+  # Docker and ECR
+  - name: PROD_PREFIX
+    value: stable
+  - name: PROD_AWS_REGION
+    value: ap-south-1
+  - name: PROD_AWS_ACCOUNT_ID
+    value:  '718378052708'
+  - name: PROD_ECR_FOLDER_NAME
+    value: 811prodonb
+  - name: PROD_ECR_REPO_NAME
+    value: k811_cronjob_kyc_bitly_submit
+
+  - name: SOURCE_AWS_REGION
+    value: ap-south-1
+  - name: SOURCE_AWS_ACCOUNT_ID
+    value: '483584640083'
+  - name: SOURCE_ECR_FOLDER_NAME
+    value: 811uatonb
+  - name: SOURCE_ECR_REPO_NAME
+    value: k811_ms_kyc_bitly_submit_cronjob
+
+  - name: HELM_CHARTS_PATH
+    value: helm-charts/k811-ms-kyc-bitly-submit-cronjob/charts
+  - name: HELM_S3BUCKET_URL
+    value: s3://k811-onb-helmcharts/prod/k811-ms-kyc-bitly-submit-cronjob/
+  - name: DR_HELM_S3BUCKET_URL
+    value: s3://k811-onb-helmcharts-dr/prod/k811-ms-kyc-bitly-submit-cronjob/
+
+  - name: KUBE_CONFIG_PATH
+    value: /home/app_user/.kube/config-prod
+  - name: NAMESPACE
+    value: prod
+  - name: DR_KUBE_CONFIG_PATH
+    value: /home/app_user/.kube/config-onb-dr
 
 stages:
-  - stage: UAT
-    displayName: UAT - GitOps Update
+  - stage: ECR_AND_HELM_UPDATE
+    displayName: "Docker Pull & Push, Helm values update"
+    pool:
+      name: $(UAT_POOL_NAME)
     jobs:
-      - job: Update_Helm_Values
-        displayName: Update values.yaml with image tag
-        pool: uat-linux-infra-pool
-        steps:
-          - checkout: self
-            persistCredentials: true
-
-          - task: Bash@3
-            name: AssumeRoleUAT
-            inputs:
-              targetType: inline
-              script: |
-                echo "Assuming UAT role..."
-                CREDS=$(aws sts assume-role \
-                  --role-arn "${{ variables.uatAssumeRole }}" \
-                  --role-session-name "uatSession")
-                export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
-                export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
-                export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
-                echo "##vso[task.setvariable variable=AWS_ACCESS_KEY_ID;issecret=true]$AWS_ACCESS_KEY_ID"
-                echo "##vso[task.setvariable variable=AWS_SECRET_ACCESS_KEY;issecret=true]$AWS_SECRET_ACCESS_KEY"
-                echo "##vso[task.setvariable variable=AWS_SESSION_TOKEN;issecret=true]$AWS_SESSION_TOKEN"
-
-          - script: |
-              echo "Updating image tag in Helm values.yaml"
-              sed -i "s|tag:.*|tag: '${{ parameters.ImageTag }}'|g" helm/${{ variables.helmChartName }}/values.yaml
-              git config user.name "azure-pipeline"
-              git config user.email "azure-pipeline@example.com"
-              git add helm/${{ variables.helmChartName }}/values.yaml
-              git commit -m "Update image tag to ${{ parameters.ImageTag }}"
-              git push
-            displayName: Update Helm values.yaml
-
-  - stage: PROD
-    displayName: Promote to PROD and DR
-    dependsOn: UAT
-    jobs:
-      - job: PromoteDockerImage
-        displayName: Pull from UAT, Push to PROD ECR
-        pool: prod-linux-infra-pool
-        steps:
-          - task: Bash@3
-            name: AssumeRolePROD
-            inputs:
-              targetType: inline
-              script: |
-                echo "Assuming PROD role..."
-                CREDS=$(aws sts assume-role \
-                  --role-arn "${{ variables.prodAssumeRole }}" \
-                  --role-session-name "prodSession")
-                export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
-                export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
-                export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
-                echo "##vso[task.setvariable variable=AWS_ACCESS_KEY_ID;issecret=true]$AWS_ACCESS_KEY_ID"
-                echo "##vso[task.setvariable variable=AWS_SECRET_ACCESS_KEY;issecret=true]$AWS_SECRET_ACCESS_KEY"
-                echo "##vso[task.setvariable variable=AWS_SESSION_TOKEN;issecret=true]$AWS_SESSION_TOKEN"
-
-          - script: |
-              echo "Login to UAT ECR"
-              aws ecr get-login-password --region ap-south-1 | \
-                docker login --username AWS --password-stdin 483584640083.dkr.ecr.ap-south-1.amazonaws.com
-
-              echo "Login to PROD ECR"
-              aws ecr get-login-password --region ap-south-1 | \
-                docker login --username AWS --password-stdin 718378052708.dkr.ecr.ap-south-1.amazonaws.com
-
-              echo "Pulling image from UAT ECR"
-              docker pull 483584640083.dkr.ecr.ap-south-1.amazonaws.com/${{ variables.uatEcrRepo }}:${{ parameters.ImageTag }}
-
-              echo "Tagging image for PROD ECR"
-              docker tag 483584640083.dkr.ecr.ap-south-1.amazonaws.com/${{ variables.uatEcrRepo }}:${{ parameters.ImageTag }} \
-                718378052708.dkr.ecr.ap-south-1.amazonaws.com/${{ variables.prodEcrRepo }}:${{ parameters.ImageTag }}
-
-              echo "Pushing to PROD ECR"
-              docker push 718378052708.dkr.ecr.ap-south-1.amazonaws.com/${{ variables.prodEcrRepo }}:${{ parameters.ImageTag }}
-            displayName: Docker Pull & Push
-
-      - job: HelmPackageAndDeploy
-        displayName: Helm Package, Upload to S3, Deploy to PROD and DR
-        dependsOn: PromoteDockerImage
-        pool: prod-linux-infra-pool
-        steps:
-          - checkout: self
-
-          - script: |
-              echo "Packaging Helm chart"
-              cd helm/${{ variables.helmChartName }}
-              helm dependency update
-              helm package . --destination ../package/
-
-              echo "Uploading chart to S3"
-              aws s3 cp ../package/${{ variables.helmChartName }}-*.tgz ${{ variables.helmS3Bucket }}/
-            displayName: Helm package & S3 upload
-
-          - script: |
-              echo "Deploying to PROD"
-              helm upgrade --install ${{ variables.helmChartName }} oci://${{ variables.helmS3Bucket }} \
-                --namespace prod-kyc --version ${{ parameters.ImageTag }} --wait
-            displayName: Deploy to PROD
-
-          - script: |
-              echo "Deploying to DR"
-              helm upgrade --install ${{ variables.helmChartName }} oci://${{ variables.helmS3Bucket }} \
-                --namespace dr-kyc --version ${{ parameters.ImageTag }} --wait
-            displayName: Deploy to DR
+      - job: UAT_IMAGE_AND_HELM
