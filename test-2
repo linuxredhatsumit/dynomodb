@@ -60,6 +60,12 @@ variables:
   - name: DR_KUBE_CONFIG_PATH
     value: /home/app_user/.kube/config-onb-dr
 
+  # Assume role ARNs
+  - name: UAT_ASSUME_ROLE_ARN
+    value: arn:aws:iam::483584640083:role/uat-onb-crossaccount-role
+  - name: PROD_ASSUME_ROLE_ARN
+    value: arn:aws:iam::718378052708:role/prod-onb-crossaccount-role
+
 stages:
   - stage: ECR_AND_HELM_UPDATE
     displayName: "Docker Pull & Push, Helm values update"
@@ -71,12 +77,27 @@ stages:
           - checkout: none
 
           - task: Bash@3
-            displayName: "Pull from UAT, Push to PROD ECR"
+            displayName: "Assume Role for UAT and PROD"
             inputs:
               targetType: 'inline'
               script: |
                 set -e
+                echo "Assuming UAT role"
+                CREDS=$(aws sts assume-role --role-arn $(UAT_ASSUME_ROLE_ARN) --role-session-name uat-session)
+                export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+                export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+                export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+
+                echo "Login to UAT ECR"
                 aws ecr get-login-password --region $(SOURCE_AWS_REGION) | docker login --username AWS --password-stdin $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com
+
+                echo "Assuming PROD role"
+                CREDS=$(aws sts assume-role --role-arn $(PROD_ASSUME_ROLE_ARN) --role-session-name prod-session)
+                export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
+                export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
+                export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+
+                echo "Login to PROD ECR"
                 aws ecr get-login-password --region $(PROD_AWS_REGION) | docker login --username AWS --password-stdin $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com
 
                 docker pull $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }}
