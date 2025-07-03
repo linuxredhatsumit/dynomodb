@@ -1,30 +1,3 @@
-Assuming AWS Role for PROD
-
-An error occurred (AccessDenied) when calling the AssumeRole operation: User: arn:aws:sts::718378052708:assumed-role/EC2_SSM_+_Admin_Access/i-07d0eb0b1b340b40f is not authorized to perform: sts:AssumeRole on resource: arn:aws:iam::k811_kyc:role/EKS-Setup-Role-Kotak811
-Promoting Docker Image from Dev ECR to PROD ECR
-Source image: 483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_kyc:811_app_ms_kyc-development-20250702.2
-Target image: 718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_kyc:811_app_ms_kyc-development-20250702.2
-Checking if image already exists in PROD ECR...
-Image not found in PROD. Copying from Dev...
-
-WARNING! Your credentials are stored unencrypted in '/home/app_user/.docker/config.json'.
-Configure a credential helper to remove this warning. See
-https://docs.docker.com/go/credential-store/
-
-Login Succeeded
-
-WARNING! Your credentials are stored unencrypted in '/home/app_user/.docker/config.json'.
-Configure a credential helper to remove this warning. See
-https://docs.docker.com/go/credential-store/
-
-Login Succeeded
-Error response from daemon: pull access denied for 483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_kyc, repository does not exist or may require 'docker login': denied: User: arn:aws:sts::718378052708:assumed-role/EC2_SSM_+_Admin_Access/i-07d0eb0b1b340b40f is not authorized to perform: ecr:BatchGetImage on resource: arn:aws:ecr:ap-south-1:483584640083:repository/811uatonb/k811_ms_kyc because no resource-based policy allows the ecr:BatchGetImage action
-Error response from daemon: No such image: 483584640083.dkr.ecr.ap-south-1.amazonaws.com/811uatonb/k811_ms_kyc:811_app_ms_kyc-development-20250702.2
-The push refers to repository [718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_kyc]
-An image does not exist locally with the tag: 718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_kyc
-
-########
-getting above error in my cronjob pipeline, can u take refrence from service pipline how they are acessing it uat staff and can suggest
 parameters:
   - name: Jira_URL
     type: string
@@ -32,101 +5,47 @@ parameters:
     displayName: "Jira URL"
 
 stages:
-  - stage: ECR_CLONE
+  - stage: ECR_PROMOTE
+    displayName: "Promote Docker Image from UAT to PROD"
     pool:
       name: $(DEVOPS_POOL_NAME)
     jobs:
-      - deployment: PRODDeployment
-        displayName: PRODDeployment
-        environment: prod-pipeline-approvals
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - script: |
-                    echo "approved to deploy UAT Image to PROD"
-                  displayName: Approve UAT image to depoly in PROD
-      - job: ECR_IMAGE_PUSH_FROM_UAT_TO_PROD
+      - job: PromoteUATImageToPROD
+        displayName: "Promote UAT Docker Image to PROD ECR"
         steps:
+
+          # Step 1: Assume UAT role and export credentials
           - script: |
-              pwd
+              echo "Assuming UAT role to pull image..."
               unset AWS_SESSION_TOKEN
               unset AWS_SECRET_ACCESS_KEY
               unset AWS_ACCESS_KEY_ID
-              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(SOURCE_AWS_ACCOUNT_ID):role/$(UAT_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
-              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-              version=$(kubectl get deployment $(SOURCE_SERVICE_NAME) -o jsonpath=''{$.spec.template.spec.containers[:1].image}'' -n $(SOURCE_NAMESPACE) --kubeconfig $(SOURCE_KUBE_CONFIG_PATH) | cut -d ':' -f 2)
-              echo "##vso[task.setvariable variable=version]$version"
-            displayName: "$(SOURCE_SERVICE_NAME) Tag value in UAT environment ."
 
-          - script: |
-              echo $(version)
-            displayName: UAT Environment Docker image of $(SOURCE_SERVICE_NAME)
+              CREDENTIALS=$(aws sts assume-role \
+                --role-arn arn:aws:iam::$(SOURCE_AWS_ACCOUNT_ID):role/$(UAT_ROLE_NAME) \
+                --role-session-name "$(Build.DefinitionName)-$(Build.BuildNumber)")
 
-          - script: |
-              pwd
-              unset AWS_SESSION_TOKEN
-              unset AWS_SECRET_ACCESS_KEY
-              unset AWS_ACCESS_KEY_ID
-              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(SOURCE_AWS_ACCOUNT_ID):role/$(UAT_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
-              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+              export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId')
+              export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey')
+              export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r '.Credentials.SessionToken')
+
+              echo "Logging in to UAT ECR..."
               aws ecr get-login-password --region $(SOURCE_AWS_REGION) | docker login --username AWS --password-stdin $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com
-              docker pull $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version)
-              docker tag $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version) $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-$(version)
+
+              echo "Pulling image from UAT..."
+              docker pull $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(IMAGE_TAG)
+            displayName: "Assume UAT role and pull image"
+
+          # Step 2: Tag and Push to PROD ECR
+          - script: |
+              echo "Tagging image for PROD..."
+              docker tag \
+                $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(IMAGE_TAG) \
+                $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-$(IMAGE_TAG)
+
+              echo "Logging in to PROD ECR..."
               aws ecr get-login-password --region $(PROD_AWS_REGION) | docker login --username AWS --password-stdin $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com
-              docker push $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-$(version)
-            displayName: "Login, Docker and Push"
 
-          - script: |
-              git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
-            displayName: "clone repository"
-
-          - script: |
-              pwd
-              git pull 
-              sed -i -e 's/tag:.*/tag: $(PROD_PREFIX)-$(version)/'  $(HELM_CHARTS_PATH)/$(ENV)-values.yaml
-              sed -i -e 's/tag:.*/tag: $(PROD_PREFIX)-$(version)/'  $(HELM_CHARTS_PATH)/$(DR-ENV)-values.yaml
-            displayName: "replace helm charts"
-            workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
-
-          - script: |
-              git config --global user.email "pipeline@kotak.com"
-              git config --global user.name "Pipeline"
-              git add -A
-              git status
-              git commit -m "azure pipeline commited to updated prod-values.yaml in helm charts"
-              echo "Pushing now!!!"
-              git pull
-              git push -u origin $(BRANCH_NAME)
-            displayName: "Updating Chart Values"
-            workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
-
-  - stage: PROD
-    pool:
-      name: $(PROD_POOL_NAME)
-      # demands:
-      #   - agent.name -equals $(PROD_AGENT_IN_AGENTPOOL)
-    displayName: "Build in PROD Environment"
-    jobs:
-      # - deployment: PRODDeployment
-      #   displayName: PRODDeployment
-      #   environment: devops-test-approval
-      #   strategy:
-      #     runOnce:
-      #       deploy:
-      #         steps:
-      #         - script: |
-      #             echo "approved to deploy UAT Image to PROD"
-      #           displayName: Approve UAT image to depoly in PROD
-      - job: Service_deployment_in_PROD
-        displayName: "Service deployment in PROD"
-        steps:
-          - script: |
-              git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
-            displayName: "clone repository"
-          - template: build.yaml
-          - template: dr-build.yaml
+              echo "Pushing image to PROD..."
+              docker push $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-$(IMAGE_TAG)
+            displayName: "Tag and push to PROD ECR"
