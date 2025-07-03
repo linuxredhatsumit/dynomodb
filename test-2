@@ -1,14 +1,173 @@
-in uat pool
+trigger: none
 
-- script: |
-              git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
-            displayName: "Clone Helm repo"
+parameters:
+  - name: ImageTag
+    displayName: "Docker Image Tag to promote"
+    type: string
+    default: ""
 
-in prod pool
-     name: $(PROD_POOL_NAME)
+variables:
+  - group: Kotak-ECR-Credentials
+  - name: SERVICE_NAME
+    value: k811-ms-kyc-bitly-submit-cronjob
+  - name: ENV
+    value: prod
+  - name: DR-ENV
+    value: prod-dr
+  - name: BRANCH_NAME
+    value: master
+  - name: REPOSITORY_NAME
+    value: kotak-811-devops-prod
+
+  # Agent pools
+  - name: UAT_POOL_NAME
+    value: K811-DevOps
+  - name: PROD_POOL_NAME
+    value: k811-prod
+
+  # Docker and ECR
+  - name: PROD_PREFIX
+    value: stable
+  - name: PROD_AWS_REGION
+    value: ap-south-1
+  - name: PROD_AWS_ACCOUNT_ID
+    value: '718378052708'
+  - name: PROD_ECR_FOLDER_NAME
+    value: 811prodonb
+  - name: PROD_ECR_REPO_NAME
+    value: k811_cronjob_kyc_bitly_submit
+
+  - name: SOURCE_AWS_REGION
+    value: ap-south-1
+  - name: SOURCE_AWS_ACCOUNT_ID
+    value: '483584640083'
+  - name: SOURCE_ECR_FOLDER_NAME
+    value: 811uatonb
+  - name: SOURCE_ECR_REPO_NAME
+    value: k811_ms_kyc_bitly_submit_cronjob
+
+  - name: HELM_CHARTS_PATH
+    value: helm-charts/k811-ms-kyc-bitly-submit-cronjob/charts
+  - name: HELM_S3BUCKET_URL
+    value: s3://k811-onb-helmcharts/prod/k811-ms-kyc-bitly-submit-cronjob/
+  - name: DR_HELM_S3BUCKET_URL
+    value: s3://k811-onb-helmcharts-dr/prod/k811-ms-kyc-bitly-submit-cronjob/
+
+  - name: KUBE_CONFIG_PATH
+    value: /home/app_user/.kube/config-prod
+  - name: NAMESPACE
+    value: prod
+  - name: DR_KUBE_CONFIG_PATH
+    value: /home/app_user/.kube/config-onb-dr
+
+stages:
+  - stage: ECR_AND_HELM_UPDATE
+    displayName: "Docker Pull & Push, Helm values update"
+    pool:
+      name: $(UAT_POOL_NAME)
     jobs:
-      - job: DEPLOY
+      - job: UAT_IMAGE_AND_HELM
         steps:
-          - script: |
-              git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
+          - checkout: none
+
+          - task: Bash@3
+            displayName: "Pull from UAT, Push to PROD ECR"
+            inputs:
+              targetType: 'inline'
+              script: |
+                set -e
+                aws ecr get-login-password --region $(SOURCE_AWS_REGION) | docker login --username AWS --password-stdin $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com
+                aws ecr get-login-password --region $(PROD_AWS_REGION) | docker login --username AWS --password-stdin $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com
+
+                docker pull $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }}
+                docker tag $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }} \
+                  $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):${{ parameters.ImageTag }}
+                docker push $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):${{ parameters.ImageTag }}
+
+          - task: Bash@3
+            displayName: "Clone Helm repo"
+            inputs:
+              targetType: 'inline'
+              script: |
+                git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
+
+          - task: Bash@3
+            displayName: "Update tag in values.yaml"
+            inputs:
+              targetType: 'inline'
+              script: |
+                cd $(REPOSITORY_NAME)/$(HELM_CHARTS_PATH)
+                sed -i "s|tag:.*|tag: '${{ parameters.ImageTag }}'|" values.yaml
+
+          - task: Bash@3
+            displayName: "Commit updated Helm values"
+            inputs:
+              targetType: 'inline'
+              script: |
+                cd $(REPOSITORY_NAME)
+                git config user.email "build-pipeline@kotak.com"
+                git config user.name "Build Pipeline"
+                git add $(HELM_CHARTS_PATH)/values.yaml
+                git commit -m "Update image tag to ${{ parameters.ImageTag }}"
+                git push origin $(BRANCH_NAME)
+
+  - stage: PROD_DEPLOYMENT
+    displayName: "Package Helm, Deploy to PROD & DR"
+    pool:
+      name: $(PROD_POOL_NAME)
+    dependsOn: ECR_AND_HELM_UPDATE
+    jobs:
+      - job: DEPLOY_TO_PROD_AND_DR
+        steps:
+          - checkout: none
+
+          - task: Bash@3
             displayName: "Clone repo on PROD agent"
+            inputs:
+              targetType: 'inline'
+              script: |
+                git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
+
+          - task: Bash@3
+            displayName: "Update Chart.yaml"
+            inputs:
+              targetType: 'inline'
+              script: |
+                cd $(REPOSITORY_NAME)/$(HELM_CHARTS_PATH)
+                sed -i "s/^version:.*/version: ${{ parameters.ImageTag }}/" Chart.yaml
+
+          - task: Bash@3
+            displayName: "Push Helm chart to S3"
+            inputs:
+              targetType: 'inline'
+              script: |
+                cd $(REPOSITORY_NAME)/$(HELM_CHARTS_PATH)
+                helm package .
+                aws s3 cp *.tgz $(HELM_S3BUCKET_URL)
+                aws s3 cp *.tgz $(DR_HELM_S3BUCKET_URL)
+
+          - task: Bash@3
+            displayName: "Deploy to PROD"
+            inputs:
+              targetType: 'inline'
+              script: |
+                export KUBECONFIG=$(KUBE_CONFIG_PATH)
+                helm upgrade --install $(SERVICE_NAME) $(HELM_S3BUCKET_URL)$(SERVICE_NAME)-${{ parameters.ImageTag }}.tgz --namespace $(NAMESPACE)
+
+          - task: Bash@3
+            displayName: "Deploy to DR"
+            inputs:
+              targetType: 'inline'
+              script: |
+                export KUBECONFIG=$(DR_KUBE_CONFIG_PATH)
+                helm upgrade --install $(SERVICE_NAME) $(DR_HELM_S3BUCKET_URL)$(SERVICE_NAME)-${{ parameters.ImageTag }}.tgz --namespace $(NAMESPACE)
+
+          - task: Bash@3
+            displayName: "Verify Deployments"
+            inputs:
+              targetType: 'inline'
+              script: |
+                export KUBECONFIG=$(KUBE_CONFIG_PATH)
+                kubectl rollout status cronjob/$(SERVICE_NAME) --namespace=$(NAMESPACE)
+                export KUBECONFIG=$(DR_KUBE_CONFIG_PATH)
+                kubectl rollout status cronjob/$(SERVICE_NAME) --namespace=$(NAMESPACE)
