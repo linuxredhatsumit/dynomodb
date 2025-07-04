@@ -1,0 +1,76 @@
+import boto3
+import botocore
+import logging
+import json
+import sys
+
+
+class JsonFormatter(logging.Formatter):
+    def format(self, record):
+        log_entry = {
+            "level": record.levelname,
+            "logger": f"{record.name}.{record.funcName}",
+            "message": record.getMessage(),
+        }
+        return json.dumps(log_entry)
+
+logger = logging.getLogger("api_cleanup")
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(JsonFormatter())
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
+
+
+try:
+    client = boto3.client("apigateway", region_name="ap-south-1")  
+except botocore.exceptions.BotoCoreError as e:
+    logger.error(f"boto.client.connection: Failed to create client: {str(e)}")
+    sys.exit(1)
+
+# ---- Disable logs and tracing ----
+def disable_logging_and_tracing(api_id, stage_name):
+    patch_ops = [
+        {"op": "replace", "path": "/*/*/logging/loglevel", "value": "OFF"},
+        {"op": "replace", "path": "/*/*/logging/dataTrace", "value": "false"},
+        # {"op": "replace", "path": "/*/*/metrics/enabled", "value": "true"},
+        {"op": "replace", "path": "/tracingEnabled", "value": "false"},
+    ]
+    try:
+        client.update_stage(
+            restApiId=api_id,
+            stageName=stage_name,
+            patchOperations=patch_ops,
+        )
+        logger.info(f"disable_logging_and_tracing.{stage_name}: Logs/tracing disabled for API {api_id}")
+    except botocore.exceptions.ClientError as e:
+        logger.error(f"disable_logging_and_tracing.{stage_name}: Error updating stage: {e.response['Error']['Message']}")
+
+def get_all_rest_apis():
+    paginator = client.get_paginator("get_rest_apis")
+    for page in paginator.paginate():
+        for api in page.get("items", []):
+            yield api
+
+
+def main():
+    for api in get_all_rest_apis():
+        api_id = api["id"]
+        api_name = api.get("name", "UnnamedAPI")
+        logger.info(f"main.{api_name}: Checking API ID {api_id}")
+        try:
+            stages = client.get_stages(restApiId=api_id).get("item", [])
+            for stage in stages:
+                stage_name = stage["stageName"]
+                method_settings = stage.get("methodSettings", {})
+                tracing = stage.get("tracingEnabled", False)
+
+                if method_settings or tracing:
+                    logger.info(f"main.{stage_name}: Logs/tracing enabled. Disabling...")
+                    disable_logging_and_tracing(api_id, stage_name)
+                else:
+                    logger.info(f"main.{stage_name}: Nothing enabled. Skipping.")
+        except botocore.exceptions.ClientError as e:
+            logger.error(f"main.{api_name}: Failed to check stages: {e.response['Error']['Message']}")
+
+if __name__ == "__main__":
+    main()
