@@ -39,6 +39,7 @@ def wait_for_table_active(dynamodb, table_name):
         logger.info("Waiting for table to become ACTIVE...", extra={"context": "wait_for_table_active"})
         time.sleep(5)
 
+
 def load_gsi_config(table_name, check_gsi):
     if not check_gsi:
         logger.info("checkGSI is false. Skipping GSI config load.", extra={"context": "config.load"})
@@ -67,51 +68,125 @@ def load_gsi_config(table_name, check_gsi):
 
     try:
         with open(file_path, "r") as f:
-            gsi_config = json.load(f)
+            try:
+                gsi_config = json.load(f)
+            except json.JSONDecodeError as e:
+                logger.error(json.dumps({
+                    "context": "config.load",
+                    "error": f"Invalid JSON format in scaling file: {str(e)}"
+                }))
+                sys.exit(1)
         
-        # Validate GSI configuration
+        # Validate GSI configuration structure
+        if not isinstance(gsi_config, dict):
+            logger.error(json.dumps({
+                "context": "config.validate",
+                "error": "GSI config must be a JSON object with index names as keys"
+            }))
+            sys.exit(1)
+
+        # Validate each GSI configuration
         valid_projection_types = {"ALL", "KEYS_ONLY", "INCLUDE"}
         for index_name, conf in gsi_config.items():
+            if not isinstance(conf, dict):
+                logger.error(json.dumps({
+                    "context": "config.validate",
+                    "error": f"Configuration for index {index_name} must be a JSON object"
+                }))
+                sys.exit(1)
+
+            # Validate projection type
             if "ProjectionType" in conf and conf["ProjectionType"] not in valid_projection_types:
                 logger.error(json.dumps({
                     "context": "config.validate",
                     "error": f"Invalid ProjectionType for index {index_name}: {conf['ProjectionType']}. Must be one of {valid_projection_types}"
                 }))
                 sys.exit(1)
-            if conf.get("ProjectionType") == "INCLUDE" and "NonKeyAttributes" not in conf:
+                
+            if conf.get("ProjectionType") == "INCLUDE":
+                if "NonKeyAttributes" not in conf:
+                    logger.error(json.dumps({
+                        "context": "config.validate",
+                        "error": f"NonKeyAttributes required for index {index_name} when ProjectionType is INCLUDE"
+                    }))
+                    sys.exit(1)
+                if not isinstance(conf["NonKeyAttributes"], list):
+                    logger.error(json.dumps({
+                        "context": "config.validate",
+                        "error": f"NonKeyAttributes for index {index_name} must be a list"
+                    }))
+                    sys.exit(1)
+
+            # Validate throughput settings if provided
+            if "ReadCapacityUnits" in conf and not isinstance(conf["ReadCapacityUnits"], int):
                 logger.error(json.dumps({
                     "context": "config.validate",
-                    "error": f"NonKeyAttributes required for index {index_name} when ProjectionType is INCLUDE"
+                    "error": f"ReadCapacityUnits for index {index_name} must be an integer"
                 }))
                 sys.exit(1)
-            if "NonKeyAttributes" in conf and not isinstance(conf["NonKeyAttributes"], list):
+                
+            if "WriteCapacityUnits" in conf and not isinstance(conf["WriteCapacityUnits"], int):
                 logger.error(json.dumps({
                     "context": "config.validate",
-                    "error": f"NonKeyAttributes for index {index_name} must be a list"
+                    "error": f"WriteCapacityUnits for index {index_name} must be an integer"
                 }))
                 sys.exit(1)
-        
-        logger.info(json.dumps({"context": "config.load", "message": f"Loaded GSI config: {gsi_config}"}))
+
+        logger.info(json.dumps({
+            "context": "config.load", 
+            "message": f"Successfully loaded and validated GSI config with {len(gsi_config)} indexes"
+        }))
         return gsi_config
-    except json.JSONDecodeError as e:
-        logger.error(json.dumps({"context": "config.load", "error": f"Invalid JSON format: {str(e)}"}))
+
+    except Exception as e:
+        logger.error(json.dumps({
+            "context": "config.load",
+            "error": f"Unexpected error loading GSI config: {str(e)}"
+        }))
         sys.exit(1)
 
 def validate_gsi_config(desc, gsi_config, check_gsi):
     if not check_gsi or not gsi_config:
-        logger.info("No GSI config to validate (checkGSI=false or no config found).", extra={"context": "config.validate"})
+        logger.info("No GSI config to validate (checkGSI=false or no config found).", 
+                   extra={"context": "config.validate"})
         return
 
-    actual_indexes = set(gsi['IndexName'] for gsi in desc.get("GlobalSecondaryIndexes", []))
+    actual_indexes = {gsi['IndexName'] for gsi in desc.get("GlobalSecondaryIndexes", [])}
     config_indexes = set(gsi_config.keys())
-    if actual_indexes != config_indexes:
+
+    # Check if counts match
+    if len(actual_indexes) != len(config_indexes):
         logger.error(json.dumps({
             "context": "config.validate",
-            "error": "Mismatch between actual GSIs and scaling.json",
-            "actual_indexes": list(actual_indexes),
-            "config_indexes": list(config_indexes)
+            "error": f"GSI count mismatch. Table has {len(actual_indexes)} GSIs, config specifies {len(config_indexes)}",
+            "actual_indexes": sorted(actual_indexes),
+            "config_indexes": sorted(config_indexes)
         }))
         sys.exit(1)
+
+    # Check if names match exactly
+    if actual_indexes != config_indexes:
+        missing_in_config = actual_indexes - config_indexes
+        missing_in_table = config_indexes - actual_indexes
+        
+        error_msg = "GSI name mismatch between table and config"
+        details = {
+            "missing_in_config": sorted(missing_in_config) if missing_in_config else "None",
+            "missing_in_table": sorted(missing_in_table) if missing_in_table else "None"
+        }
+        
+        logger.error(json.dumps({
+            "context": "config.validate",
+            "error": error_msg,
+            "details": details
+        }))
+        sys.exit(1)
+
+    logger.info(json.dumps({
+        "context": "config.validate",
+        "message": "GSI configuration validation successful",
+        "indexes": sorted(config_indexes)
+    }))
 
 def update_gsi_configuration(dynamodb, table_name, gsi_config):
     """
@@ -528,7 +603,9 @@ def main():
     parser.add_argument("--checkGSI", type=lambda x: x.lower() == 'true', default=True)
     parser.add_argument("--dry-run", action="store_true")
     args = parser.parse_args()
-
+    ##################################################
+    args.tableName = args.tableName.strip()
+#####################################################
     # Log received arguments for debugging
     logger.info(json.dumps({
         "context": "args",
