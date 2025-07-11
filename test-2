@@ -1,194 +1,214 @@
-trigger: none
+import boto3
+import ast
+import json
+from datetime import datetime
+import pytz
+# from datetime import datetime, timedelta
+import OpenSSL
+from OpenSSL import crypto
+import os
+import smtplib
+from email.mime.multipart import MIMEMultipart
+from email.mime.text import MIMEText
+from email.mime.application import MIMEApplication
 
-parameters:
-  - name: ImageTag
-    displayName: "Docker Image Tag to promote"
-    type: string
-    default: ""
+def get_expiring_certs(region):
+    try:
+        print(f"get_expiring_certs.regionlist: {region}")
+        try:
+            acm = boto3.client('acm', region_name=region)
+        except Exception as e:
+            print(f"Failed to create client: {str(e)}")
+        response = acm.list_certificates()
+        certificates = response['CertificateSummaryList']
+        today = datetime.now()
+        expiring_certs = []
+        try:
+            no_of_days_to_expire = int(os.environ['No_of_days_to_expire'])
+        except KeyError:
+            print("no_of_days_to_expire environment variable is not set")
+        print(f"Expiry days as condition on certificate : {no_of_days_to_expire}")
+        try:
+            for cert in certificates:
+                cert_arn = cert['CertificateArn']
+                cert_detail = acm.describe_certificate(CertificateArn=cert_arn)
+                expiry_date = cert_detail['Certificate']['NotAfter'].replace(tzinfo=None)
+                if (expiry_date - today).days == no_of_days_to_expire:
+                    expiring_certs.append({
+                        'CertificateArn': cert_arn,
+                        'DomainName': cert_detail['Certificate']['DomainName'],
+                        'ExpirationDate': cert_detail['Certificate']['NotAfter'],
+                        'DaysToExpiration': (expiry_date - today).days
+                    })
+            print(f"Expiring Certificate list: {expiring_certs}")
+        except Exception as e:
+            print(f"Error in checking certificate expire: {str(e)}")
+        return expiring_certs
+    except Exception as e:
+        print(f"Failed to list aws acm certificates: {str(e)}")
+    return expiring_certs
 
-variables:
-  - group: Kotak-ECR-Credentials
-  - name: SERVICE_NAME
-    value: k811-ms-kyc-bitly-submit-cronjob
-  - name: ENV
-    value: prod
-  - name: DR-ENV
-    value: prod-dr
-  - name: BRANCH_NAME
-    value: master
-  - name: REPOSITORY_NAME
-    value: kotak-811-devops-prod
+def generate_csr(domain_name):
+    try:
+        # Generate private key and CSR
+        key = crypto.PKey()
+        key.generate_key(crypto.TYPE_RSA, 2048)
 
-  # Agent pools
-  - name: UAT_POOL_NAME
-    value: K811-DevOps
-  - name: PROD_POOL_NAME
-    value: k811-prod
+        req = crypto.X509Req()
+        req.get_subject().CN = domain_name
+        req.get_subject().O = 'Kotak Mahindra Bank'
+        req.get_subject().OU = 'Kotak811'
+        req.get_subject().C = 'IN'
+        req.get_subject().ST = 'Maharashtra'
+        req.get_subject().L = 'Mumbai'
+        req.get_subject().emailAddress = 'devops.kotak811@kotak.com'
 
-  # Docker and ECR
-  - name: PROD_PREFIX
-    value: stable
-  - name: PROD_AWS_REGION
-    value: ap-south-1
-  - name: PROD_AWS_ACCOUNT_ID
-    value: '718378052708'
-  - name: PROD_ECR_FOLDER_NAME
-    value: 811prodonb
-  - name: PROD_ECR_REPO_NAME
-    value: k811_cronjob_kyc_bitly_submit
+        req.set_pubkey(key)
+        req.sign(key, 'sha256')
 
-  - name: SOURCE_AWS_REGION
-    value: ap-south-1
-  - name: SOURCE_AWS_ACCOUNT_ID
-    value: '483584640083'
-  - name: SOURCE_ECR_FOLDER_NAME
-    value: 811uatonb
-  - name: SOURCE_ECR_REPO_NAME
-    value: k811_ms_kyc_bitly_submit_cronjob
+        private_key = crypto.dump_privatekey(crypto.FILETYPE_PEM, key).decode('utf-8')
+        csr = crypto.dump_certificate_request(crypto.FILETYPE_PEM, req).decode('utf-8')
 
-  - name: HELM_CHARTS_PATH
-    value: helm-charts/k811-ms-kyc-bitly-submit-cronjob/charts
-  - name: HELM_S3BUCKET_URL
-    value: s3://k811-onb-helmcharts/prod/k811-ms-kyc-bitly-submit-cronjob/
-  - name: DR_HELM_S3BUCKET_URL
-    value: s3://k811-onb-helmcharts-dr/prod/k811-ms-kyc-bitly-submit-cronjob/
+        return private_key, csr
+    except Exception as e:
+        print(f"Failed to create CSR certificate: {str(e)}")
+    return None
+    # except botocore.exceptions.BotoCoreError as e:
+    #     logger.error(f"Failed to create CSR certificate: {str(e)}")
+    #     return None
 
-  - name: KUBE_CONFIG_PATH
-    value: /home/app_user/.kube/config-prod
-  - name: NAMESPACE
-    value: prod
-  - name: DR_KUBE_CONFIG_PATH
-    value: /home/app_user/.kube/config-onb-dr
+def upload_to_s3(bucket_name, s3_key_name, content, domain_name):
+    try:
+        current_datetime = datetime.now(pytz.timezone('Asia/Kolkata')).strftime("%Y-%m-%d-%H-%M-%S")
+        destination_object_key=f"{domain_name}_{current_datetime}/{s3_key_name}"
+        try:
+            s3 = boto3.client('s3')
+        except Exception as e:
+            print(f"Failed to create client: {str(e)}")
 
-  # Assume role ARNs
-  - name: UAT_ASSUME_ROLE_ARN
-    value: arn:aws:iam::483584640083:role/uat-onb-crossaccount-role
-  - name: PROD_ASSUME_ROLE_ARN
-    value: arn:aws:iam::718378052708:role/prod-onb-crossaccount-role
+        s3.put_object(Body=content, Bucket=bucket_name, Key=destination_object_key)
+        #s3.copy_object(Bucket=bucket_name, CopySource={'Bucket': bucket_name, 'Key': key_name}, Key=destination_object_key)
+        #s3.delete_object(Bucket=bucket_name, Key=key_name)
+        print(f"File {s3_key_name} copied to {destination_object_key}")
+    except Exception as e:
+        print(f"Failed to upload key to s3 bucket: {str(e)}")
+    return None
 
-stages:
-  - stage: ECR_AND_HELM_UPDATE
-    displayName: "Docker Pull & Push, Helm values update"
-    pool:
-      name: $(UAT_POOL_NAME)
-    jobs:
-      - job: UAT_IMAGE_AND_HELM
-        steps:
-          - checkout: none
+def send_email_smtp(subject, filepath, filename, domain_name, sender_email, recipient_email):
+    # try:
+    report_file_path = filepath
+    try:
+        smtp_server = os.environ['smtp_server']
+    except KeyError:
+        print("smtp_server environment variable is not set")
+    try:
+        smtp_username = os.environ['smtp_username']
+    except KeyError:
+        print("smtp_username environment variable is not set")
+    try:
+        smtp_password = os.environ['smtp_password']
+    except KeyError:
+        print("smtp_password environment variable is not set")
+    try:
+        smtp_port = os.environ['smtp_port']
+    except KeyError:
+        print("smtp_port environment variable is not set")
+    # Create a multipart message and set headers
+    message = MIMEMultipart()
+    message['From'] = sender_email
+    message['To'] = ', '.join(recipient_email)
+    message['Subject'] = subject
 
-          - task: Bash@3
-            displayName: "Assume Role for UAT and PROD"
-            inputs:
-              targetType: 'inline'
-              script: |
-                set -e
-                echo "Assuming UAT role"
-                CREDS=$(aws sts assume-role --role-arn $(UAT_ASSUME_ROLE_ARN) --role-session-name uat-session)
-                export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
-                export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
-                export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+    attachment_file_name = filename
 
-                echo "Login to UAT ECR"
-                aws ecr get-login-password --region $(SOURCE_AWS_REGION) | docker login --username AWS --password-stdin $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com
+    BODY = f"Please provide the certificate for the attached CSR - {domain_name}."
 
-                echo "Assuming PROD role"
-                CREDS=$(aws sts assume-role --role-arn $(PROD_ASSUME_ROLE_ARN) --role-session-name prod-session)
-                export AWS_ACCESS_KEY_ID=$(echo $CREDS | jq -r '.Credentials.AccessKeyId')
-                export AWS_SECRET_ACCESS_KEY=$(echo $CREDS | jq -r '.Credentials.SecretAccessKey')
-                export AWS_SESSION_TOKEN=$(echo $CREDS | jq -r '.Credentials.SessionToken')
+    plain_text_body = MIMEText(BODY, 'plain')
+    message.attach(plain_text_body)
 
-                echo "Login to PROD ECR"
-                aws ecr get-login-password --region $(PROD_AWS_REGION) | docker login --username AWS --password-stdin $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com
+    with open(report_file_path, 'rb') as file:
+        # Attach the file with filename to the email
+        message.attach(MIMEApplication(file.read(), Name=attachment_file_name))
 
-                docker pull $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }}
-                docker tag $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):${{ parameters.ImageTag }} \
-                  $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):${{ parameters.ImageTag }}
-                docker push $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):${{ parameters.ImageTag }}
+    # Start SMTP session
+    server = smtplib.SMTP(smtp_server, smtp_port)
+    server.starttls()
+    # Login to SMTP server
+    server.login(smtp_username, smtp_password)
 
-          - task: Bash@3
-            displayName: "Clone Helm repo"
-            inputs:
-              targetType: 'inline'
-              script: |
-                git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
+    # Send email
+    server.sendmail(sender_email, recipient_email, message.as_string())
 
-          - task: Bash@3
-            displayName: "Update tag in values.yaml"
-            inputs:
-              targetType: 'inline'
-              script: |
-                cd $(REPOSITORY_NAME)/$(HELM_CHARTS_PATH)
-                sed -i "s|tag:.*|tag: '${{ parameters.ImageTag }}'|" values.yaml
+    # Quit SMTP session
+    server.quit()
 
-          - task: Bash@3
-            displayName: "Commit updated Helm values"
-            inputs:
-              targetType: 'inline'
-              script: |
-                cd $(REPOSITORY_NAME)
-                git config user.email "build-pipeline@kotak.com"
-                git config user.name "Build Pipeline"
-                git add $(HELM_CHARTS_PATH)/values.yaml
-                git commit -m "Update image tag to ${{ parameters.ImageTag }}"
-                git push origin $(BRANCH_NAME)
+    print("Email sent successfully")
+    # except Exception as e:
+    #     print(f"Failed to send CSR certificate via email: {str(e)}")
+    # return None
 
-  - stage: PROD_DEPLOYMENT
-    displayName: "Package Helm, Deploy to PROD & DR"
-    pool:
-      name: $(PROD_POOL_NAME)
-    dependsOn: ECR_AND_HELM_UPDATE
-    jobs:
-      - job: DEPLOY_TO_PROD_AND_DR
-        steps:
-          - checkout: none
+def lambda_handler(event, context):
+    print(f"Regions environment variable: {os.environ['regions']}")
+    #regions = os.environ['regions']
+    try:
+        #regions = json.loads(os.environ['regions'])
+        regions = ast.literal_eval(os.environ['regions'])
+    except KeyError:
+        print("regions environment variable is not set")
+    try:
+        s3_bucket_name = os.environ['s3_bucket_name']
+    except KeyError:
+        print("s3_bucket_name environment variable is not set")
+    try:
+        sender_email = os.environ['sender_email']
+    except KeyError:
+        print("sender_email environment variable is not set")
+    #recipient_email = os.environ['recipient_email']
+    #recipient_email = json.loads(os.environ['recipient_email'])
+    try:
+        recipient_email = ast.literal_eval(os.environ['recipient_email'])
+    except KeyError:
+        print("recipient_email environment variable is not set")
+    expiring_certs = []
 
-          - task: Bash@3
-            displayName: "Clone repo on PROD agent"
-            inputs:
-              targetType: 'inline'
-              script: |
-                git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
+    for region in regions:
+        expiring_certs.extend(get_expiring_certs(region))
 
-          - task: Bash@3
-            displayName: "Update Chart.yaml"
-            inputs:
-              targetType: 'inline'
-              script: |
-                cd $(REPOSITORY_NAME)/$(HELM_CHARTS_PATH)
-                sed -i "s/^version:.*/version: ${{ parameters.ImageTag }}/" Chart.yaml
+    unique_expiring_certs = list({cert['DomainName']: cert for cert in expiring_certs}.values())
 
-          - task: Bash@3
-            displayName: "Push Helm chart to S3"
-            inputs:
-              targetType: 'inline'
-              script: |
-                cd $(REPOSITORY_NAME)/$(HELM_CHARTS_PATH)
-                helm package .
-                aws s3 cp *.tgz $(HELM_S3BUCKET_URL)
-                aws s3 cp *.tgz $(DR_HELM_S3BUCKET_URL)
+    if unique_expiring_certs:
+        for cert in unique_expiring_certs:
+            try:
+                domain_name = cert['DomainName']
+            except json.JSONDecodeError as e:
+                print(f"Error parsing domain_name: {e}")
+            private_key, csr = generate_csr(domain_name)
+            # print("Private Key:")
+            # print(private_key)
+            # print("\nCertificate Signing Request:")
+            # print(csr)
 
-          - task: Bash@3
-            displayName: "Deploy to PROD"
-            inputs:
-              targetType: 'inline'
-              script: |
-                export KUBECONFIG=$(KUBE_CONFIG_PATH)
-                helm upgrade --install $(SERVICE_NAME) $(HELM_S3BUCKET_URL)$(SERVICE_NAME)-${{ parameters.ImageTag }}.tgz --namespace $(NAMESPACE)
+            ## Upload key to s3 bucket
+            s3_key_name = f"{domain_name}_private_key.pem"
 
-          - task: Bash@3
-            displayName: "Deploy to DR"
-            inputs:
-              targetType: 'inline'
-              script: |
-                export KUBECONFIG=$(DR_KUBE_CONFIG_PATH)
-                helm upgrade --install $(SERVICE_NAME) $(DR_HELM_S3BUCKET_URL)$(SERVICE_NAME)-${{ parameters.ImageTag }}.tgz --namespace $(NAMESPACE)
-
-          - task: Bash@3
-            displayName: "Verify Deployments"
-            inputs:
-              targetType: 'inline'
-              script: |
-                export KUBECONFIG=$(KUBE_CONFIG_PATH)
-                kubectl rollout status cronjob/$(SERVICE_NAME) --namespace=$(NAMESPACE)
-                export KUBECONFIG=$(DR_KUBE_CONFIG_PATH)
-                kubectl rollout status cronjob/$(SERVICE_NAME) --namespace=$(NAMESPACE)
+            upload_to_s3(s3_bucket_name, s3_key_name, private_key, domain_name)
+            # Send CSR via email
+            subject = f"CSR for {domain_name}"
+            tmp_dir = '/tmp'
+            file_path = os.path.join(tmp_dir, f'{domain_name}.csr')
+            try:
+                with open(file_path, 'w') as file:
+                    file.write(csr)
+            except Exception as e:
+                print(f"CSR file is not created: {str(e)}")
+            filename=f"{domain_name}.csr"
+            filepath=f"{tmp_dir}/{domain_name}.csr"
+            print(f"file path : {tmp_dir}/{domain_name}.csr")
+            send_email_smtp(subject, filepath, filename, domain_name, sender_email, recipient_email)
+            print(f"Domain Name: {cert['DomainName']} will expire in {cert['DaysToExpiration']} days")
+    else:
+        print('No certificates expiring within 30 days.')
+    return {
+        'statusCode': 200,
+        'statusMessage': 'OK'
+    }
