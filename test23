@@ -1,17 +1,22 @@
 #!/bin/bash
 
-> global_tables_with_ap_south_2.txt  # Clear output file
+input_file="global_tables_with_ap_south_2.txt"
 
-for table in $(aws dynamodb list-tables \
-  --region ap-south-1 \
-  --no-verify-ssl \
-  --output text \
-  --query "TableNames[]"); do
+while read -r table; do
+  echo "🗑️ Removing ap-south-2 replica from table: $table"
 
-  aws dynamodb describe-table \
+  aws dynamodb update-table \
+    --table-name "$table" \
     --region ap-south-1 \
     --no-verify-ssl \
-    --table-name "$table" \
-    --query "Table.Replicas[*].RegionName" \
-    --output text | grep -q "ap-south-2" && echo "$table" >> global_tables_with_ap_south_2.txt
-done
+    --cli-input-json "{
+      \"ReplicaUpdates\": [
+        {
+          \"Delete\": {
+            \"RegionName\": \"ap-south-2\"
+          }
+        }
+      ]
+    }" && echo "✅ Deleted replica for $table" || echo "❌ Failed for $table"
+
+done < "$input_file"
