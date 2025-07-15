@@ -1,3 +1,22 @@
-bash dynomodb_global_table.sh 
-urllib3/connectionpool.py:1064: InsecureRequestWarning: Unverified HTTPS request is being made to host 'dynamodb.ap-south-1.amazonaws.com'. Adding certificate verification is strongly advised. See: https://urllib3.readthedocs.io/en/1.26.x/advanced-usage.html#ssl-warnings
-KMBL350986@KBMK24-00000929 ~ % 
+#!/bin/bash
+
+echo "🔍 Scanning for global tables with ap-south-2 replica..."
+
+for table in $(aws dynamodb list-tables \
+  --region ap-south-1 \
+  --no-verify-ssl \
+  --output text \
+  --query "TableNames[]"); do
+
+  echo "Checking table: $table"
+
+  if aws dynamodb describe-table \
+    --region ap-south-1 \
+    --no-verify-ssl \
+    --table-name "$table" \
+    --query "Table.Replicas[*].RegionName" \
+    --output text | grep -q "ap-south-2"; then
+
+    echo "✅ Found Global Table with ap-south-2 replica: $table"
+  fi
+done
