@@ -1,17 +1,5 @@
-PRIMARY_REGION=ap-south-1  # Replace if your primary is different
-
-for table in $(aws dynamodb list-global-tables \
-  --region $PRIMARY_REGION \
-  --query "GlobalTables[*].GlobalTableName" \
-  --output text); do
-
-  REPLICA_REGIONS=$(aws dynamodb describe-global-table \
-    --region $PRIMARY_REGION \
-    --global-table-name "$table" \
-    --query "GlobalTableDescription.ReplicationGroup[*].RegionName" \
-    --output text)
-
-  if echo "$REPLICA_REGIONS" | grep -qw "ap-south-2"; then
-    echo "✅ $table has ap-south-2 as a replica"
-  fi
-done
+python3 dynomodb_global_table.py 
+  File "/Users/KMBL350986/dynomodb_global_table.py", line 3
+    for table in $(aws dynamodb list-global-tables \
+                 ^
+SyntaxError: invalid syntax
