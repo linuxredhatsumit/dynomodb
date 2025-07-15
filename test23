@@ -1,6 +1,6 @@
 #!/bin/bash
 
-echo "🔍 Scanning for global tables with ap-south-2 replica..."
+> global_tables_with_ap_south_2.txt  # Clear output file
 
 for table in $(aws dynamodb list-tables \
   --region ap-south-1 \
@@ -8,15 +8,10 @@ for table in $(aws dynamodb list-tables \
   --output text \
   --query "TableNames[]"); do
 
-  echo "Checking table: $table"
-
-  if aws dynamodb describe-table \
+  aws dynamodb describe-table \
     --region ap-south-1 \
     --no-verify-ssl \
     --table-name "$table" \
     --query "Table.Replicas[*].RegionName" \
-    --output text | grep -q "ap-south-2"; then
-
-    echo "✅ Found Global Table with ap-south-2 replica: $table"
-  fi
+    --output text | grep -q "ap-south-2" && echo "$table" >> global_tables_with_ap_south_2.txt
 done
