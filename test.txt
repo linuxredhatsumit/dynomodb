@@ -1,58 +1,161 @@
-locals {
-  namespace                               = "prod"
-  primary_region                          = "ap-south-1"
-  secondary_region                        = "ap-south-2"
-  account_id                              = "718378052708"
-  primary_kms_key_arn                     = "arn:aws:kms:ap-south-1:718378052708:key/aa24dda9-74b3-44c1-b6c6-311903b381cd"
-  primary_kms_key_id                      = split("/", local.primary_kms_key_arn)[1]
-  secondary_kms_key_arn                   = "arn:aws:kms:ap-south-2:718378052708:key/5adff75e-d534-4626-8af8-1fba7708be7f"
-  secondary_kms_key_id                    = split("/", local.secondary_kms_key_arn)[1]
-  primary_oidc_id                         = "A6EF97FA425FCC08AA3373B0E990BBFF"
-  secondary_oidc_id                       = "2AC1353141D7F74326DB4FFFA2A00C83"
-  env                                     = "prod"
-  primary_vpc_endpoint                    = "vpce-0dd48c345b6248c37" 
-  primary_custom_authorizer_lambda_name   = "API-to-Cognito-Lambda-Prod-onb"
-  primary_custom_authorizer_name          = "prod-kotak811-custom-authorizer"
-  primary_scc_authorizer_name             = "scc-onb-custom-prod-authorizer"
-  primary_scc_authorizer_lambda_name      = "API-to-Cognito-Lambda-SCC-ONB"
-  secondary_vpc_endpoint                  = "vpce-04925324d24ea9b64"
-  secondary_custom_authorizer_lambda_name = "API-to-Cognito-Lambda-Prod-onb"
-  secondary_custom_authorizer_name        = "prod-kotak811-custom-authorizer"
-  secondary_scc_authorizer_name           = "scc-onb-custom-prod-authorizer"
-  secondary_scc_authorizer_lambda_name    = "API-to-Cognito-Lambda-SCC-ONB"
-  appconfig_iam_resources                 = concat(
-    try(var.appconfig_profile["create_msk_profile"], false) ? [module.primary_secrets_manager_msk[0].secret_arn] : [],
-    try(var.appconfig_profile["create_rds_profile"], false) ? [module.primary_secrets_manager_rds[0].secret_arn] : [],
-    try(var.appconfig_profile["create_msk_profile"], false) && var.create_in_secondary ? [module.secondary_secrets_manager_msk[0].secret_arn] : [],
-    try(var.appconfig_profile["create_rds_profile"], false) && var.create_in_secondary ? [module.secondary_secrets_manager_rds[0].secret_arn] : []
-  )
-  appconfig_ids                           = var.create_in_secondary ? ["arn:aws:appconfig:${local.primary_region}:${local.account_id}:application/${var.primary_appconfig_id}/*", "arn:aws:appconfig:${local.secondary_region}:${local.account_id}:application/${var.secondary_appconfig_id}/*"] : ["arn:aws:appconfig:${local.primary_region}:${local.account_id}:application/${var.primary_appconfig_id}/*"]
-  appconfig_kms_source                    = var.create_in_secondary ? ["secretsmanager.${local.primary_region}.amazonaws.com", "secretsmanager.${local.secondary_region}.amazonaws.com"] : ["secretsmanager.${local.primary_region}.amazonaws.com"]
-  appconfig_kms_keys                      = var.create_in_secondary ? [local.primary_kms_key_arn, local.secondary_kms_key_arn] : [local.primary_kms_key_arn]
-  sns_topic_default_policy = {
-      pub = {
-        actions = [
-            "SNS:GetTopicAttributes",
-            "SNS:SetTopicAttributes",
-            "SNS:AddPermission",
-            "SNS:RemovePermission",
-            "SNS:DeleteTopic",
-            "SNS:Subscribe",
-            "SNS:ListSubscriptionsByTopic",
-            "SNS:Publish"
-        ]
-        principals = [{
-            type        = "AWS"
-            identifiers = ["*"]
-        }]
-        conditions = [{
-            "test"     = "StringEquals"
-            "values"   = ["${local.account_id}"]
-            "variable" = "AWS:SourceOwner"
-        }
-      ]
-    }
-  }
-  sns_details = null                               // SNS to be created. EXCLUSIVELY set this to null if SNS creation need to be avoided
+trigger: none
+
+resources:
+  - repo: self
+
+pool: 
+  name: $(AWS_AGENT_POOL)
+  workspace:
+    clean: all
+
+# # # To continue the pipeline in terraform-apply-build.yaml.
+extends:
+  template: terraform-apply-build.yaml
+  parameters:
+    environmentfolder: ${{ parameters.ENVIRONMENT_NAME }}
+    servicefolder: ${{ parameters.AWS_SERVICE_NAME }}
+    # - terraformVersion: '0.15.2'
+
+variables:
+  - group: GIT
+  # - group: AWS-reference-keys
+  # - group: Kotak-ECR-Credentials
+# Agent pool details
+  - name: AWS_AGENT_POOL
+    value: 'k811-prod'
+  - name: AGENT_IN_AGENTPOOL
+    value: Linux-Agent1
+##### For AWS Role Access ########
+  - name: ROLE_NAME
+    value: EKS-Setup-Role-Kotak811
+  - name: SOURCE_ACCOUNT_NAME
+    value: PROD
+parameters:
+- name: JIRA
+  type: string
+  displayName: 'please provide JIRA ID'
+  default: ''
+- name: ENVIRONMENT_NAME
+  displayName: ENVIRONMENT_NAME
+  type: string
+  default: kotak811-prod
+  values:
+  - kotak811-prod
+  - kotak811-prod-dr
+- name: AWS_SERVICE_NAME
+  displayName: AWS_SERVICE_NAME
+  type: string
+  default: vpc
+
+
+above is azure pipline below is terraform-apply-build.yaml
+parameters:
+  - name: environmentfolder
+    type: string
+    default: test
+  - name: servicefolder
+    type: string
+    default: test
+  - name: planArgs
+    default: ''
+  - name: applyArgs
+    default: ''
     
-}
+
+stages:
+  - stage: "ValidatePlanTerraform"
+    displayName: "Terraform - Validate and Plan"
+    jobs:
+      - job: TerraformValidate
+        displayName: TerraformValidate
+        steps:
+          - script: |
+              git config --global url."https://$(PAT)@dev.azure.com/kmbl-devops/".insteadOf "https://kmbl-devops@dev.azure.com/kmbl-devops/"
+            displayName: 'Configure Git to use PAT'
+
+          - script: |
+              pwd
+              rm -rf .terraform
+              declare -A mymap=(["PROD"]="718378052708" ["811Kotak"]="12122312312312312")
+              unset AWS_SESSION_TOKEN
+              unset AWS_SECRET_ACCESS_KEY
+              unset AWS_ACCESS_KEY_ID
+
+              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::${mymap[$(SOURCE_ACCOUNT_NAME)]}:role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber) --duration-seconds=3600` 
+
+              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+              terraform --version
+              terraform init
+            workingDirectory: $(System.DefaultWorkingDirectory)/env/${{ parameters.environmentfolder }}/${{ parameters.servicefolder }}/
+            displayName: Terraform Init
+            env:
+              AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+              AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+
+      - job: planTerraform
+        dependsOn: TerraformValidate
+        displayName: TerraformPlan
+        steps:
+          - checkout: self
+            clean: false
+          - script: |
+              git config --global url."https://$(PAT)@dev.azure.com/kmbl-devops/".insteadOf "https://kmbl-devops@dev.azure.com/kmbl-devops/"
+            displayName: 'Configure Git to use PAT'
+
+          - script: |
+              pwd
+              declare -A mymap=(["PROD"]="718378052708" ["811Kotak"]="12122312312312312")
+              unset AWS_SESSION_TOKEN
+              unset AWS_SECRET_ACCESS_KEY
+              unset AWS_ACCESS_KEY_ID
+
+              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::${mymap[$(SOURCE_ACCOUNT_NAME)]}:role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber) --duration-seconds=3600` 
+
+              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+              terraform plan
+            workingDirectory: $(System.DefaultWorkingDirectory)/env/${{ parameters.environmentfolder }}/${{ parameters.servicefolder }}/
+            displayName: Terraform plan
+            env:
+              AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+              AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+
+  - stage: "TerraformApply"
+    dependsOn:
+      - "ValidatePlanTerraform"
+    displayName: TerraformApply
+    jobs:
+      - deployment: Apply
+        displayName: "Apply"
+        environment: Terraform-Prod
+        timeoutInMinutes: 300
+        # environment: Terraform-Non-Prod
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - script: |
+                    git config --global url."https://$(PAT)@dev.azure.com/kmbl-devops/".insteadOf "https://kmbl-devops@dev.azure.com/kmbl-devops/"
+                  displayName: 'Configure Git to use PAT'
+                - script: |
+                    pwd
+                    declare -A mymap=(["PROD"]="718378052708" ["811Kotak"]="12122312312312312")
+                    unset AWS_SESSION_TOKEN
+                    unset AWS_SECRET_ACCESS_KEY
+                    unset AWS_ACCESS_KEY_ID
+
+                    CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::${mymap[$(SOURCE_ACCOUNT_NAME)]}:role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber) --duration-seconds=14400` 
+
+                    export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                    export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                    export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                    terraform apply --auto-approve
+                  workingDirectory: $(System.DefaultWorkingDirectory)/env/${{ parameters.environmentfolder }}/${{ parameters.servicefolder }}/
+                  displayName: Terraform Apply
+                  env:
+                    AWS_ACCESS_KEY_ID: $(AWS_ACCESS_KEY_ID)
+                    AWS_SECRET_ACCESS_KEY: $(AWS_SECRET_ACCESS_KEY)
+
