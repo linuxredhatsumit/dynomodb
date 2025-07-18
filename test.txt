@@ -1,155 +1,435 @@
-parameters:
-  - name: ImageTag
-    type: string
-    displayName: "Image Tag to Deploy"
-    default: "1.20240625.1"
-  - name: DeployPROD
-    displayName: "Deploy to PROD Environment"
-    type: boolean
-    default: true
-  - name: DeployDR
-    displayName: "Deploy to DR Environment"
-    type: boolean
-    default: false
-  - name: Jira_URL
-    type: string
-    displayName: "Jira Ticket URL"
-    default: ""
 
-stages:
-- stage: Prepare_And_Promote_Image
-  displayName: "Prepare & Promote Artifacts"
-  jobs:
-  - job: PREPARE_ARTIFACTS
-    displayName: "Update Chart & Promote Docker Image"
-    pool:
-      name: $(DEVOPS_POOL_NAME)
-    steps:
-      - checkout: self
-        displayName: "Checkout Source Code"
+          + "application-id"       = "APP-01783"
+          + "application-manager"  = "Ram Singh"
+          + "application-name"     = "811 Onboarding App"
+          + "application-owner"    = "Amlan Mandal"
+          + "created-by-terraform" = "yes"
+          + "created-date"         = "07-17-2025"
+          + "entity"               = "KMBL"
+          + "environment"          = "prod"
+          + "project-811"          = "ONB"
+          + "project-name"         = "811-ONB"
+          + "scheduler-start"      = "NA"
+          + "scheduler-stop"       = "NA"
+          + "ticket-id"            = "DEVOPS-7685"
+          + "vertical-tlt"         = "Amlan Mandal"
+        }
+      + unique_id             = (known after apply)
+        # (1 unchanged attribute hidden)
 
-      - script: |
-          echo "Updating Helm chart files..."
-          CHART_VERSION="1.$(Build.BuildNumber)"
-          echo "Chart version: $CHART_VERSION"
-          echo "Image tag: ${{ parameters.ImageTag }}"
+      + inline_policy (known after apply)
+    }
 
-          sed -i -e "s/^version:.*/version: $CHART_VERSION/" $(HELM_CHARTS_PATH)/charts/Chart.yaml
-          sed -i -e "s/^appVersion:.*/appVersion: ${{ parameters.ImageTag }}/" $(HELM_CHARTS_PATH)/charts/Chart.yaml
-          sed -i -e "s/tag:.*/tag: ${{ parameters.ImageTag }}/" $(HELM_CHARTS_PATH)/charts/prod-values.yaml
-        displayName: "Update Helm Chart Metadata"
+  # module.secondary_api_gateway[0].module.cloudwatch_log_group.module.role.aws_iam_role_policy_attachment.default[0] will be created
+  + resource "aws_iam_role_policy_attachment" "default" {
+      + id         = (known after apply)
+      + policy_arn = (known after apply)
+      + role       = "k811-finbridge-connector-api-gw-prod-dr-log-group"
+    }
 
-      - script: |
-          set -e
-          echo "--- Promoting Image from UAT to PROD ECR ---"
+Plan: 41 to add, 0 to change, 0 to destroy.
+╷
+│ Error: Invalid provider configuration
+│ 
+│ Provider "registry.terraform.io/hashicorp/aws" requires explicit
+│ configuration. Add a provider block to the root module and configure the
+│ provider's required arguments as described in the provider documentation.
+│ 
+╵
+╷
+│ Error: invalid AWS Region: 
+│ 
+│   with provider["registry.terraform.io/hashicorp/aws"],
+│   on <empty> line 0:
+│   (source code not available)
+│ 
 
-          echo "Assuming UAT role..."
-          CREDS_UAT=$(aws sts assume-role \
-            --role-arn arn:aws:iam::$SOURCE_AWS_ACCOUNT_ID:role/$SOURCE_ROLE_NAME \
-            --role-session-name "UAT-Pull-$(Build.BuildNumber)")
 
-          export AWS_ACCESS_KEY_ID=$(echo "$CREDS_UAT" | jq -r '.Credentials.AccessKeyId')
-          export AWS_SECRET_ACCESS_KEY=$(echo "$CREDS_UAT" | jq -r '.Credentials.SecretAccessKey')
-          export AWS_SESSION_TOKEN=$(echo "$CREDS_UAT" | jq -r '.Credentials.SessionToken')
-          export AWS_REGION=$SOURCE_AWS_REGION
+getting above error below is my api.tf
+########################################
+# API Gateway Module for primary region
+########################################
+module "primary_api_gateway" {
+    count            = var.api_gateway_details != null ? 1 : 0
+    source           = "git::https://kmbl-devops@dev.azure.com/kmbl-devops/kotak811-devops-codebase/_git/k811-terraform-modules//modules/apigateway?ref=v1.0.0"
+    providers        = { aws = aws.primary }
+    name             = "k811-${var.k811_service_name}-api-gw-${local.env}"
+    stage_name       = var.api_gateway_details["stage_name"]
+    endpoint_type    = "PRIVATE"
+    vpc_endpoint_ids = local.primary_vpc_endpoint
+    body = jsonencode({
+    openapi = "3.0.1"
+    info = {
+        title   = "initialdeployment"
+        version = "1.0"
+    }
+    paths = {
+        "/path1" = {
+        get = {
+            x-amazon-apigateway-integration = {
+            httpMethod           = "GET"
+            payloadFormatVersion = "1.0"
+            type                 = "HTTP_PROXY"
+            uri                  = "https://ip-ranges.amazonaws.com/ip-ranges.json"
+            }
+        }
+        }
+    }
+    })
+    endpoint_configuration = {
+    disable_execute_api_endpoint = true
+    types                        = "PRIVATE"
+    vpc_endpoint_ids             = local.primary_vpc_endpoint
+    }
+    context              = module.this.context
+    logging_level        = "INFO"
+    metrics_enabled      = false
+    xray_tracing_enabled = false
+    data_trace_enabled   = true
+    rest_api_policy      = <<EOF
+    {
+    "Version": "2012-10-17",
+    "Statement": [
+    {
+        "Effect": "Allow",
+        "Principal": {
+        "AWS": "*"
+        },
+        "Action": "execute-api:Invoke",
+        "Resource": "${module.primary_api_gateway[0].execution_arn}/*"
+    },
+        {
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": "execute-api:Invoke",
+            "Resource": [
+                "execute-api:/*"
+            ],
+            "Condition" : {
+                "StringNotEquals": {
+                    "aws:SourceVpce": "${local.primary_vpc_endpoint}"
+                }
+            }
+        }
+    ]
+    }
+    EOF
+    access_log_format = <<EOF
+    {
+    "requestTime": "$context.requestTime",
+    "requestId": "$context.requestId",
+    "httpMethod": "$context.httpMethod",
+    "path": "$context.path",
+    "resourcePath": "$context.resourcePath",
+    "status": $context.status,
+    "responseLatency": $context.responseLatency,
+    "xrayTraceId": "$context.xrayTraceId",
+    "integrationRequestId": "$context.integration.requestId",
+    "functionResponseStatus": "$context.integration.status",
+    "integrationLatency": "$context.integration.latency",
+    "integrationServiceStatus": "$context.integration.integrationStatus",
+    "authorizeResultStatus": "$context.authorize.status",
+    "authorizerServiceStatus": "$context.authorizer.status",
+    "authorizerLatency": "$context.authorizer.latency",
+    "authorizerRequestId": "$context.authorizer.requestId",
+    "ip": "$context.identity.sourceIp",
+    "userAgent": "$context.identity.userAgent",
+    "principalId": "$context.authorizer.principalId",
+    "cognitoUser": "$context.identity.cognitoIdentityId",
+    "user": "$context.identity.user"
+    }
+    EOF
+}
 
-          echo "Logging into UAT ECR..."
-          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $SOURCE_AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+##########################################
+# API Gateway Module for secondary region
+##########################################
+module "secondary_api_gateway" {
+    count            = var.api_gateway_details != null && var.create_in_secondary ? 1 : 0
+    source           = "git::https://kmbl-devops@dev.azure.com/kmbl-devops/kotak811-devops-codebase/_git/k811-terraform-modules//modules/apigateway?ref=v1.0.0"
+    providers        = { aws = aws.secondary }
+    name             = "k811-${var.k811_service_name}-api-gw-${local.env}-dr"
+    stage_name       = var.api_gateway_details["stage_name"]
+    endpoint_type    = "PRIVATE"
+    vpc_endpoint_ids = local.secondary_vpc_endpoint
+    body = jsonencode({
+    openapi = "3.0.1"
+    info = {
+        title   = "initialdeployment"
+        version = "1.0"
+    }
+    paths = {
+        "/path1" = {
+        get = {
+            x-amazon-apigateway-integration = {
+            httpMethod           = "GET"
+            payloadFormatVersion = "1.0"
+            type                 = "HTTP_PROXY"
+            uri                  = "https://ip-ranges.amazonaws.com/ip-ranges.json"
+            }
+        }
+        }
+    }
+    })
+    endpoint_configuration = {
+    disable_execute_api_endpoint = true
+    types                        = "PRIVATE"
+    vpc_endpoint_ids             = local.secondary_vpc_endpoint
+    }
+    context              = module.this.context
+    logging_level        = "INFO"
+    metrics_enabled      = false
+    xray_tracing_enabled = false
+    data_trace_enabled   = true
+    rest_api_policy      = <<EOF
+    {
+    "Version": "2012-10-17",
+    "Statement": [
+    {
+        "Effect": "Allow",
+        "Principal": {
+        "AWS": "*"
+        },
+        "Action": "execute-api:Invoke",
+        "Resource": "${module.secondary_api_gateway[0].execution_arn}/*"
+    },
+        {
+            "Effect": "Deny",
+            "Principal": "*",
+            "Action": "execute-api:Invoke",
+            "Resource": [
+                "execute-api:/*"
+            ],
+            "Condition" : {
+                "StringNotEquals": {
+                    "aws:SourceVpce": "${local.secondary_vpc_endpoint}"
+                }
+            }
+        }
+    ]
+    }
+    EOF
+    access_log_format = <<EOF
+    {
+    "requestTime": "$context.requestTime",
+    "requestId": "$context.requestId",
+    "httpMethod": "$context.httpMethod",
+    "path": "$context.path",
+    "resourcePath": "$context.resourcePath",
+    "status": $context.status,
+    "responseLatency": $context.responseLatency,
+    "xrayTraceId": "$context.xrayTraceId",
+    "integrationRequestId": "$context.integration.requestId",
+    "functionResponseStatus": "$context.integration.status",
+    "integrationLatency": "$context.integration.latency",
+    "integrationServiceStatus": "$context.integration.integrationStatus",
+    "authorizeResultStatus": "$context.authorize.status",
+    "authorizerServiceStatus": "$context.authorizer.status",
+    "authorizerLatency": "$context.authorizer.latency",
+    "authorizerRequestId": "$context.authorizer.requestId",
+    "ip": "$context.identity.sourceIp",
+    "userAgent": "$context.identity.userAgent",
+    "principalId": "$context.authorizer.principalId",
+    "cognitoUser": "$context.identity.cognitoIdentityId",
+    "user": "$context.identity.user"
+    }
+    EOF
+}
 
-          SRC_IMG="$SOURCE_AWS_ACCOUNT_ID.dkr.ecr.$SOURCE_AWS_REGION.amazonaws.com/$SOURCE_ECR_FOLDER_NAME/$SOURCE_ECR_REPO_NAME:${{ parameters.ImageTag }}"
-          docker pull $SRC_IMG
+#####################################################
+# APIGW CUSTOM DOMAIN NAME Mapping for primary rgion
+#####################################################
+resource "aws_apigatewayv2_api_mapping" "primary_api_gw_mapping" {
+    for_each        = try(var.api_gateway_details["primary_custom_domains"], {}) 
+    provider        = aws.primary
+    api_id          = module.primary_api_gateway[0].id
+    domain_name     = each.value["name"]
+    stage           = var.api_gateway_details["stage_name"]
+    api_mapping_key = each.value["key"]
+    depends_on      = [ module.primary_api_gateway[0]]
+}
 
-          echo "Assuming PROD role..."
-          CREDS_PROD=$(aws sts assume-role \
-            --role-arn arn:aws:iam::$PROD_AWS_ACCOUNT_ID:role/$PROD_ROLE_NAME \
-            --role-session-name "PROD-Push-$(Build.BuildNumber)")
+########################################################
+# APIGW CUSTOM DOMAIN NAME Mapping for secondary region
+########################################################
+resource "aws_apigatewayv2_api_mapping" "secondary_api_gw_mapping" {
+    for_each        = try(var.api_gateway_details["secondary_custom_domains"], {})
+    provider        = aws.secondary
+    api_id          = module.secondary_api_gateway[0].id
+    domain_name     = each.value["name"]
+    stage           = var.api_gateway_details["stage_name"]
+    api_mapping_key = each.value["key"]
+    depends_on      = [ module.secondary_api_gateway[0]]
+}
 
-          export AWS_ACCESS_KEY_ID=$(echo "$CREDS_PROD" | jq -r '.Credentials.AccessKeyId')
-          export AWS_SECRET_ACCESS_KEY=$(echo "$CREDS_PROD" | jq -r '.Credentials.SecretAccessKey')
-          export AWS_SESSION_TOKEN=$(echo "$CREDS_PROD" | jq -r '.Credentials.SessionToken')
-          export AWS_REGION=$PROD_AWS_REGION
+##########
+# API key
+##########
+resource "random_password" "api_key" {
+    count   = try(var.api_gateway_details["create_key_authorizer"], false) == true ? 1 : 0
+    length  = 25
+    special = false
+}
 
-          echo "Logging into PROD ECR..."
-          aws ecr get-login-password --region $AWS_REGION | docker login --username AWS --password-stdin $PROD_AWS_ACCOUNT_ID.dkr.ecr.$AWS_REGION.amazonaws.com
+#############################################################
+# APIGW Key based authorizer + Usage Plan for primary region
+#############################################################
+resource "aws_api_gateway_usage_plan" "primary_usage_plan" {
+    count    = try(var.api_gateway_details["create_key_authorizer"], false) == true ? 1 : 0
+    provider = aws.primary
+    name     = "k811-${var.k811_service_name}-usage-plan-${local.env}"
+    api_stages {
+        api_id = module.primary_api_gateway[0].id
+        stage  = var.api_gateway_details["stage_name"]
+    }
+    depends_on = [ module.primary_api_gateway[0] ]
+}
 
-          TGT_IMG="$PROD_AWS_ACCOUNT_ID.dkr.ecr.$PROD_AWS_REGION.amazonaws.com/$PROD_ECR_FOLDER_NAME/$PROD_ECR_REPO_NAME:${{ parameters.ImageTag }}"
+resource "aws_api_gateway_api_key" "primary_api_key" {
+    count    = try(var.api_gateway_details["create_key_authorizer"], false) == true ? 1 : 0
+    provider = aws.primary
+    name     = "k811-${var.k811_service_name}-api-key-${local.env}"
+    value    = random_password.api_key[0].result
+    tags     = {
+        Name          = "k811-${var.k811_service_name}-api-key-${local.env}"
+        resource-name = "k811-${var.k811_service_name}-api-key-${local.env}"
+    }
+}
 
-          if ! aws ecr describe-images --repository-name $PROD_ECR_REPO_NAME --image-ids imageTag=${{ parameters.ImageTag }} --region $AWS_REGION > /dev/null 2>&1; then
-            echo "Image not found in PROD ECR. Tagging and pushing..."
-            docker tag $SRC_IMG $TGT_IMG
-            docker push $TGT_IMG
-          else
-            echo "Image already exists in PROD ECR. Skipping push."
-          fi
-        displayName: "Promote Docker Image to PROD ECR"
-      
-      - task: PublishPipelineArtifact@1
-        displayName: "Publish updated Helm Chart"
-        inputs:
-          targetPath: '$(HELM_CHARTS_PATH)/charts'
-          artifactName: 'helm-chart-prod'
+resource "aws_api_gateway_usage_plan_key" "primary_usage_plan_api_key" {
+    count         = try(var.api_gateway_details["create_key_authorizer"], false) == true ? 1 : 0
+    provider      = aws.primary
+    key_id        = aws_api_gateway_api_key.primary_api_key[0].id
+    key_type      = "API_KEY"
+    usage_plan_id = aws_api_gateway_usage_plan.primary_usage_plan[0].id
+}
+###############################################################
+# APIGW Key based authorizer + Usage Plan for secondary region
+###############################################################
+resource "aws_api_gateway_usage_plan" "secondary_usage_plan" {
+    count    = try(var.api_gateway_details["create_key_authorizer"], false) && var.create_in_secondary == true ? 1 : 0
+    provider = aws.secondary
+    name     = "k811-${var.k811_service_name}-usage-plan-${local.env}"
+    api_stages {
+        api_id = module.secondary_api_gateway[0].id
+        stage  = var.api_gateway_details["stage_name"]
+    }
+    depends_on = [ module.secondary_api_gateway[0] ]
+}
 
-- stage: DeployPROD
-  displayName: "Deploy to PROD"
-  dependsOn: Prepare_And_Promote_Image
-  condition: and(succeeded(), eq('${{ parameters.DeployPROD }}', 'true'))
-  jobs:
-  - deployment: DeployHelmChartPROD
-    displayName: "Deploy Helm Chart to PROD"
-    pool:
-      name: $(PROD_POOL_NAME)
-    environment: 'PROD'
-    strategy:
-      runOnce:
-        deploy:
-          steps:
-            - task: DownloadPipelineArtifact@2
-              displayName: "Download Helm Chart artifact"
-              inputs:
-                artifactName: 'helm-chart-prod'
-                downloadPath: '$(System.ArtifactsDirectory)/helm-chart'
-            
-            - script: |
-                set -e
-                echo "Deploying Helm chart to PROD..."
+resource "aws_api_gateway_api_key" "secondary_api_key" {
+    count    = try(var.api_gateway_details["create_key_authorizer"], false) && var.create_in_secondary == true ? 1 : 0
+    provider = aws.secondary
+    name     = "k811-${var.k811_service_name}-api-key-${local.env}"
+    value    = random_password.api_key[0].result
+    tags     = {
+        Name          = "k811-${var.k811_service_name}-api-key-${local.env}"
+        resource-name = "k811-${var.k811_service_name}-api-key-${local.env}"
+    }
+}
 
-                echo "Assuming PROD role for deployment..."
-                CREDS=$(aws sts assume-role \
-                  --role-arn arn:aws:iam::$PROD_AWS_ACCOUNT_ID:role/$PROD_ROLE_NAME \
-                  --role-session-name "PROD-Deploy-$(Build.BuildNumber)")
+resource "aws_api_gateway_usage_plan_key" "secondary_usage_plan_key" {
+    count         = try(var.api_gateway_details["create_key_authorizer"], false) && var.create_in_secondary == true ? 1 : 0
+    provider      = aws.secondary
+    key_id        = aws_api_gateway_api_key.secondary_api_key[0].id
+    key_type      = "API_KEY"
+    usage_plan_id = aws_api_gateway_usage_plan.secondary_usage_plan[0].id
+}
 
-                export AWS_ACCESS_KEY_ID=$(echo "$CREDS" | jq -r '.Credentials.AccessKeyId')
-                export AWS_SECRET_ACCESS_KEY=$(echo "$CREDS" | jq -r '.Credentials.SecretAccessKey')
-                export AWS_SESSION_TOKEN=$(echo "$CREDS" | jq -r '.Credentials.SessionToken')
-                export AWS_REGION=$PROD_AWS_REGION
+###########################################################################
+# Custom Authorizer + Trigger for Api to Cognito Lambda for primary region
+###########################################################################
+resource "aws_api_gateway_authorizer" "primary_custom_authorizer" {
+    count                            = try(var.api_gateway_details["create_custom_authorizer"], false) == true ? 1 : 0
+    provider                         = aws.primary
+    name                             = local.primary_custom_authorizer_name
+    rest_api_id                      = module.primary_api_gateway[0].id
+    type                             = "REQUEST"
+    identity_validation_expression   = "^(Bearer )[a-zA-Z0-9\\-_]+?\\.[a-zA-Z0-9\\-_]+?\\.([a-zA-Z0-9\\-_]+)$"
+    identity_source                  = "method.request.header.Authorization"
+    authorizer_uri                   = "arn:aws:apigateway:${local.primary_region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${local.primary_region}:${local.account_id}:function:${local.primary_custom_authorizer_lambda_name}/invocations"
+    authorizer_result_ttl_in_seconds = "60"
+}
 
-                CHART_DIR="$(System.ArtifactsDirectory)/helm-chart"
-                CHART_VERSION="1.$(Build.BuildNumber)"
+resource "aws_lambda_permission" "primary_lambda_permission" {
+    count         = try(var.api_gateway_details["create_custom_authorizer"], false) == true ? 1 : 0
+    provider      = aws.primary
+    action        = "lambda:InvokeFunction"
+    function_name = local.primary_custom_authorizer_lambda_name
+    principal     = "apigateway.amazonaws.com"
+    source_arn    = "${module.primary_api_gateway[0].execution_arn}/authorizers/${aws_api_gateway_authorizer.primary_custom_authorizer[count.index].id}"
+    depends_on    = [ aws_api_gateway_authorizer.primary_custom_authorizer[0] ]
+}
 
-                helm s3 init $HELM_S3BUCKET_URL || true
-                helm repo add prod-helm $HELM_S3BUCKET_URL || true
+#############################################################################
+# Custom Authorizer + Trigger for Api to Cognito Lambda for secondary region
+#############################################################################
+resource "aws_api_gateway_authorizer" "secondary_custom_authorizer" {
+    count                            = try(var.api_gateway_details["create_custom_authorizer"], false) && var.create_in_secondary == true ? 1 : 0
+    provider                         = aws.secondary
+    name                             = local.secondary_custom_authorizer_name
+    rest_api_id                      = module.secondary_api_gateway[0].id
+    type                             = "REQUEST"
+    identity_validation_expression   = "^(Bearer )[a-zA-Z0-9\\-_]+?\\.[a-zA-Z0-9\\-_]+?\\.([a-zA-Z0-9\\-_]+)$"
+    identity_source                  = "method.request.header.Authorization"
+    authorizer_uri                   = "arn:aws:apigateway:${local.secondary_region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${local.secondary_region}:${local.account_id}:function:${local.secondary_custom_authorizer_lambda_name}/invocations"
+    authorizer_result_ttl_in_seconds = "60"
+}
 
-                helm package $CHART_DIR
-                helm s3 push --force $SERVICE_NAME-$CHART_VERSION.tgz prod-helm
+resource "aws_lambda_permission" "secondary_lambda_permission" {
+    count         = try(var.api_gateway_details["create_custom_authorizer"], false) && var.create_in_secondary == true ? 1 : 0
+    provider      = aws.secondary
+    action        = "lambda:InvokeFunction"
+    function_name = local.secondary_custom_authorizer_lambda_name
+    principal     = "apigateway.amazonaws.com"
+    source_arn    = "${module.secondary_api_gateway[0].execution_arn}/authorizers/${aws_api_gateway_authorizer.secondary_custom_authorizer[count.index].id}"
+    depends_on    = [ aws_api_gateway_authorizer.secondary_custom_authorizer[0] ]
+}
 
-                helm repo update
-                helm upgrade --install $ENV-$SERVICE_NAME prod-helm/$SERVICE_NAME \
-                  --version $CHART_VERSION \
-                  --namespace $NAMESPACE \
-                  --kubeconfig $KUBE_CONFIG_PATH \
-                  --wait --timeout 5m
-              displayName: "Package, Push & Deploy Helm Chart"
+###############################################################################
+# SCC Custom Authorizer + Trigger for Api to Cognito Lambda for primary region
+###############################################################################
+resource "aws_api_gateway_authorizer" "primary_scc_custom_authorizer" {
+    count                            = try(var.api_gateway_details["create_scc_authorizer"], false) ? 1 : 0
+    provider                         = aws.primary
+    name                             = local.primary_custom_authorizer_name
+    rest_api_id                      = module.primary_api_gateway[0].id
+    type                             = "REQUEST"
+    identity_source                  = "method.request.header.Authorization"
+    authorizer_uri                   = "arn:aws:apigateway:${local.primary_region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${local.primary_region}:${local.account_id}:function:${local.primary_scc_authorizer_lambda_name}/invocations"
+    authorizer_result_ttl_in_seconds = "60"
+}
+resource "aws_lambda_permission" "primary_lambda_permission_scc" {
+    count         = try(var.api_gateway_details["create_scc_authorizer"], false) ? 1 : 0
+    provider      = aws.primary
+    action        = "lambda:InvokeFunction"
+    function_name = local.primary_scc_authorizer_lambda_name
+    principal     = "apigateway.amazonaws.com"
+    source_arn    = "${module.primary_api_gateway[0].execution_arn}/authorizers/${aws_api_gateway_authorizer.primary_scc_custom_authorizer[count.index].id}"
+    depends_on    = [ aws_api_gateway_authorizer.primary_scc_custom_authorizer[0] ]
+}
 
-            - script: |
-                echo "Verifying CronJob deployment..."
-                CREDS=$(aws sts assume-role \
-                  --role-arn arn:aws:iam::$PROD_AWS_ACCOUNT_ID:role/$PROD_ROLE_NAME \
-                  --role-session-name "PROD-Verify-$(Build.BuildNumber)")
+#################################################################################
+# SCC Custom Authorizer + Trigger for Api to Cognito Lambda for secondary region
+#################################################################################
+resource "aws_api_gateway_authorizer" "secondary_scc_custom_authorizer" {
+    count                            = try(var.api_gateway_details["create_scc_authorizer"], false) && var.create_in_secondary == true ? 1 : 0
+    provider                         = aws.secondary
+    name                             = local.secondary_custom_authorizer_name
+    rest_api_id                      = module.secondary_api_gateway[0].id
+    type                             = "REQUEST"
+    identity_source                  = "method.request.header.Authorization"
+    authorizer_uri                   = "arn:aws:apigateway:${local.secondary_region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${local.secondary_region}:${local.account_id}:function:${local.secondary_scc_authorizer_lambda_name}/invocations"
+    authorizer_result_ttl_in_seconds = "60"
+}
+resource "aws_lambda_permission" "secondary_lambda_permission_scc" {
+    count         = try(var.api_gateway_details["create_scc_authorizer"], false) && var.create_in_secondary == true ? 1 : 0
+    provider                         = aws.secondary
+    action        = "lambda:InvokeFunction"
+    function_name = local.secondary_scc_authorizer_lambda_name
+    principal     = "apigateway.amazonaws.com"
+    source_arn    = "${module.secondary_api_gateway[0].execution_arn}/authorizers/${aws_api_gateway_authorizer.secondary_scc_custom_authorizer[count.index].id}"
+    depends_on    = [ aws_api_gateway_authorizer.secondary_scc_custom_authorizer[0] ]
+}
 
-                export AWS_ACCESS_KEY_ID=$(echo "$CREDS" | jq -r '.Credentials.AccessKeyId')
-                export AWS_SECRET_ACCESS_KEY=$(echo "$CREDS" | jq -r '.Credentials.SecretAccessKey')
-                export AWS_SESSION_TOKEN=$(echo "$CREDS" | jq -r '.Credentials.SessionToken')
-                export AWS_REGION=$PROD_AWS_REGION
-
-                kubectl get cronjob $SERVICE_NAME -n $NAMESPACE --kubeconfig $KUBE_CONFIG_PATH
-              displayName: "Verify Helm Deployment"
+let me know if u need any otehr TF file the check the error 
