@@ -1,45 +1,58 @@
-provider "aws" {
-  region = local.primary_region
-  alias  = "primary"
-    default_tags {
-        tags = {
-            application-name     = "811 Onboarding App"
-            application-id       = "APP-01783"
-            application-owner    = "Amlan Mandal"
-            vertical-tlt         = "Amlan Mandal"
-            created-by-terraform = "yes"
-            entity               = "KMBL"
-            project-name         = "811-ONB"
-            environment          = local.env
-            scheduler-start      = "NA"
-            scheduler-stop       = "NA"
-            project-811          = "ONB"
-            application-manager  = var.application_manager
-            created-date         = var.created_date
-            ticket-id            = var.ticket_id
+locals {
+  namespace                               = "prod"
+  primary_region                          = "ap-south-1"
+  secondary_region                        = "ap-south-2"
+  account_id                              = "718378052708"
+  primary_kms_key_arn                     = "arn:aws:kms:ap-south-1:718378052708:key/aa24dda9-74b3-44c1-b6c6-311903b381cd"
+  primary_kms_key_id                      = split("/", local.primary_kms_key_arn)[1]
+  secondary_kms_key_arn                   = "arn:aws:kms:ap-south-2:718378052708:key/5adff75e-d534-4626-8af8-1fba7708be7f"
+  secondary_kms_key_id                    = split("/", local.secondary_kms_key_arn)[1]
+  primary_oidc_id                         = "A6EF97FA425FCC08AA3373B0E990BBFF"
+  secondary_oidc_id                       = "2AC1353141D7F74326DB4FFFA2A00C83"
+  env                                     = "prod"
+  primary_vpc_endpoint                    = "vpce-0dd48c345b6248c37" 
+  primary_custom_authorizer_lambda_name   = "API-to-Cognito-Lambda-Prod-onb"
+  primary_custom_authorizer_name          = "prod-kotak811-custom-authorizer"
+  primary_scc_authorizer_name             = "scc-onb-custom-prod-authorizer"
+  primary_scc_authorizer_lambda_name      = "API-to-Cognito-Lambda-SCC-ONB"
+  secondary_vpc_endpoint                  = "vpce-04925324d24ea9b64"
+  secondary_custom_authorizer_lambda_name = "API-to-Cognito-Lambda-Prod-onb"
+  secondary_custom_authorizer_name        = "prod-kotak811-custom-authorizer"
+  secondary_scc_authorizer_name           = "scc-onb-custom-prod-authorizer"
+  secondary_scc_authorizer_lambda_name    = "API-to-Cognito-Lambda-SCC-ONB"
+  appconfig_iam_resources                 = concat(
+    try(var.appconfig_profile["create_msk_profile"], false) ? [module.primary_secrets_manager_msk[0].secret_arn] : [],
+    try(var.appconfig_profile["create_rds_profile"], false) ? [module.primary_secrets_manager_rds[0].secret_arn] : [],
+    try(var.appconfig_profile["create_msk_profile"], false) && var.create_in_secondary ? [module.secondary_secrets_manager_msk[0].secret_arn] : [],
+    try(var.appconfig_profile["create_rds_profile"], false) && var.create_in_secondary ? [module.secondary_secrets_manager_rds[0].secret_arn] : []
+  )
+  appconfig_ids                           = var.create_in_secondary ? ["arn:aws:appconfig:${local.primary_region}:${local.account_id}:application/${var.primary_appconfig_id}/*", "arn:aws:appconfig:${local.secondary_region}:${local.account_id}:application/${var.secondary_appconfig_id}/*"] : ["arn:aws:appconfig:${local.primary_region}:${local.account_id}:application/${var.primary_appconfig_id}/*"]
+  appconfig_kms_source                    = var.create_in_secondary ? ["secretsmanager.${local.primary_region}.amazonaws.com", "secretsmanager.${local.secondary_region}.amazonaws.com"] : ["secretsmanager.${local.primary_region}.amazonaws.com"]
+  appconfig_kms_keys                      = var.create_in_secondary ? [local.primary_kms_key_arn, local.secondary_kms_key_arn] : [local.primary_kms_key_arn]
+  sns_topic_default_policy = {
+      pub = {
+        actions = [
+            "SNS:GetTopicAttributes",
+            "SNS:SetTopicAttributes",
+            "SNS:AddPermission",
+            "SNS:RemovePermission",
+            "SNS:DeleteTopic",
+            "SNS:Subscribe",
+            "SNS:ListSubscriptionsByTopic",
+            "SNS:Publish"
+        ]
+        principals = [{
+            type        = "AWS"
+            identifiers = ["*"]
+        }]
+        conditions = [{
+            "test"     = "StringEquals"
+            "values"   = ["${local.account_id}"]
+            "variable" = "AWS:SourceOwner"
         }
+      ]
     }
-}
-
-provider "aws" {
-  region = local.secondary_region
-  alias  = "secondary"
-    default_tags {
-        tags = {
-            application-name     = "811 Onboarding App"
-            application-id       = "APP-01783"
-            application-owner    = "Amlan Mandal"
-            vertical-tlt         = "Amlan Mandal"
-            created-by-terraform = "yes"
-            entity               = "KMBL"
-            project-name         = "811-ONB"
-            environment          = local.env
-            scheduler-start      = "NA"
-            scheduler-stop       = "NA"
-            project-811          = "ONB"
-            application-manager  = var.application_manager
-            created-date         = var.created_date
-            ticket-id            = var.ticket_id
-        }
-    }
+  }
+  sns_details = null                               // SNS to be created. EXCLUSIVELY set this to null if SNS creation need to be avoided
+    
 }
