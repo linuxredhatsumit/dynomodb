@@ -1,427 +1,713 @@
-vents:
-Type Reason Age From Message
----- ------ ---- ---- -------
-Normal Scheduled 43m default-scheduler Successfully assigned prod/k811-finbridge-connector-55b7658484-qrtx6 to ip-10-59-84-228.ap-south-1.compute.internal
-Normal Pulling 41m (x4 over 43m) kubelet Pulling image "718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_ms_istio_proxy:stable-"
-Warning Failed 41m (x4 over 43m) kubelet Failed to pull image "718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_ms_istio_proxy:stable-": rpc error: code = NotFound desc = failed to pull and unpack image "718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_ms_istio_proxy:stable-": failed to resolve reference "718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_ms_istio_proxy:stable-": 718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_ms_istio_proxy:stable-: not found
-Warning Failed 41m (x4 over 43m) kubelet Error: ErrImagePull
-Warning Failed 41m (x6 over 43m) kubelet Error: ImagePullBackOff
-Normal BackOff 3m2s (x176 over 43m) kubelet Back-off pulling image "718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_ms_istio_proxy:stable-"
-app_user@KBPREC81L10281:~$ docker image -ls
+import argparse
+import boto3
+import time
+from datetime import datetime
+import logging
+import json
+import sys
+import os
+from botocore.exceptions import ClientError
 
-below is yaml
-pipline
-trigger: none
+class JSONFormatter(logging.Formatter):
+    def format(self, record):
+        log_entry = {
+            "timestamp": datetime.utcnow().strftime("%Y-%m-%d %H:%M:%S"),
+            "level": record.levelname,
+            "context": getattr(record, "context", "autoscaling"),
+            "message": record.getMessage()
+        }
+        return json.dumps(log_entry)
 
-# pass varibale to build.yaml file.
-variables:
-- group: Kotak-ECR-Credentials
-# - name: SERVICE_NAME
-- name: ENV
-value: prod
-- name: DR-ENV
-value: prod-dr
-# For AWS Role Access
-- name: PROD_ROLE_NAME
-value: EKS-Setup-Role-Kotak811
-- name: UAT_ROLE_NAME
-value: EKS_Setup_Role
-# details for prod repo to update pro-values.yaml
-- name: BRANCH_NAME
-value: master
-- name: REPOSITORY_NAME
-value: kotak-811-devops-prod
+logger = logging.getLogger()
+handler = logging.StreamHandler(sys.stdout)
+handler.setFormatter(JSONFormatter())
+logger.addHandler(handler)
+logger.setLevel(logging.INFO)
 
-# Agent pool details
-- name: DEVOPS_POOL_NAME
-value: "K811-DevOps"
-- name: PROD_POOL_NAME
-value: k811-prod
-- name: PROD_AGENT_IN_AGENTPOOL
-value: Linux-Agent3
-# docker details to push to prod ECR
-- name: PROD_PREFIX
-value: stable
-- name: PROD_AWS_REGION
-value: ap-south-1
-- name: PROD_AWS_ACCOUNT_ID
-value: "718378052708"
-- name: PROD_ECR_FOLDER_NAME
-value: 811prodonb
-- name: PROD_ECR_REPO_NAME
-value: "finbridge-connector"
+def get_table_description(dynamodb, table_name):
+    try:
+        return dynamodb.describe_table(TableName=table_name)['Table']
+    except ClientError as e:
+        logger.error(json.dumps({"context": "describe_table", "error": str(e)}))
+        sys.exit(1)
+
+def wait_for_table_active(dynamodb, table_name):
+    while True:
+        desc = get_table_description(dynamodb, table_name)
+        if desc['TableStatus'] == 'ACTIVE':
+            break
+        logger.info("Waiting for table to become ACTIVE...", extra={"context": "wait_for_table_active"})
+        time.sleep(5)
 
 
-# source Enviornmnet details
-# - name: SOURCE_SERVICE_NAME
-- name: SOURCE_AWS_REGION
-value: ap-south-1
-- name: SOURCE_AWS_ACCOUNT_ID
-value: "483584640083"
-- name: SOURCE_ECR_FOLDER_NAME
-value: 811uatonb
-- name: SOURCE_ECR_REPO_NAME
-value: "k811_app_ms_finbridge_connector"
-- name: SOURCE_KUBE_CONFIG_PATH
-value: /home/app_user/.kube/config-uat
-- name: SOURCE_NAMESPACE
-value: 811-uat
-# helm related variables
-- name: HELM_CHARTS_PATH
-value: helm-charts/${{ parameters.service }}/charts
-- name: HELM_S3BUCKET_URL
-value: s3://k811-onb-helmcharts/prod/${{ parameters.service }}/
-- name: DR_HELM_S3BUCKET_URL
-value: s3://k811-onb-helmcharts-dr/prod/${{ parameters.service }}/
-- name: KUBE_CONFIG_PATH
-value: /home/app_user/.kube/config-prod
-- name: DR_KUBE_CONFIG_PATH
-value: /home/app_user/.kube/config-onb-dr
-- name: NAMESPACE
-value: prod
-- name: ECR_ISTIO_REPO_NAME
-value: k811_ms_istio_proxy
+def load_gsi_config(table_name, check_gsi):
+    if not check_gsi:
+        logger.info("checkGSI is false. Skipping GSI config load.", extra={"context": "config.load"})
+        return {}
 
-# Parameter to input Jira Ticket
-parameters:
-- name: Jira_URL
-type: string
-default: ""
-displayName: "Jira URL"
-- name: service
-type: string
-displayName: 'Select the Service Name for Deploy'
-default: k811-finbridge-connector
-values:
-- k811-finbridge-connector
-# - name: image_tag
-# type: string
-# default: ""
-# displayName: "Image Tag"
-# - name: branch_name
-# type: string
-# default: master
-# displayName: "Pipeline repository branch"
+    repo_root = os.environ.get("Build_SourcesDirectory", ".")
+    repo_name = os.environ.get("REPOSITORY_NAME", "gsi-config-repo")
+    folder_path = os.path.join(repo_root, repo_name, table_name)
+    file_path = os.path.join(folder_path, "scaling.json")
 
-stages:
-- stage: ECR_CLONE
-pool:
-name: $(DEVOPS_POOL_NAME)
-jobs:
-- deployment: PRODDeployment
-displayName: PRODDeployment
-environment: prod-pipeline-approvals
-strategy:
-runOnce:
-deploy:
-steps:
-- script: |
-echo "approved to deploy UAT Image to PROD"
-displayName: Approve UAT image to depoly in PROD
-- job: ECR_IMAGE_PUSH_FROM_UAT_TO_PROD
-steps:
-- script: |
-pwd
-unset AWS_SESSION_TOKEN
-unset AWS_SECRET_ACCESS_KEY
-unset AWS_ACCESS_KEY_ID
-CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(SOURCE_AWS_ACCOUNT_ID):role/$(UAT_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
-export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-version=$(kubectl get deployment ${{ parameters.service }} -o jsonpath=''{$.spec.template.spec.containers[:1].image}'' -n $(SOURCE_NAMESPACE) --kubeconfig $(SOURCE_KUBE_CONFIG_PATH) | cut -d ':' -f 2)
-echo "##vso[task.setvariable variable=version]$version"
-istio_image=$(kubectl get deployment ${{ parameters.service }} -o jsonpath='{.spec.template.metadata.annotations.sidecar\.istio\.io/proxyImage}' -n $(SOURCE_NAMESPACE) --kubeconfig $(SOURCE_KUBE_CONFIG_PATH) | awk -F':' '{print $2}')
-echo "##vso[task.setvariable variable=istio_image]$istio_image"
-displayName: "${{ parameters.service }} Tag value in UAT environment ."
+    logger.info(f"Looking for config file at: {file_path}", extra={"context": "config.load"})
 
-- script: |
-echo $(istio_image)
-echo $(version)
-displayName: UAT Environment Docker image of ${{ parameters.service }}
+    if not os.path.exists(folder_path):
+        logger.warning(json.dumps({
+            "context": "config.load",
+            "message": f"Table folder not found at: {folder_path}. Assuming no GSIs."
+        }))
+        return {}
 
-- script: |
-pwd
-unset AWS_SESSION_TOKEN
-unset AWS_SECRET_ACCESS_KEY
-unset AWS_ACCESS_KEY_ID
-CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(SOURCE_AWS_ACCOUNT_ID):role/$(UAT_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
-export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-aws ecr get-login-password --region $(SOURCE_AWS_REGION) | docker login --username AWS --password-stdin $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com
-docker pull $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version)
-docker tag $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version) $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-$(version)
-aws ecr get-login-password --region $(PROD_AWS_REGION) | docker login --username AWS --password-stdin $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com
-docker push $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-$(version)
-# ---Istio Block ---
-if [ -n "$(istio_image)" ]; then
-echo "Istio sidecar image detected: $(istio_image). Pulling/tagging/pushing..."
-docker pull $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(ECR_ISTIO_REPO_NAME):$(istio_image)
-docker tag $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(ECR_ISTIO_REPO_NAME):$(istio_image) $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(ECR_ISTIO_REPO_NAME):$(PROD_PREFIX)-$(istio_image)
-docker push $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(ECR_ISTIO_REPO_NAME):$(PROD_PREFIX)-$(istio_image)
-else
-echo "No Istio sidecar image for this service. Skipping Istio image pull/tag/push."
-fi
-# --- End Istio ---
-# docker pull $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(ECR_ISTIO_REPO_NAME):$(istio_image)
-# docker tag $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(ECR_ISTIO_REPO_NAME):$(istio_image) $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(ECR_ISTIO_REPO_NAME):$(PROD_PREFIX)-$(istio_image)
-# docker push $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(ECR_ISTIO_REPO_NAME):$(PROD_PREFIX)-$(istio_image)
-displayName: "Login, Docker and Push"
+    if not os.path.exists(file_path):
+        logger.warning(json.dumps({
+            "context": "config.load",
+            "message": f"Scaling config file not found at: {file_path}. Assuming no GSIs."
+        }))
+        return {}
 
-- script: |
-git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
-displayName: "clone repository"
+    try:
+        with open(file_path, "r") as f:
+            try:
+                gsi_config = json.load(f)
+            except json.JSONDecodeError as e:
+                logger.error(json.dumps({
+                    "context": "config.load",
+                    "error": f"Invalid JSON format in scaling file: {str(e)}"
+                }))
+                sys.exit(1)
+        
+        # Validate GSI configuration structure
+        if not isinstance(gsi_config, dict):
+            logger.error(json.dumps({
+                "context": "config.validate",
+                "error": "GSI config must be a JSON object with index names as keys"
+            }))
+            sys.exit(1)
 
-- script: |
-pwd
-git pull
-sed -i -e 's/tag:.*/tag: $(PROD_PREFIX)-$(version)/' $(HELM_CHARTS_PATH)/$(ENV)-values.yaml
-sed -i -e 's/tag:.*/tag: $(PROD_PREFIX)-$(version)/' $(HELM_CHARTS_PATH)/$(DR-ENV)-values.yaml
-sed -i -e 's/istio_tag:.*/istio_tag: $(PROD_PREFIX)-$(istio_image)/' $(HELM_CHARTS_PATH)/$(ENV)-values.yaml
-sed -i -e 's/istio_tag:.*/istio_tag: $(PROD_PREFIX)-$(istio_image)/' $(HELM_CHARTS_PATH)/$(DR-ENV)-values.yaml
-displayName: "replace helm charts"
-workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
+        # Validate each GSI configuration
+        valid_projection_types = {"ALL", "KEYS_ONLY", "INCLUDE"}
+        for index_name, conf in gsi_config.items():
+            if not isinstance(conf, dict):
+                logger.error(json.dumps({
+                    "context": "config.validate",
+                    "error": f"Configuration for index {index_name} must be a JSON object"
+                }))
+                sys.exit(1)
 
-- script: |
-git config --global user.email "pipeline@kotak.com"
-git config --global user.name "Pipeline"
-git add -A
-git status
-git commit -m "azure pipeline commited to updated prod-values.yaml in helm charts"
-echo "Pushing now!!!"
-git pull
-git push -u origin $(BRANCH_NAME)
-displayName: "Updating Chart Values"
-workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
+            # Validate projection type
+            if "ProjectionType" in conf and conf["ProjectionType"] not in valid_projection_types:
+                logger.error(json.dumps({
+                    "context": "config.validate",
+                    "error": f"Invalid ProjectionType for index {index_name}: {conf['ProjectionType']}. Must be one of {valid_projection_types}"
+                }))
+                sys.exit(1)
+                
+            if conf.get("ProjectionType") == "INCLUDE":
+                if "NonKeyAttributes" not in conf:
+                    logger.error(json.dumps({
+                        "context": "config.validate",
+                        "error": f"NonKeyAttributes required for index {index_name} when ProjectionType is INCLUDE"
+                    }))
+                    sys.exit(1)
+                if not isinstance(conf["NonKeyAttributes"], list):
+                    logger.error(json.dumps({
+                        "context": "config.validate",
+                        "error": f"NonKeyAttributes for index {index_name} must be a list"
+                    }))
+                    sys.exit(1)
 
-- stage: PROD
-pool:
-name: $(PROD_POOL_NAME)
-# demands:
-# - agent.name -equals $(PROD_AGENT_IN_AGENTPOOL)
-displayName: "Build in PROD Environment"
-jobs:
-# UNCOMMENT HERE FOR PROD MUMBAI REGION DEPLOYMENT
-- job: Service_deployment_in_PROD
-displayName: "Service deployment in PROD"
-steps:
-- script: |
-git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
-displayName: "clone repository"
-- script: |
-pwd
-sed -i -e 's/name:.*/name: ${{ parameters.service }}/' $(HELM_CHARTS_PATH)/Chart.yaml
-sed -i -e 's/appVersion:.*/appVersion: 1.$(Build.BuildNumber)/' $(HELM_CHARTS_PATH)/Chart.yaml
-sed -i -e 's/version:.*/version: 1.$(Build.BuildNumber)/' $(HELM_CHARTS_PATH)/Chart.yaml
-displayName: "replace helm charts"
-workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
+            # Validate throughput settings if provided
+            if "ReadCapacityUnits" in conf and not isinstance(conf["ReadCapacityUnits"], int):
+                logger.error(json.dumps({
+                    "context": "config.validate",
+                    "error": f"ReadCapacityUnits for index {index_name} must be an integer"
+                }))
+                sys.exit(1)
+                
+            if "WriteCapacityUnits" in conf and not isinstance(conf["WriteCapacityUnits"], int):
+                logger.error(json.dumps({
+                    "context": "config.validate",
+                    "error": f"WriteCapacityUnits for index {index_name} must be an integer"
+                }))
+                sys.exit(1)
 
-- script: |
-pwd
-unset AWS_SESSION_TOKEN
-unset AWS_SECRET_ACCESS_KEY
-unset AWS_ACCESS_KEY_ID
-CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
-export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-helm s3 init $(HELM_S3BUCKET_URL)
-helm repo add $(ENV)-${{ parameters.service }} $(HELM_S3BUCKET_URL)
-helm package $(HELM_CHARTS_PATH)/
-helm s3 push --force ${{ parameters.service }}-1.$(Build.BuildNumber).tgz $(ENV)-${{ parameters.service }}
-aws s3 ls $(HELM_S3BUCKET_URL)
-helm repo update
-helm search repo $(ENV)-${{ parameters.service }}
-displayName: "Charts Push To S3"
-workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
+        logger.info(json.dumps({
+            "context": "config.load", 
+            "message": f"Successfully loaded and validated GSI config with {len(gsi_config)} indexes"
+        }))
+        return gsi_config
 
-- script: |
-pwd
-unset AWS_SESSION_TOKEN
-unset AWS_SECRET_ACCESS_KEY
-unset AWS_ACCESS_KEY_ID
-CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
-export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-rm -rf $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/*.tgz
-helm repo update
-helm fetch $(ENV)-${{ parameters.service }}/${{ parameters.service }}
-tar -xvf ${{ parameters.service }}-1.$(Build.BuildNumber).tgz
-helm upgrade --install $(ENV)-${{ parameters.service }} ${{ parameters.service }}/ -f ${{ parameters.service }}/$(ENV)-values.yaml --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) --wait --timeout 3m
-displayName: "Helm Charts Deployment"
+    except Exception as e:
+        logger.error(json.dumps({
+            "context": "config.load",
+            "error": f"Unexpected error loading GSI config: {str(e)}"
+        }))
+        sys.exit(1)
 
-- script: |
-pwd
-unset AWS_SESSION_TOKEN
-unset AWS_SECRET_ACCESS_KEY
-unset AWS_ACCESS_KEY_ID
-CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
-export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-sleep 10
-echo "########################## list of pods ########################################"
-kubectl get po --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i ${{ parameters.service }}
-echo "########################## list of deployed services ########################################"
-kubectl get deployment --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) | grep -i ${{ parameters.service }}
-displayName: "Application Status"
+def validate_gsi_config(desc, gsi_config, check_gsi):
+    if not check_gsi or not gsi_config:
+        logger.info("No GSI config to validate (checkGSI=false or no config found).", 
+                   extra={"context": "config.validate"})
+        return
 
-- job: Service_deployment_in_PROD_DR
-displayName: "Service deployment in PROD DR"
-steps:
-- script: |
-git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
-displayName: "clone repository"
-- script: |
-pwd
-sed -i -e 's/name:.*/name: ${{ parameters.service }}/' $(HELM_CHARTS_PATH)/Chart.yaml
-sed -i -e 's/appVersion:.*/appVersion: 1.$(Build.BuildNumber)/' $(HELM_CHARTS_PATH)/Chart.yaml
-sed -i -e 's/version:.*/version: 1.$(Build.BuildNumber)/' $(HELM_CHARTS_PATH)/Chart.yaml
-displayName: "replace helm charts"
-workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
+    actual_indexes = {gsi['IndexName'] for gsi in desc.get("GlobalSecondaryIndexes", [])}
+    config_indexes = set(gsi_config.keys())
 
-- script: |
-pwd
-unset AWS_SESSION_TOKEN
-unset AWS_SECRET_ACCESS_KEY
-unset AWS_ACCESS_KEY_ID
-CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
-export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-helm s3 init $(DR_HELM_S3BUCKET_URL)
-helm repo add $(DR-ENV)-${{ parameters.service }} $(DR_HELM_S3BUCKET_URL)
-helm package $(HELM_CHARTS_PATH)/
-helm s3 push --force ${{ parameters.service }}-1.$(Build.BuildNumber).tgz $(DR-ENV)-${{ parameters.service }}
-aws s3 ls $(DR_HELM_S3BUCKET_URL)
-helm repo update
-helm search repo $(DR-ENV)-${{ parameters.service }}
-displayName: "Charts Push To S3"
-workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
+    # Check if counts match
+    if len(actual_indexes) != len(config_indexes):
+        logger.error(json.dumps({
+            "context": "config.validate",
+            "error": f"GSI count mismatch. Table has {len(actual_indexes)} GSIs, config specifies {len(config_indexes)}",
+            "actual_indexes": sorted(actual_indexes),
+            "config_indexes": sorted(config_indexes)
+        }))
+        sys.exit(1)
 
-- script: |
-pwd
-unset AWS_SESSION_TOKEN
-unset AWS_SECRET_ACCESS_KEY
-unset AWS_ACCESS_KEY_ID
-CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
-export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-rm -rf $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/*.tgz
-helm repo update
-helm fetch $(DR-ENV)-${{ parameters.service }}/${{ parameters.service }}
-tar -xvf ${{ parameters.service }}-1.$(Build.BuildNumber).tgz
-helm upgrade --install $(DR-ENV)-${{ parameters.service }} ${{ parameters.service }}/ -f ${{ parameters.service }}/$(DR-ENV)-values.yaml --namespace $(NAMESPACE) --kubeconfig $(DR_KUBE_CONFIG_PATH) --wait --timeout 3m
-displayName: "Helm Charts Deployment"
+    # Check if names match exactly
+    if actual_indexes != config_indexes:
+        missing_in_config = actual_indexes - config_indexes
+        missing_in_table = config_indexes - actual_indexes
+        
+        error_msg = "GSI name mismatch between table and config"
+        details = {
+            "missing_in_config": sorted(missing_in_config) if missing_in_config else "None",
+            "missing_in_table": sorted(missing_in_table) if missing_in_table else "None"
+        }
+        
+        logger.error(json.dumps({
+            "context": "config.validate",
+            "error": error_msg,
+            "details": details
+        }))
+        sys.exit(1)
 
-- script: |
-pwd
-unset AWS_SESSION_TOKEN
-unset AWS_SECRET_ACCESS_KEY
-unset AWS_ACCESS_KEY_ID
-CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
-export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-sleep 10
-echo "########################## list of pods ########################################"
-kubectl get po --namespace $(NAMESPACE) --kubeconfig $(DR_KUBE_CONFIG_PATH) | grep -i ${{ parameters.service }}
-echo "########################## list of deployed services ########################################"
-kubectl get deployment --namespace $(NAMESPACE) --kubeconfig $(DR_KUBE_CONFIG_PATH) | grep -i ${{ parameters.service }}
-displayName: "Application Status"
+    logger.info(json.dumps({
+        "context": "config.validate",
+        "message": "GSI configuration validation successful",
+        "indexes": sorted(config_indexes)
+    }))
 
-below is value.yaml
-namespace: prod
-env: "prod"
-deadlineSeconds: 600
-autoscaling:
-minReplicas: 2
-maxReplicas: 8
-targetCPUUtilizationPercentage: 50
-targetMemoryUtilizationPercentage: 50
-hpa:
-enabled: true
-PodDisruptionBudget:
-maxUnavailable: 1
-trafficip: 10.0.0.0/8
-appconfig:
-APPCONFIG_ENABLED: true
-APPCONFIG_APPLICATION: 'onb-uscc-applications'
-APPCONFIG_ENVIRONMENT: 'production'
-APPCONFIG_PROFILE: 'uscc-applications-prod'
-APPCONFIG_MSK_SECRETS_PROFILE: 'uscc-application-msk-secret-prod'
-APPCONFIG_RDS_SECRETS_PROFILE: 'uscc-applications-secret-prod'
-APPCONFIG_MAX_CONFIG_AGE: 86400
-# APPCONFIG_FEATURE_ENABLED: true
-# APPCONFIG_FEATURE_FLAG_APPLICATION: 'onb-uscc-applications'
-# APPCONFIG_FEATURE_FLAG_ENVIRONMENT: 'uat'
-# APPCONFIG_FEATURE_FLAG_PROFILE: 'uat-uscc-applications-feature-flag'
-# APPCONFIG_FEATURE_FLAG_MAX_CONFIG_AGE: 300
-COM_APPCONFIG_APPLICATION: "811-services-appconfig"
-COM_APPCONFIG_PROFILE: "common-appconfig-pord"
-COM_APPCONFIG_MAX_CONFIG_AGE: "86400"
-ENV: "prod"
-PROJECT_NAME: "811_app_ms_uscc_applications"
-OTEL_RESOURCE_ATTRIBUTES: "application=k811-onb-prod"
-OTEL_SERVICE_NAME: "k811-ms-uscc-applications"
-OTEL_METRICS_EXPORTER: "none"
-OTEL_TRACES_EXPORTER: "otlp"
-OTEL_EXPORTER_OTLP_ENDPOINT: "http://$(NODE):4318"
-OTEL_PROPAGATORS: "b3,tracecontext,baggage"
-OTEL_PYTHON_LOG_CORRELATION: "true"
-OTEL_EXPORTER_OTLP_PROTOCOL: "http/protobuf"
-OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_REQUEST: "x-platform-id,x-reg-id,x-request-id,x-session-id"
-OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_SERVER_RESPONSE: "x-platform-id,x-reg-id,x-request-id,x-session-id"
-OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_REQUEST: "x-platform-id,x-reg-id,x-request-id,x-session-id"
-OTEL_INSTRUMENTATION_HTTP_CAPTURE_HEADERS_CLIENT_RESPONSE: "x-platform-id,x-reg-id,x-request-id,x-session-id"
-node:
-name: node
-operator: In
-nodegroup:
-labels: ["stateless-spot,stateless-ondemand"]
-probePath: /uscc-applications/health
-image:
-repository: 718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_ms_uscc_applications
-tag: stable-811_app_ms_uscc_applications-development-20250712.3
-name: k811-uscc-applications
-serviceaccount:
-enabled: true
-name: 811-onb-prod-sa-uscc-applications
-role: arn:aws:iam::718378052708:role/k811-onb-prod-eks-uscc-applications-sa
-rolebinding: k811-uscc-applications
-service:
-name: k811-uscc-applications
-type: ClusterIP
-externalPort: 8080
-internalPort: 8080
-portName: k811-uscc-applications
-resources:
-limits:
-cpu: 1000m
-memory: 2Gi
-requests:
-cpu: 500m
-memory: 1Gi
-gateways:
-gateway: gateway
-prefix: "/uscc-applications"
-host: "*"
-internalPort: 8080
-weightvalue: 100
-isCustomIstio:
-enabled: true
-encryption: "prod/istio_codec/symmetric20240618165134578300000001"
-enc_path: /uscc-applications/v1/update-application|/uscc-applications/v1/cancel-application|/uscc-applications/v1/submit-application|/uscc-applications/v1/application/status
-exclude_enc_path: '$^'
-aws_region: "ap-south-1"
-custom_istio_image:
-repository: 718378052708.dkr.ecr.ap-south-1.amazonaws.com/811prodonb/k811_ms_istio_proxy
-istio_tag: stable-custom-encoder-proxyv2.1.24.6-enhanced
-spreadAz: true
-podAntiAffinity: "none" #Accepted values are none, soft and hard. If this variable not defined then takes hard scheduling by default
+def update_gsi_configuration(dynamodb, table_name, gsi_config):
+    """
+    Update GSI configurations, including throughput and projection attributes.
+    If projection attributes differ, delete and recreate the GSI with AttributeDefinitions.
+    """
+    try:
+        updated = False
+        table_desc = dynamodb.describe_table(TableName=table_name)["Table"]
+        existing_gsis = {gsi["IndexName"]: gsi for gsi in table_desc.get("GlobalSecondaryIndexes", [])}
+        table_attribute_definitions = table_desc.get("AttributeDefinitions", [])
+        gsi_updates = []
+
+        for index_name, conf in gsi_config.items():
+            existing = existing_gsis.get(index_name)
+            if not existing:
+                logger.warning(json.dumps({
+                    "context": "gsi.update",
+                    "message": f"GSI {index_name} not found in table. Skipping update."
+                }))
+                continue
+
+            projection_needs_update = False
+            throughput_needs_update = False
+
+            # Check projection attributes
+            current_projection = existing.get("Projection", {})
+            desired_projection_type = conf.get("ProjectionType", current_projection.get("ProjectionType", "ALL"))
+            desired_non_key_attributes = conf.get("NonKeyAttributes", [])
+            current_non_key_attributes = current_projection.get("NonKeyAttributes", [])
+
+            # Log current and desired projection attributes for debugging
+            logger.info(json.dumps({
+                "context": "gsi.update",
+                "message": f"Checking projection attributes for GSI {index_name}",
+                "current_projection_type": current_projection.get("ProjectionType"),
+                "desired_projection_type": desired_projection_type,
+                "current_non_key_attributes": current_non_key_attributes,
+                "desired_non_key_attributes": desired_non_key_attributes
+            }))
+
+            # Compare projection attributes
+            if (current_projection.get("ProjectionType") != desired_projection_type or
+                    sorted(current_non_key_attributes or []) != sorted(desired_non_key_attributes or [])):
+                projection_needs_update = True
+                logger.info(json.dumps({
+                    "context": "gsi.update",
+                    "message": f"Projection attributes for GSI {index_name} need updating: current={current_projection}, desired={{'ProjectionType': '{desired_projection_type}', 'NonKeyAttributes': {desired_non_key_attributes}}}"
+                }))
+
+            # Check throughput
+            current_throughput = existing.get("ProvisionedThroughput", {})
+            desired_throughput = {
+                "ReadCapacityUnits": conf.get("ReadCapacityUnits", 5),
+                "WriteCapacityUnits": conf.get("WriteCapacityUnits", 5)
+            }
+            if (current_throughput.get("ReadCapacityUnits") != desired_throughput["ReadCapacityUnits"] or
+                    current_throughput.get("WriteCapacityUnits") != desired_throughput["WriteCapacityUnits"]):
+                throughput_needs_update = True
+                logger.info(json.dumps({
+                    "context": "gsi.update",
+                    "message": f"Throughput for GSI {index_name} needs updating",
+                    "current_read_capacity": current_throughput.get("ReadCapacityUnits"),
+                    "current_write_capacity": current_throughput.get("WriteCapacityUnits"),
+                    "desired_read_capacity": desired_throughput["ReadCapacityUnits"],
+                    "desired_write_capacity": desired_throughput["WriteCapacityUnits"]
+                }))
+
+            if projection_needs_update:
+                # Delete GSI
+                logger.info(json.dumps({
+                    "context": "gsi.update",
+                    "message": f"Deleting GSI {index_name} to update projection attributes"
+                }))
+                gsi_updates.append({
+                    "Delete": {
+                        "IndexName": index_name
+                    }
+                })
+                dynamodb.update_table(
+                    TableName=table_name,
+                    GlobalSecondaryIndexUpdates=gsi_updates
+                )
+                wait_for_table_active(dynamodb, table_name)
+                gsi_updates = []
+
+                # Prepare AttributeDefinitions for GSI creation
+                key_attributes = [ks["AttributeName"] for ks in existing["KeySchema"]]
+                required_attributes = set(key_attributes + desired_non_key_attributes)
+                attribute_definitions = []
+                attribute_types = {
+                    "id": "S",
+                    "status": "S",
+                    "mandateStatus": "S",
+                    "customerid": "N",
+                    "email": "S"
+                }
+
+                for attr in required_attributes:
+                    attr_type = attribute_types.get(attr)
+                    if not attr_type:
+                        logger.warning(json.dumps({
+                            "context": "gsi.update",
+                            "message": f"Attribute {attr} not found in table's AttributeDefinitions. Assuming type 'S'."
+                        }))
+                        attr_type = "S"
+                    attribute_definitions.append({
+                        "AttributeName": attr,
+                        "AttributeType": attr_type
+                    })
+
+                # Recreate GSI
+                create_update = {
+                    "Create": {
+                        "IndexName": index_name,
+                        "KeySchema": existing["KeySchema"],
+                        "Projection": {
+                            "ProjectionType": desired_projection_type
+                        },
+                        "ProvisionedThroughput": desired_throughput
+                    }
+                }
+                if desired_projection_type == "INCLUDE":
+                    create_update["Create"]["Projection"]["NonKeyAttributes"] = desired_non_key_attributes
+                gsi_updates.append(create_update)
+                updated = True
+            elif throughput_needs_update:
+                # Update throughput only
+                gsi_updates.append({
+                    "Update": {
+                        "IndexName": index_name,
+                        "ProvisionedThroughput": desired_throughput
+                    }
+                })
+                updated = True
+
+        if gsi_updates:
+            logger.info(json.dumps({
+                "context": "gsi.update",
+                "message": f"Applying GSI updates: {gsi_updates}"
+            }))
+            # Include AttributeDefinitions when creating GSIs
+            update_kwargs = {
+                "TableName": table_name,
+                "GlobalSecondaryIndexUpdates": gsi_updates
+            }
+            if any("Create" in update for update in gsi_updates):
+                update_kwargs["AttributeDefinitions"] = attribute_definitions
+                logger.info(json.dumps({
+                    "context": "gsi.update",
+                    "message": f"Including AttributeDefinitions: {attribute_definitions}"
+                }))
+
+            dynamodb.update_table(**update_kwargs)
+            logger.info("GSI configuration update submitted. Waiting 10 seconds before continuing...")
+            time.sleep(10)
+
+        # Verify final GSI configuration
+        final_desc = dynamodb.describe_table(TableName=table_name)["Table"]
+        for gsi in final_desc.get("GlobalSecondaryIndexes", []):
+            name = gsi["IndexName"]
+            rcu = gsi["ProvisionedThroughput"]["ReadCapacityUnits"]
+            wcu = gsi["ProvisionedThroughput"]["WriteCapacityUnits"]
+            projection = gsi.get("Projection", {})
+            logger.info(json.dumps({
+                "context": "gsi.verification",
+                "message": f"Final configuration for GSI {name}",
+                "IndexName": name,
+                "ReadCapacityUnits": rcu,
+                "WriteCapacityUnits": wcu,
+                "ProjectionType": projection.get("ProjectionType"),
+                "NonKeyAttributes": projection.get("NonKeyAttributes", [])
+            }))
+
+        return updated
+
+    except ClientError as e:
+        logger.error(json.dumps({"context": "gsi.update", "error": str(e)}))
+        sys.exit(1)
+
+def update_billing_mode(dynamodb, table_name, mode, read=None, write=None, gsi_config=None, max_read_units=None, max_write_units=None):
+    try:
+        updated = False
+        table_desc = dynamodb.describe_table(TableName=table_name)["Table"]
+        current_mode = table_desc.get("BillingModeSummary", {}).get("BillingMode", "PROVISIONED")
+
+        if mode.upper() == "PROVISIONED":
+            if current_mode == "PAY_PER_REQUEST":
+                logger.info("Switching table to PROVISIONED mode...", extra={"context": "update_billing_mode"})
+                update_kwargs = {
+                    'TableName': table_name,
+                    'BillingMode': 'PROVISIONED',
+                    'ProvisionedThroughput': {
+                        'ReadCapacityUnits': read or 5,
+                        'WriteCapacityUnits': write or 5
+                    }
+                }
+
+                if gsi_config:
+                    gsi_updates = []
+                    for gsi_name, conf in gsi_config.items():
+                        gsi_updates.append({
+                            'Update': {
+                                'IndexName': gsi_name,
+                                'ProvisionedThroughput': {
+                                    'ReadCapacityUnits': conf.get("ReadCapacityUnits", 5),
+                                    'WriteCapacityUnits': conf.get("WriteCapacityUnits", 5)
+                                }
+                            }
+                        })
+                    update_kwargs["GlobalSecondaryIndexUpdates"] = gsi_updates
+
+                dynamodb.update_table(**update_kwargs)
+                updated = True
+                logger.info("Table and GSIs switched to PROVISIONED.", extra={"context": "update_billing_mode"})
+                wait_for_table_active(dynamodb, table_name)
+            else:
+                logger.info("Table already in PROVISIONED mode. Checking GSI configuration...", extra={"context": "gsi.update"})
+                if gsi_config:
+                    updated = update_gsi_configuration(dynamodb, table_name, gsi_config) or updated
+
+        else:  # PAY_PER_REQUEST mode
+            if current_mode == "PROVISIONED":
+                logger.info("Switching table to PAY_PER_REQUEST mode...", extra={"context": "update_billing_mode"})
+                update_kwargs = {
+                    'TableName': table_name,
+                    'BillingMode': 'PAY_PER_REQUEST'
+                }
+                
+                # Only include OnDemandThroughput if both max_read_units and max_write_units are provided and > 0
+                if max_read_units is not None and max_write_units is not None and max_read_units > 0 and max_write_units > 0:
+                    update_kwargs['OnDemandThroughput'] = {
+                        'MaxReadRequestUnits': max_read_units,
+                        'MaxWriteRequestUnits': max_write_units
+                    }
+                    logger.info(json.dumps({
+                        "context": "update_billing_mode",
+                        "message": f"Setting maximum read request units to {max_read_units} and write request units to {max_write_units}"
+                    }))
+                    
+                dynamodb.update_table(**update_kwargs)
+                updated = True
+                wait_for_table_active(dynamodb, table_name)
+            else:
+                # Table is already in PAY_PER_REQUEST mode - check if we need to update max units
+                if max_read_units is not None and max_write_units is not None and max_read_units > 0 and max_write_units > 0:
+                    logger.info("Table already in PAY_PER_REQUEST mode. Updating maximum request units...", 
+                              extra={"context": "update_billing_mode"})
+                    update_kwargs = {
+                        'TableName': table_name,
+                        'OnDemandThroughput': {
+                            'MaxReadRequestUnits': max_read_units,
+                            'MaxWriteRequestUnits': max_write_units
+                        }
+                    }
+                    dynamodb.update_table(**update_kwargs)
+                    updated = True
+                    wait_for_table_active(dynamodb, table_name)
+                else:
+                    logger.info("Table already in PAY_PER_REQUEST mode. No maximum request units specified for update.", 
+                              extra={"context": "update_billing_mode"})
+
+        if not updated:
+            logger.info("No updates found for table or GSIs.", extra={"context": "update_billing_mode"})
+            return
+
+        # Verify final table configuration
+        final_desc = dynamodb.describe_table(TableName=table_name)["Table"]
+        logger.info(json.dumps({
+            "context": "table.verification",
+            "message": f"Final table configuration",
+            "TableName": table_name,
+            "BillingMode": final_desc.get("BillingModeSummary", {}).get("BillingMode", "PROVISIONED"),
+            "ReadCapacityUnits": final_desc.get("ProvisionedThroughput", {}).get("ReadCapacityUnits", 0),
+            "WriteCapacityUnits": final_desc.get("ProvisionedThroughput", {}).get("WriteCapacityUnits", 0),
+            "MaxReadRequestUnits": final_desc.get("OnDemandThroughput", {}).get("MaxReadRequestUnits", "Not set"),
+            "MaxWriteRequestUnits": final_desc.get("OnDemandThroughput", {}).get("MaxWriteRequestUnits", "Not set")
+        }))
+
+    except ClientError as e:
+        logger.error(json.dumps({"context": "update_billing_mode", "error": str(e)}))
+        sys.exit(1)
 
 
-what is reason?
+def register_scaling(autoscaling, table_name, dimension, min_capacity, max_capacity, target_utilization, index_name=None):
+    if dimension.startswith("dynamodb:table:"):
+        resource_id = f"table/{table_name}"
+    elif index_name:
+        resource_id = f"table/{table_name}/index/{index_name}"
+    else:
+        logger.error(json.dumps({
+            "context": f"autoscaling.register.{dimension}",
+            "error": "Index name is required for GSI autoscaling"
+        }))
+        sys.exit(1)
+
+    policy_name = f"{resource_id.replace('/', '-')}-{dimension.split(':')[-1]}-policy"
+
+    try:
+        # Check existing scalable target
+        scalable_targets = autoscaling.describe_scalable_targets(
+            ServiceNamespace='dynamodb',
+            ResourceIds=[resource_id],
+            ScalableDimension=dimension
+        )['ScalableTargets']
+
+        # Check existing policy
+        existing_policies = autoscaling.describe_scaling_policies(
+            ServiceNamespace='dynamodb',
+            ResourceId=resource_id,
+            ScalableDimension=dimension
+        )['ScalingPolicies']
+
+        # Check if existing scalable target and policy match desired settings
+        policy_matches = False
+        if scalable_targets and existing_policies:
+            target = scalable_targets[0]
+            policy = existing_policies[0]
+            current_min = target.get('MinCapacity', 0)
+            current_max = target.get('MaxCapacity', 0)
+            current_target_value = policy.get('TargetTrackingScalingPolicyConfiguration', {}).get('TargetValue', 0)
+
+            if (current_min == min_capacity and
+                current_max == max_capacity and
+                current_target_value == target_utilization and
+                policy.get('PolicyType') == 'TargetTrackingScaling'):
+                policy_matches = True
+                logger.info(json.dumps({
+                    "context": f"autoscaling.register.{dimension}",
+                    "message": f"No updates needed for autoscaling policy: {policy_name}, settings already match (min={min_capacity}, max={max_capacity}, target={target_utilization})"
+                }))
+                return
+
+        # If no match, proceed with registration
+        logger.info(json.dumps({
+            "context": f"autoscaling.register.{dimension}",
+            "message": f"Registering scalable target: min={min_capacity}, max={max_capacity}, target={target_utilization}"
+        }))
+
+        autoscaling.register_scalable_target(
+            ServiceNamespace="dynamodb",
+            ResourceId=resource_id,
+            ScalableDimension=dimension,
+            MinCapacity=min_capacity,
+            MaxCapacity=max_capacity
+        )
+
+        # Delete existing policies if they exist
+        for pol in existing_policies:
+            logger.info(json.dumps({
+                "context": f"autoscaling.cleanup.{dimension}",
+                "message": f"Deleting existing policy: {pol['PolicyName']}"
+            }))
+            autoscaling.delete_scaling_policy(
+                PolicyName=pol['PolicyName'],
+                ServiceNamespace='dynamodb',
+                ResourceId=resource_id,
+                ScalableDimension=dimension
+            )
+
+        autoscaling.put_scaling_policy(
+            PolicyName=policy_name,
+            ServiceNamespace="dynamodb",
+            ResourceId=resource_id,
+            ScalableDimension=dimension,
+            PolicyType='TargetTrackingScaling',
+            TargetTrackingScalingPolicyConfiguration={
+                'TargetValue': target_utilization,
+                'PredefinedMetricSpecification': {
+                    'PredefinedMetricType': 'DynamoDBReadCapacityUtilization'
+                    if "Read" in dimension else 'DynamoDBWriteCapacityUtilization'
+                },
+                'ScaleInCooldown': 60,
+                'ScaleOutCooldown': 60
+            }
+        )
+
+        logger.info(json.dumps({
+            "context": f"autoscaling.register.{dimension}",
+            "message": "Scaling policy registered successfully"
+        }))
+
+    except ClientError as e:
+        logger.error(json.dumps({
+            "context": f"autoscaling.register.{dimension}",
+            "error": str(e)
+        }))
+        sys.exit(1)
+
+def deregister_scaling(autoscaling, table_name, dimension):
+    try:
+        autoscaling.deregister_scalable_target(
+            ServiceNamespace="dynamodb",
+            ResourceId=table_name,
+            ScalableDimension=dimension
+        )
+    except ClientError as e:
+        logger.warning(json.dumps({"context": f"autoscaling.deregister.{dimension}", "warning": str(e)}))
+
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--tableName", required=True)
+    parser.add_argument("--region", required=True)
+    parser.add_argument("--readMode", choices=["ondemand", "provisioned"], required=True)
+    parser.add_argument("--writeMode", choices=["ondemand", "provisioned"], required=True)
+    parser.add_argument("--minRead", type=int)
+    parser.add_argument("--maxRead", type=int)
+    parser.add_argument("--targetRead", type=int)
+    parser.add_argument("--minWrite", type=int)
+    parser.add_argument("--maxWrite", type=int)
+    parser.add_argument("--targetWrite", type=int)
+    parser.add_argument("--maxReadUnits", type=int, default=0, help="Maximum read request units for PAY_PER_REQUEST mode (optional)")
+    parser.add_argument("--maxWriteUnits", type=int, default=0, help="Maximum write request units for PAY_PER_REQUEST mode (optional)")
+    parser.add_argument("--checkGSI", type=lambda x: x.lower() == 'true', default=True)
+    parser.add_argument("--dry-run", action="store_true")
+    args = parser.parse_args()
+    ##################################################
+    args.tableName = args.tableName.strip()
+#####################################################
+    # Log received arguments for debugging
+    logger.info(json.dumps({
+        "context": "args",
+        "message": f"Received arguments: tableName={args.tableName}, region={args.region}, readMode={args.readMode}, writeMode={args.writeMode}, minRead={args.minRead}, maxRead={args.maxRead}, targetRead={args.targetRead}, minWrite={args.minWrite}, maxWrite={args.maxWrite}, targetWrite={args.targetWrite}, maxReadUnits={args.maxReadUnits}, maxWriteUnits={args.maxWriteUnits}, checkGSI={args.checkGSI}, dry-run={args.dry_run}"
+    }))
+
+    dynamodb = boto3.client("dynamodb", region_name=args.region)
+    autoscaling = boto3.client("application-autoscaling", region_name=args.region)
+
+    logger.info("Found credentials from IAM Role: vpn-access", extra={"context": "autoscaling"})
+
+    desc = get_table_description(dynamodb, args.tableName)
+    current_mode = desc.get('BillingModeSummary', {}).get('BillingMode', 'PROVISIONED')
+    gsi_config = load_gsi_config(args.tableName, args.checkGSI)
+    validate_gsi_config(desc, gsi_config, args.checkGSI)
+
+    if args.dry_run:
+        logger.info(json.dumps({
+            "context": "dry_run",
+            "message": "Dry run mode - no changes applied",
+            "tableName": args.tableName,
+            "targetBilling": args.readMode,
+            "checkGSI": args.checkGSI
+        }))
+        sys.exit(0)
+
+    # Prepare max units parameters if they're valid
+    max_read = args.maxReadUnits if args.maxReadUnits and args.maxReadUnits > 0 else None
+    max_write = args.maxWriteUnits if args.maxWriteUnits and args.maxWriteUnits > 0 else None
+
+    if args.readMode == "provisioned" or args.writeMode == "provisioned":
+        # Switching to or staying in provisioned mode
+        if current_mode == "PAY_PER_REQUEST":
+            logger.info("Switching from PAY_PER_REQUEST to PROVISIONED mode", 
+                      extra={"context": "mode_change"})
+        
+        update_billing_mode(dynamodb, args.tableName, "provisioned",
+                          read=args.targetRead, write=args.targetWrite,
+                          gsi_config=gsi_config)
+        wait_for_table_active(dynamodb, args.tableName)
+
+        if args.readMode == "provisioned":
+            register_scaling(autoscaling, args.tableName, "dynamodb:table:ReadCapacityUnits",
+                           args.minRead or 5, args.maxRead or 100, args.targetRead or 70)
+
+        if args.writeMode == "provisioned":
+            register_scaling(autoscaling, args.tableName, "dynamodb:table:WriteCapacityUnits",
+                           args.minWrite or 5, args.maxWrite or 100, args.targetWrite or 70)
+
+        if args.checkGSI and gsi_config:
+            for index_name, conf in gsi_config.items():
+                logger.info(json.dumps({
+                    "context": "autoscaling.config",
+                    "message": f"Applying autoscaling for index: {index_name}"
+                }))
+
+                if "MinReadCapacityUnits" in conf:
+                    register_scaling(
+                        autoscaling,
+                        args.tableName,
+                        "dynamodb:index:ReadCapacityUnits",
+                        conf["MinReadCapacityUnits"],
+                        conf["MaxReadCapacityUnits"],
+                        conf["TargetReadUtilization"],
+                        index_name=index_name
+                    )
+
+                if "MinWriteCapacityUnits" in conf:
+                    register_scaling(
+                        autoscaling,
+                        args.tableName,
+                        "dynamodb:index:WriteCapacityUnits",
+                        conf["MinWriteCapacityUnits"],
+                        conf["MaxWriteCapacityUnits"],
+                        conf["TargetWriteUtilization"],
+                        index_name=index_name
+                    )
+    else:
+        # Handling on-demand mode cases
+        if current_mode == "PROVISIONED":
+            # Switching from provisioned to on-demand
+            logger.info("Switching from PROVISIONED to PAY_PER_REQUEST mode",
+                       extra={"context": "mode_change"})
+            deregister_scaling(autoscaling, args.tableName, "dynamodb:table:ReadCapacityUnits")
+            deregister_scaling(autoscaling, args.tableName, "dynamodb:table:WriteCapacityUnits")
+            
+            update_billing_mode(dynamodb, args.tableName, "ondemand",
+                              max_read_units=max_read,
+                              max_write_units=max_write)
+            wait_for_table_active(dynamodb, args.tableName)
+        else:
+            # Already in on-demand mode - check if we need to update max units
+            if max_read is not None and max_write is not None:
+                logger.info("Table is already in PAY_PER_REQUEST mode. Updating maximum request units...",
+                           extra={"context": "mode_update"})
+                update_billing_mode(dynamodb, args.tableName, "ondemand",
+                                   max_read_units=max_read,
+                                   max_write_units=max_write)
+                wait_for_table_active(dynamodb, args.tableName)
+            else:
+                logger.info("Table already in PAY_PER_REQUEST mode. No maximum request units specified for update.",
+                           extra={"context": "mode_check"})
+
+if __name__ == "__main__":
+    main()
