@@ -1,48 +1,30 @@
-KMBL350986@KBMK24-00000929 ~ % bash delete_replicaion.sh                      
-
-SSL validation failed for https://s3.amazonaws.com/ [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:1010)
-KMBL350986@KBMK24-00000929 ~ % cat delete_replicaion.sh 
 #!/bin/bash
 
-# Enable dry-run mode (set to true to simulate deletion)
 DRY_RUN=true
-
-# Log file path
 LOG_FILE="replication-deletion.log"
 
-# List all buckets
-buckets=$(aws s3api list-buckets --query "Buckets[].Name" --output text)
+echo "Starting replication config check on $(date)" >> "$LOG_FILE"
 
-# Loop through each bucket and delete replication configuration
+buckets=$(aws s3api list-buckets --query "Buckets[].Name" --output text --no-verify-ssl)
+
 for bucket in $buckets; do
   echo "Checking bucket: $bucket"
-
-  # Check if replication configuration exists
   output=$(aws s3api get-bucket-replication --bucket "$bucket" --no-verify-ssl 2>&1)
+
   if [ $? -eq 0 ]; then
     if [ "$DRY_RUN" = true ]; then
-      echo "Dry run: would delete replication configuration for bucket: $bucket"
+      echo "Dry run: would delete replication config for $bucket"
       echo "$(date): Dry run - replication config exists for $bucket" >> "$LOG_FILE"
     else
-      echo "Deleting replication configuration for bucket: $bucket"
+      echo "Deleting replication config for $bucket"
       aws s3api delete-bucket-replication --bucket "$bucket" --no-verify-ssl
-      echo "$(date): Deleted replication configuration for $bucket" >> "$LOG_FILE"
+      echo "$(date): Deleted replication config for $bucket" >> "$LOG_FILE"
     fi
+  elif echo "$output" | grep -q "NoSuchReplicationConfiguration"; then
+    echo "No replication config for $bucket"
+    echo "$(date): No replication config for $bucket" >> "$LOG_FILE"
   else
-    if echo "$output" | grep -q "NoSuchReplicationConfiguration"; then
-      echo "No replication configuration found for bucket: $bucket"
-      echo "$(date): No replication config for $bucket" >> "$LOG_FILE"
-    else
-      echo "Error checking replication for bucket $bucket: $output"
-      echo "$(date): Error checking $bucket - $output" >> "$LOG_FILE"
-    fi
+    echo "Error: $output"
+    echo "$(date): Error checking $bucket - $output" >> "$LOG_FILE"
   fi
 done
-
-KMBL350986@KBMK24-00000929 ~ % aws s3 ls --no-verify-ssl
-urllib3/connectionpool.py:1064: InsecureRequestWarning: Unverified HTTPS request is being made to host 's3.amazonaws.com'. Adding certificate verification is strongly advised. See: https://urllib3.readthedocs.io/en/1.26.x/advanced-usage.html#ssl-warnings
-2023-01-30 13:41:11 811-acqui-artifacts
-2022-02-17 17:59:20 811-acqui-directus-uat
-2022-12-08 16:39:16 811-acqui-elasticsearch-snapshots-dev
-2022-11-03 15:15:52 811-acqui-elasticsearch-snapshots-uat
-2023-02-01 15:08:27 811-acquica-directus-uat
