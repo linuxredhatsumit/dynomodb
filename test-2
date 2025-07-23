@@ -76,12 +76,18 @@ parameters:
     type: number
     displayName: Max Read Request Units (ondemand only)
     default: 0
-   
   - name: maxWriteUnits
     type: number
     displayName: Max Write Request Units (ondemand only)
     default: 0
- 
+  - name: initialReadUnits
+    type: number
+    displayName: Initial Read Capacity Units (provisioned only)
+    default: 5
+  - name: initialWriteUnits
+    type: number
+    displayName: Initial Write Capacity Units (provisioned only)
+    default: 5
 
 stages:
   - stage: DynamoDBOperation
@@ -166,6 +172,11 @@ stages:
                     if [ "${{ parameters.readMode }}" = "ondemand" ] && [ "${{ parameters.writeMode }}" = "ondemand" ] && \
                        [ "${{ parameters.maxReadUnits }}" -gt 0 ] && [ "${{ parameters.maxWriteUnits }}" -gt 0 ]; then
                       ARGS="$ARGS --maxReadUnits ${{ parameters.maxReadUnits }} --maxWriteUnits ${{ parameters.maxWriteUnits }}"
+                    fi
+                    
+                    # Add initialReadUnits and initialWriteUnits only if mode is provisioned
+                    if [ "${{ parameters.readMode }}" = "provisioned" ] || [ "${{ parameters.writeMode }}" = "provisioned" ]; then
+                      ARGS="$ARGS --initialReadUnits ${{ parameters.initialReadUnits }} --initialWriteUnits ${{ parameters.initialWriteUnits }}"
                     fi
                     
                     # Debug the raw and expanded command
