@@ -1,214 +1,178 @@
-import boto3
-import ast
-import json
-from datetime import datetime
-import pytz
-# from datetime import datetime, timedelta
-import OpenSSL
-from OpenSSL import crypto
-import os
-import smtplib
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.application import MIMEApplication
+trigger: none
 
-def get_expiring_certs(region):
-    try:
-        print(f"get_expiring_certs.regionlist: {region}")
-        try:
-            acm = boto3.client('acm', region_name=region)
-        except Exception as e:
-            print(f"Failed to create client: {str(e)}")
-        response = acm.list_certificates()
-        certificates = response['CertificateSummaryList']
-        today = datetime.now()
-        expiring_certs = []
-        try:
-            no_of_days_to_expire = int(os.environ['No_of_days_to_expire'])
-        except KeyError:
-            print("no_of_days_to_expire environment variable is not set")
-        print(f"Expiry days as condition on certificate : {no_of_days_to_expire}")
-        try:
-            for cert in certificates:
-                cert_arn = cert['CertificateArn']
-                cert_detail = acm.describe_certificate(CertificateArn=cert_arn)
-                expiry_date = cert_detail['Certificate']['NotAfter'].replace(tzinfo=None)
-                if (expiry_date - today).days == no_of_days_to_expire:
-                    expiring_certs.append({
-                        'CertificateArn': cert_arn,
-                        'DomainName': cert_detail['Certificate']['DomainName'],
-                        'ExpirationDate': cert_detail['Certificate']['NotAfter'],
-                        'DaysToExpiration': (expiry_date - today).days
-                    })
-            print(f"Expiring Certificate list: {expiring_certs}")
-        except Exception as e:
-            print(f"Error in checking certificate expire: {str(e)}")
-        return expiring_certs
-    except Exception as e:
-        print(f"Failed to list aws acm certificates: {str(e)}")
-    return expiring_certs
+# pool and agent details.
+variables:
+  - group: Kotak-ECR-Credentials
+  # Agent pool details
+  - name: POOL_NAME
+    value: k811-devops
+  - name: AGENT_IN_AGENTPOOL
+    value: 'Linux-Agent1'
+  # python version to use from _tool
+  - name: PYTHON_VERSION
+    value: '3.10'
+  - name: ROLE_NAME
+    value: EKS_Setup_Role
+  - name: SOURCE_ACCOUNT_NAME
+    value: NON_PROD
+  - name: AWS_ACCOUNT_ID
+    value: "483584640083"
+  - name: REPOSITORY_NAME
+    value: k811-ddb-index
 
-def generate_csr(domain_name):
-    try:
-        # Generate private key and CSR
-        key = crypto.PKey()
-        key.generate_key(crypto.TYPE_RSA, 2048)
+pool:
+  name: $(POOL_NAME)
+  demands:
+    - agent.name -equals $(AGENT_IN_AGENTPOOL)
 
-        req = crypto.X509Req()
-        req.get_subject().CN = domain_name
-        req.get_subject().O = 'Kotak Mahindra Bank'
-        req.get_subject().OU = 'Kotak811'
-        req.get_subject().C = 'IN'
-        req.get_subject().ST = 'Maharashtra'
-        req.get_subject().L = 'Mumbai'
-        req.get_subject().emailAddress = 'devops.kotak811@kotak.com'
+parameters:
+  - name: tableName
+    type: string
+    displayName: DynamoDB Table Name
+  - name: region
+    type: string
+    displayName: AWS Region
+  - name: readMode
+    type: string
+    displayName: Read Capacity Mode
+    values: [ondemand, provisioned]
+  - name: writeMode
+    type: string
+    displayName: Write Capacity Mode
+    values: [ondemand, provisioned]
+  - name: minRead
+    type: number
+    displayName: Minimum Read Capacity
+    default: 5
+  - name: maxRead
+    type: number
+    displayName: Maximum Read Capacity
+    default: 100
+  - name: targetRead
+    type: number
+    displayName: Target Read Utilization (%)
+    default: 70
+  - name: minWrite
+    type: number
+    displayName: Minimum Write Capacity
+    default: 5
+  - name: maxWrite
+    type: number
+    displayName: Maximum Write Capacity
+    default: 100
+  - name: targetWrite
+    type: number
+    displayName: Target Write Utilization (%)
+    default: 70
+  - name: checkGSI
+    type: boolean
+    displayName: Check GSI Configuration
+    default: true
+  - name: BRANCH_NAME
+    displayName: GSI Config Branch
+    type: string
+    default: development
+  - name: maxReadUnits
+    type: number
+    displayName: Max Read Request Units (ondemand only)
+    default: 0
+   
+  - name: maxWriteUnits
+    type: number
+    displayName: Max Write Request Units (ondemand only)
+    default: 0
+ 
 
-        req.set_pubkey(key)
-        req.sign(key, 'sha256')
+stages:
+  - stage: DynamoDBOperation
+    jobs:
+      - deployment: ExecuteDynamoDBOperation
+        displayName: "Execute DynamoDB Operation"
+        environment: non-prod-Dynamodb-approval
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - checkout: self
+                  displayName: 'Checkout repository'
 
-        private_key = crypto.dump_privatekey(crypto.FILETYPE_PEM, key).decode('utf-8')
-        csr = crypto.dump_certificate_request(crypto.FILETYPE_PEM, req).decode('utf-8')
+                - script: |
+                    set -e
+                    rm -rf $(REPOSITORY_NAME)
+                    git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b ${{ parameters.BRANCH_NAME }}
+                  env:
+                    Build_SourcesDirectory: $(Build.SourcesDirectory)
+                    REPOSITORY_NAME: $(REPOSITORY_NAME)
+                    PAT: $(PAT)  # Assuming PAT is in the variable group
+                  condition: and(succeeded(), eq(${{ parameters.checkGSI }}, true))
+                  displayName: "Clone GSI Config Repo"
 
-        return private_key, csr
-    except Exception as e:
-        print(f"Failed to create CSR certificate: {str(e)}")
-    return None
-    # except botocore.exceptions.BotoCoreError as e:
-    #     logger.error(f"Failed to create CSR certificate: {str(e)}")
-    #     return None
+                - script: |
+                    unset AWS_SESSION_TOKEN
+                    unset AWS_SECRET_ACCESS_KEY
+                    unset AWS_ACCESS_KEY_ID
+                    CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+                    export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                    export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                    export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                    # Change to the dynamodb-scale directory
+                    cd others/dynamodb-scale &&
+                    echo "Setting up Python Environment"
+                    python3 -m venv dynomoscaleenv
+                    source dynomoscaleenv/bin/activate
+                    pip3 install boto3 requests --upgrade
+                  displayName: 'Execute Python Script for DynamoDB Operation'
 
-def upload_to_s3(bucket_name, s3_key_name, content, domain_name):
-    try:
-        current_datetime = datetime.now(pytz.timezone('Asia/Kolkata')).strftime("%Y-%m-%d-%H-%M-%S")
-        destination_object_key=f"{domain_name}_{current_datetime}/{s3_key_name}"
-        try:
-            s3 = boto3.client('s3')
-        except Exception as e:
-            print(f"Failed to create client: {str(e)}")
-
-        s3.put_object(Body=content, Bucket=bucket_name, Key=destination_object_key)
-        #s3.copy_object(Bucket=bucket_name, CopySource={'Bucket': bucket_name, 'Key': key_name}, Key=destination_object_key)
-        #s3.delete_object(Bucket=bucket_name, Key=key_name)
-        print(f"File {s3_key_name} copied to {destination_object_key}")
-    except Exception as e:
-        print(f"Failed to upload key to s3 bucket: {str(e)}")
-    return None
-
-def send_email_smtp(subject, filepath, filename, domain_name, sender_email, recipient_email):
-    # try:
-    report_file_path = filepath
-    try:
-        smtp_server = os.environ['smtp_server']
-    except KeyError:
-        print("smtp_server environment variable is not set")
-    try:
-        smtp_username = os.environ['smtp_username']
-    except KeyError:
-        print("smtp_username environment variable is not set")
-    try:
-        smtp_password = os.environ['smtp_password']
-    except KeyError:
-        print("smtp_password environment variable is not set")
-    try:
-        smtp_port = os.environ['smtp_port']
-    except KeyError:
-        print("smtp_port environment variable is not set")
-    # Create a multipart message and set headers
-    message = MIMEMultipart()
-    message['From'] = sender_email
-    message['To'] = ', '.join(recipient_email)
-    message['Subject'] = subject
-
-    attachment_file_name = filename
-
-    BODY = f"Please provide the certificate for the attached CSR - {domain_name}."
-
-    plain_text_body = MIMEText(BODY, 'plain')
-    message.attach(plain_text_body)
-
-    with open(report_file_path, 'rb') as file:
-        # Attach the file with filename to the email
-        message.attach(MIMEApplication(file.read(), Name=attachment_file_name))
-
-    # Start SMTP session
-    server = smtplib.SMTP(smtp_server, smtp_port)
-    server.starttls()
-    # Login to SMTP server
-    server.login(smtp_username, smtp_password)
-
-    # Send email
-    server.sendmail(sender_email, recipient_email, message.as_string())
-
-    # Quit SMTP session
-    server.quit()
-
-    print("Email sent successfully")
-    # except Exception as e:
-    #     print(f"Failed to send CSR certificate via email: {str(e)}")
-    # return None
-
-def lambda_handler(event, context):
-    print(f"Regions environment variable: {os.environ['regions']}")
-    #regions = os.environ['regions']
-    try:
-        #regions = json.loads(os.environ['regions'])
-        regions = ast.literal_eval(os.environ['regions'])
-    except KeyError:
-        print("regions environment variable is not set")
-    try:
-        s3_bucket_name = os.environ['s3_bucket_name']
-    except KeyError:
-        print("s3_bucket_name environment variable is not set")
-    try:
-        sender_email = os.environ['sender_email']
-    except KeyError:
-        print("sender_email environment variable is not set")
-    #recipient_email = os.environ['recipient_email']
-    #recipient_email = json.loads(os.environ['recipient_email'])
-    try:
-        recipient_email = ast.literal_eval(os.environ['recipient_email'])
-    except KeyError:
-        print("recipient_email environment variable is not set")
-    expiring_certs = []
-
-    for region in regions:
-        expiring_certs.extend(get_expiring_certs(region))
-
-    unique_expiring_certs = list({cert['DomainName']: cert for cert in expiring_certs}.values())
-
-    if unique_expiring_certs:
-        for cert in unique_expiring_certs:
-            try:
-                domain_name = cert['DomainName']
-            except json.JSONDecodeError as e:
-                print(f"Error parsing domain_name: {e}")
-            private_key, csr = generate_csr(domain_name)
-            # print("Private Key:")
-            # print(private_key)
-            # print("\nCertificate Signing Request:")
-            # print(csr)
-
-            ## Upload key to s3 bucket
-            s3_key_name = f"{domain_name}_private_key.pem"
-
-            upload_to_s3(s3_bucket_name, s3_key_name, private_key, domain_name)
-            # Send CSR via email
-            subject = f"CSR for {domain_name}"
-            tmp_dir = '/tmp'
-            file_path = os.path.join(tmp_dir, f'{domain_name}.csr')
-            try:
-                with open(file_path, 'w') as file:
-                    file.write(csr)
-            except Exception as e:
-                print(f"CSR file is not created: {str(e)}")
-            filename=f"{domain_name}.csr"
-            filepath=f"{tmp_dir}/{domain_name}.csr"
-            print(f"file path : {tmp_dir}/{domain_name}.csr")
-            send_email_smtp(subject, filepath, filename, domain_name, sender_email, recipient_email)
-            print(f"Domain Name: {cert['DomainName']} will expire in {cert['DaysToExpiration']} days")
-    else:
-        print('No certificates expiring within 30 days.')
-    return {
-        'statusCode': 200,
-        'statusMessage': 'OK'
-    }
+                - script: |
+                    set -e
+                    unset AWS_SESSION_TOKEN
+                    unset AWS_SECRET_ACCESS_KEY
+                    unset AWS_ACCESS_KEY_ID
+                    CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+                    export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                    export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                    export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                    cd others/dynamodb-scale
+                    source dynomoscaleenv/bin/activate
+                    echo "Running DynamoDB Auto Scaling Management Script"
+                    
+                    # Validate max units parameters
+                    if [ "${{ parameters.readMode }}" = "ondemand" ] && [ "${{ parameters.writeMode }}" = "ondemand" ]; then
+                      if [ "${{ parameters.maxReadUnits }}" -gt 0 ] || [ "${{ parameters.maxWriteUnits }}" -gt 0 ]; then
+                        if [ "${{ parameters.maxReadUnits }}" -le 0 ] || [ "${{ parameters.maxWriteUnits }}" -le 0 ]; then
+                          echo "##vso[task.logissue type=error]Both maxReadUnits and maxWriteUnits must be specified and > 0 if either is specified"
+                          exit 1
+                        fi
+                        echo "Using maximum read/write request units: ${{ parameters.maxReadUnits }}/${{ parameters.maxWriteUnits }}"
+                      else
+                        echo "No maximum read/write request units specified (or values are 0). Using default on-demand settings."
+                      fi
+                    fi
+                    
+                    # Build the command with optional parameters
+                    ARGS="--tableName ${{ parameters.tableName }} \
+                          --region ${{ parameters.region }} \
+                          --readMode ${{ parameters.readMode }} \
+                          --writeMode ${{ parameters.writeMode }} \
+                          --minRead ${{ parameters.minRead }} \
+                          --maxRead ${{ parameters.maxRead }} \
+                          --targetRead ${{ parameters.targetRead }} \
+                          --minWrite ${{ parameters.minWrite }} \
+                          --maxWrite ${{ parameters.maxWrite }} \
+                          --targetWrite ${{ parameters.targetWrite }} \
+                          --checkGSI ${{ parameters.checkGSI }}"
+                    
+                    # Add maxReadUnits and maxWriteUnits only if both are > 0 and mode is ondemand
+                    if [ "${{ parameters.readMode }}" = "ondemand" ] && [ "${{ parameters.writeMode }}" = "ondemand" ] && \
+                       [ "${{ parameters.maxReadUnits }}" -gt 0 ] && [ "${{ parameters.maxWriteUnits }}" -gt 0 ]; then
+                      ARGS="$ARGS --maxReadUnits ${{ parameters.maxReadUnits }} --maxWriteUnits ${{ parameters.maxWriteUnits }}"
+                    fi
+                    
+                    # Debug the raw and expanded command
+                    echo "Command arguments: $ARGS"
+                    # Run the command with quoted ARGS
+                    python3 manage_dynamodb_autoscaling.py $ARGS
+                  env:
+                    Build_SourcesDirectory: $(Build.SourcesDirectory)
+                    REPOSITORY_NAME: $(REPOSITORY_NAME)
+                  displayName: "Configure DynamoDB Auto Scaling"
