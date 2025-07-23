@@ -1,59 +1,48 @@
-import boto3
-import logging
-import json
-from botocore.exceptions import ClientError
+KMBL350986@KBMK24-00000929 ~ % bash delete_replicaion.sh                      
 
-# --- JSON Logging Setup ---
-class JsonFormatter(logging.Formatter):
-    def format(self, record):
-        return json.dumps({
-            "level": record.levelname,
-            "logger": f"{record.name}.{record.funcName}",
-            "message": record.getMessage(),
-        })
+SSL validation failed for https://s3.amazonaws.com/ [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:1010)
+KMBL350986@KBMK24-00000929 ~ % cat delete_replicaion.sh 
+#!/bin/bash
 
-logger = logging.getLogger("apigw-checker")
-handler = logging.StreamHandler()
-handler.setFormatter(JsonFormatter())
-logger.setLevel(logging.INFO)
-logger.addHandler(handler)
+# Enable dry-run mode (set to true to simulate deletion)
+DRY_RUN=true
 
-# --- Create API Gateway Client ---
-try:
-    client = boto3.client("apigateway", region_name="ap-south-1")
-except Exception as e:
-    logger.error(f"client.creation.{str(e)}")
-    exit(1)
+# Log file path
+LOG_FILE="replication-deletion.log"
 
-# --- Use paginator to list all APIs ---
-def get_all_apis():
-    paginator = client.get_paginator("get_rest_apis")
-    for page in paginator.paginate():
-        for item in page.get("items", []):
-            yield item["id"], item["name"]
+# List all buckets
+buckets=$(aws s3api list-buckets --query "Buckets[].Name" --output text)
 
-# --- Check if any logging/tracing is enabled ---
-def is_logging_or_tracing_enabled(stage):
-    method_settings = stage.get("methodSettings", {})
-    for path, settings in method_settings.items():
-        if settings.get("loggingLevel", "OFF") != "OFF":
-            return True
-        if settings.get("dataTraceEnabled", False):
-            return True
-    if stage.get("tracingEnabled"):
-        return True
-    return False
+# Loop through each bucket and delete replication configuration
+for bucket in $buckets; do
+  echo "Checking bucket: $bucket"
 
-# --- Main check logic ---
-def main():
-    for api_id, api_name in get_all_apis():
-        try:
-            stages = client.get_stages(restApiId=api_id).get("item", [])
-            for stage in stages:
-                if is_logging_or_tracing_enabled(stage):
-                    logger.info(f"api.check.logging_enabled: API={api_name}, Stage={stage['stageName']}, ID={api_id}")
-        except ClientError as e:
-            logger.error(f"api.error.get_stages: {str(e)}")
+  # Check if replication configuration exists
+  output=$(aws s3api get-bucket-replication --bucket "$bucket" --no-verify-ssl 2>&1)
+  if [ $? -eq 0 ]; then
+    if [ "$DRY_RUN" = true ]; then
+      echo "Dry run: would delete replication configuration for bucket: $bucket"
+      echo "$(date): Dry run - replication config exists for $bucket" >> "$LOG_FILE"
+    else
+      echo "Deleting replication configuration for bucket: $bucket"
+      aws s3api delete-bucket-replication --bucket "$bucket" --no-verify-ssl
+      echo "$(date): Deleted replication configuration for $bucket" >> "$LOG_FILE"
+    fi
+  else
+    if echo "$output" | grep -q "NoSuchReplicationConfiguration"; then
+      echo "No replication configuration found for bucket: $bucket"
+      echo "$(date): No replication config for $bucket" >> "$LOG_FILE"
+    else
+      echo "Error checking replication for bucket $bucket: $output"
+      echo "$(date): Error checking $bucket - $output" >> "$LOG_FILE"
+    fi
+  fi
+done
 
-if __name__ == "__main__":
-    main()
+KMBL350986@KBMK24-00000929 ~ % aws s3 ls --no-verify-ssl
+urllib3/connectionpool.py:1064: InsecureRequestWarning: Unverified HTTPS request is being made to host 's3.amazonaws.com'. Adding certificate verification is strongly advised. See: https://urllib3.readthedocs.io/en/1.26.x/advanced-usage.html#ssl-warnings
+2023-01-30 13:41:11 811-acqui-artifacts
+2022-02-17 17:59:20 811-acqui-directus-uat
+2022-12-08 16:39:16 811-acqui-elasticsearch-snapshots-dev
+2022-11-03 15:15:52 811-acqui-elasticsearch-snapshots-uat
+2023-02-01 15:08:27 811-acquica-directus-uat
