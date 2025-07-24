@@ -1,22 +1,49 @@
-#!/bin/bash
+./bin/kafka-topics.sh --zookeeper z-1.onbdatalake.6ha42a.c4.kafka.ap-south-1.amazonaws.com:2181 --create --replication-factor 2 --partitions 10 --topic VERIFY_PLUS_SERVICE_REQUEST_VKYC_STATUS_UPDATE_UAT
 
-input_file="global_tables_with_ap_south_2.txt"
+./bin/kafka-acls.sh --authorizer-properties zookeeper.connect=z-1.onbdatalake.6ha42a.c4.kafka.ap-south-1.amazonaws.com:2181 --add --allow-principal User:msk-user-ddlm-dev --operation read --topic DDLM_RATE_LIMIT_LAYER_dev --group DDLM_RATE_LIMIT_LAYER_GROUP_dev
 
-while read -r table; do
-  echo "🗑️ Removing ap-south-2 replica from table: $table"
 
-  aws dynamodb update-table \
-    --table-name "$table" \
-    --region ap-south-1 \
-    --no-verify-ssl \
-    --cli-input-json "{
-      \"ReplicaUpdates\": [
-        {
-          \"Delete\": {
-            \"RegionName\": \"ap-south-2\"
-          }
-        }
-      ]
-    }" && echo "✅ Deleted replica for $table" || echo "❌ Failed for $table"
+./bin/kafka-acls.sh --authorizer-properties zookeeper.connect=z-1.onbdatalake.6ha42a.c4.kafka.ap-south-1.amazonaws.com:2181 --add --allow-principal User:msk-user-ddlm-dev --operation write --topic DDLM_RATE_LIMIT_LAYER_dev
 
-done < "$input_file"
+cahnge the topic aand group as given below and give the script
+Kafka Topic Creation
+Ensure the necessary Kafka topics are created.
+
+Kafka Topic creation:
+finbridge-pl-events
+
+pl-aa-events
+
+Steps:
+Create a Kafka topic for the service.
+
+Verify the topic creation.
+
+4. Access to Kafka Topics (Producer and Consumer)
+Grant the service user access as both producer and consumer for the Kafka topics.
+
+Steps:
+Assign producer access to the Kafka user for the specific topic.
+
+Assign consumer access to the Kafka user for the specific topic.
+
+Verify the permissions for the Kafka user.
+
+Kafka Producer access:
+Topic Name: finbridge-pl-event
+Producer Service: FinBridge Connector
+
+
+Topic Name: pl-aa-events
+Producer Service: FinBridge Connector
+
+Kafka Consumer access:
+Topic Name: finbridge-pl-event
+Consumer Service: FinBridge Connector
+Group Ids: finbridge-connector-notification-storage-group, finbridge-connector-notification-forwarding-group
+
+Topic Name: pl-aa-events
+Consumer Service: PL Service
+Group Ids: pl-consumer-group-analysed-report-event
+
+change _dev to _prod
