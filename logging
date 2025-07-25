@@ -1,17 +1,137 @@
 {
-"Action": [
-"s3:GetObject",
-"s3:ListBucket",
-"s3:PutObject"
-],
-"Effect": "Allow",
-"Resource": [
-"arn:aws:s3:::kotak-811-cdp-mis-fileupload",
-"arn:aws:s3:::kotak-811-cdp-mis-fileupload/dsg_physical_channels/vector_files_to_upload/current_file/*"
-]
+    "Statement": [
+        {
+            "Action": [
+                "kms:Decrypt",
+                "kms:Encrypt",
+                "kms:GenerateDataKey"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:kms:ap-south-1:483584640083:key/fd55a4ac-4afd-467f-b41d-ce6881f6cd61",
+                "arn:aws:kms:ap-south-1:483584640083:key/cc498c37-f3b6-4dfa-a9fb-4e98996be115"
+            ]
+        },
+        {
+            "Action": [
+                "ssm:DescribeParameters",
+                "secretsmanager:DescribeSecret",
+                "secretsmanager:GetSecretValue"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:secretsmanager:ap-south-1:483584640083:secret:dev/istio_codec/symmetric-mIBuc8",
+                "arn:aws:secretsmanager:ap-south-1:483584640083:secret:dev/istio_codec/hybrid-tUT4KP"
+            ]
+        },
+        {
+            "Action": [
+                "appconfig:ListTagsForResource",
+                "appconfig:GetHostedConfigurationVersion",
+                "appconfig:GetDeployment",
+                "appconfig:ListEnvironments",
+                "appconfig:StartDeployment",
+                "appconfig:GetExtensionAssociation",
+                "appconfig:GetLatestConfiguration",
+                "appconfig:ListDeployments",
+                "appconfig:GetExtension",
+                "appconfig:GetEnvironment",
+                "appconfig:GetDeploymentStrategy",
+                "appconfig:ListConfigurationProfiles",
+                "appconfig:GetConfiguration",
+                "appconfig:GetApplication",
+                "appconfig:GetConfigurationProfile",
+                "appconfig:ListHostedConfigurationVersions",
+                "appconfig:StartConfigurationSession"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:appconfig:ap-south-1:483584640083:application/3f0aioi",
+                "arn:aws:appconfig:ap-south-1:483584640083:application/3f0aioi/configurationprofile/*",
+                "arn:aws:appconfig:ap-south-1:483584640083:application/3f0aioi/environment/*",
+                "arn:aws:appconfig:ap-south-1:483584640083:application/3tpx908",
+                "arn:aws:appconfig:ap-south-1:483584640083:application/3tpx908/configurationprofile/*",
+                "arn:aws:appconfig:ap-south-1:483584640083:application/3tpx908/environment/*"
+            ]
+        },
+        {
+            "Action": [
+                "kafka-cluster:Connect"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:kafka:ap-south-1:483584640083:cluster/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4"
+            ]
+        },
+        {
+            "Action": [
+                "kafka-cluster:DescribeTopic",
+                "kafka-cluster:WriteData",
+                "kafka-cluster:WriteDataIdempotently"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/cros-account-master-events-dlq-dev",
+                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/cros-transaction-events-dlq-dev",
+                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/k811-dc-events-dlq-dev",
+                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/k811-cc-events-dlq-dev",
+                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/finacle-account-master-events-dev",
+                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/finacle-transaction-events-dev",
+                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/dc-transaction-events-dev",
+                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/cc-transaction-events-dev"
+            ]
+        },
+        {
+            "Action": [
+                "kafka-cluster:DescribeTopic",
+                "kafka-cluster:ReadData",
+                "kafka-cluster:DescribeGroup",
+                "kafka-cluster:AlterGroup"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/cros-account-master-events-dlq-dev",
+                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/cros-transaction-events-dlq-dev",
+                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/k811-dc-events-dlq-dev",
+                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/k811-cc-events-dlq-dev",
+                "arn:aws:kafka:ap-south-1:483584640083:group/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/k811-balance-events-ingestor-dev1",
+                "arn:aws:kafka:ap-south-1:483584640083:group/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/k811-transaction-events-ingestor-dev1",
+                "arn:aws:kafka:ap-south-1:483584640083:group/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/k811-dc-events-ingestor-dev",
+                "arn:aws:kafka:ap-south-1:483584640083:group/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/k811-cc-events-ingestor-dev"
+            ]
+        },
+        {
+            "Action": [
+                "dynamodb:Query",
+                "dynamodb:UpdateItem",
+                "dynamodb:PutItem",
+                "dynamodb:GetItem",
+                "dynamodb:BatchWriteItem",
+                "dynamodb:ListContributorInsights",
+                "dynamodb:ListGlobalTables",
+                "dynamodb:ListTables",
+                "dynamodb:ListBackups",
+                "dynamodb:ListImports",
+                "dynamodb:ListExports",
+                "dynamodb:Scan"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:dynamodb:ap-south-1:483584640083:table/Product_Reco_Leads*"
+            ]
+        },
+        {
+            "Action": [
+                "s3:GetObject",
+                "s3:ListBucket",
+                "s3:PutObject"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:s3:::kotak-811-cdp-mis-fileupload",
+                "arn:aws:s3:::kotak-811-cdp-mis-fileupload/dsg_physical_channels/vector_files_to_upload/current_file/*"
+            ]
+        }
+    ],
+    "Version": "2012-10-17"
 }
-]
-}
-why getting error
-software.amazon.awssdk.services.s3.model.S3Exception: User: arn:aws:sts::483584640083:assumed-role/k811-onb-dev-eks-ddlm-sa/aws-sdk-java-1753368937227 is not authorized to perform: s3:PutObject on resource: "arn:aws:s3:::kotak-811-cdp-mis-fileupload/dsg_physical_channels/vector_files_to_upload/current_file/data_2025_07_24.csv" because no resource-based policy allows the s3:PutObject action (Service: S3, Status Code: 403, Request ID: 6M538EMD8K4W1PX0, Extended Request ID: QkNkmDB9Qc4+rvkAXyB/raE/0GMVwBq0BingiQB7awzS5nJ5+vk7z41hlLa286o/jRaw2N3wuX2QumCGfilkdIsRFcrmE/DK)
-at software.amazon.awssdk.protocols.xml.internal.unmarshall.AwsXmlPredicatedResponseHandler.handleErrorResponse(AwsXmlPredicatedResponseHandler.java:156) ~[aws-xml-protocol-2.22.0.jar!/:?]
