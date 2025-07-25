@@ -1,87 +1,17 @@
-import boto3
-import botocore
-import logging
-import json
-import sys
-
-# ----- JSON Formatter for logs -----
-class JsonFormatter(logging.Formatter):
-    def format(self, record):
-        log_entry = {
-            "level": record.levelname,
-            "logger": f"{record.name}.{record.funcName}",
-            "message": record.getMessage(),
-        }
-        return json.dumps(log_entry)
-
-# ----- Set up logger -----
-logger = logging.getLogger("api_cleanup")
-handler = logging.StreamHandler(sys.stdout)
-handler.setFormatter(JsonFormatter())
-logger.addHandler(handler)
-logger.setLevel(logging.INFO)
-
-# ----- Regions to scan -----
-REGIONS = ["ap-south-1", "ap-south-2"]
-
-# ----- Create Boto3 API Gateway client for a region -----
-def create_client(region):
-    try:
-        return boto3.client("apigateway", region_name=region)
-    except botocore.exceptions.BotoCoreError as e:
-        logger.error(f"boto.client.connection.{region}: Failed to create client: {str(e)}")
-        return None
-
-# ----- Fetch all REST APIs -----
-def get_all_rest_apis(client):
-    paginator = client.get_paginator("get_rest_apis")
-    for page in paginator.paginate():
-        for api in page.get("items", []):
-            yield api
-
-# ----- Disable logging and tracing for a stage -----
-def disable_logging_and_tracing(client, api_id, stage_name, region):
-    patch_ops = [
-        {"op": "replace", "path": "/*/*/logging/loglevel", "value": "OFF"},
-        {"op": "replace", "path": "/*/*/logging/dataTrace", "value": "false"},
-        {"op": "replace", "path": "/tracingEnabled", "value": "false"},
-    ]
-    try:
-        client.update_stage(
-            restApiId=api_id,
-            stageName=stage_name,
-            patchOperations=patch_ops,
-        )
-        logger.info(f"disable_logging_and_tracing.{region}.{stage_name}: Logs/tracing disabled for API {api_id}")
-    except botocore.exceptions.ClientError as e:
-        logger.error(f"disable_logging_and_tracing.{region}.{stage_name}: Error updating stage: {e.response['Error']['Message']}")
-
-# ----- Main execution -----
-def main():
-    for region in REGIONS:
-        logger.info(f"main.region: Starting scan for region {region}")
-        client = create_client(region)
-        if not client:
-            continue
-
-        for api in get_all_rest_apis(client):
-            api_id = api["id"]
-            api_name = api.get("name", "UnnamedAPI")
-            logger.info(f"main.{region}.{api_name}: Checking API ID {api_id}")
-            try:
-                stages = client.get_stages(restApiId=api_id).get("item", [])
-                for stage in stages:
-                    stage_name = stage["stageName"]
-                    method_settings = stage.get("methodSettings", {})
-                    tracing = stage.get("tracingEnabled", False)
-
-                    if method_settings or tracing:
-                        logger.info(f"main.{region}.{stage_name}: Logs/tracing enabled. Disabling...")
-                        disable_logging_and_tracing(client, api_id, stage_name, region)
-                    else:
-                        logger.info(f"main.{region}.{stage_name}: Nothing enabled. Skipping.")
-            except botocore.exceptions.ClientError as e:
-                logger.error(f"main.{region}.{api_name}: Failed to check stages: {e.response['Error']['Message']}")
-
-if __name__ == "__main__":
-    main()
+{
+"Action": [
+"s3:GetObject",
+"s3:ListBucket",
+"s3:PutObject"
+],
+"Effect": "Allow",
+"Resource": [
+"arn:aws:s3:::kotak-811-cdp-mis-fileupload",
+"arn:aws:s3:::kotak-811-cdp-mis-fileupload/dsg_physical_channels/vector_files_to_upload/current_file/*"
+]
+}
+]
+}
+why getting error
+software.amazon.awssdk.services.s3.model.S3Exception: User: arn:aws:sts::483584640083:assumed-role/k811-onb-dev-eks-ddlm-sa/aws-sdk-java-1753368937227 is not authorized to perform: s3:PutObject on resource: "arn:aws:s3:::kotak-811-cdp-mis-fileupload/dsg_physical_channels/vector_files_to_upload/current_file/data_2025_07_24.csv" because no resource-based policy allows the s3:PutObject action (Service: S3, Status Code: 403, Request ID: 6M538EMD8K4W1PX0, Extended Request ID: QkNkmDB9Qc4+rvkAXyB/raE/0GMVwBq0BingiQB7awzS5nJ5+vk7z41hlLa286o/jRaw2N3wuX2QumCGfilkdIsRFcrmE/DK)
+at software.amazon.awssdk.protocols.xml.internal.unmarshall.AwsXmlPredicatedResponseHandler.handleErrorResponse(AwsXmlPredicatedResponseHandler.java:156) ~[aws-xml-protocol-2.22.0.jar!/:?]
