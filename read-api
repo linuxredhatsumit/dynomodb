@@ -1,30 +1,39 @@
-#!/bin/bash
+Parent pipeline used these runtime parameters
+tableName : "ankur_test"
+region : "ap-south-1"
+readMode : "provisioned"
+writeMode : "provisioned"
+minRead : "1"
+maxRead : "1"
+targetRead : "65"
+minWrite : "1"
+maxWrite : "1"
+targetWrite : "65"
+checkGSI : "false"
+BRANCH_NAME : "development"
+maxReadUnits : "0"
+maxWriteUnits : "0"
+initialReadUnits : "7"
+initialWriteUnits : "7"
 
-DRY_RUN=true
-LOG_FILE="replication-deletion.log"
+below error
 
-echo "Starting replication config check on $(date)" >> "$LOG_FILE"
 
-buckets=$(aws s3api list-buckets --query "Buckets[].Name" --output text --no-verify-ssl)
 
-for bucket in $buckets; do
-  echo "Checking bucket: $bucket"
-  output=$(aws s3api get-bucket-replication --bucket "$bucket" --no-verify-ssl 2>&1)
+Running DynamoDB Auto Scaling Management Script
+Command arguments: --tableName ankur_test       --region ap-south-1       --readMode provisioned       --writeMode provisioned       --minRead 1       --maxRead 1       --targetRead 65       --minWrite 1       --maxWrite 1       --targetWrite 65       --checkGSI False --initialReadUnits 7 --initialWriteUnits 7
+usage: manage_dynamodb_autoscaling.py [-h] --tableName TABLENAME --region
+                                      REGION --readMode {ondemand,provisioned}
+                                      --writeMode {ondemand,provisioned}
+                                      [--minRead MINREAD] [--maxRead MAXREAD]
+                                      [--targetRead TARGETREAD]
+                                      [--minWrite MINWRITE]
+                                      [--maxWrite MAXWRITE]
+                                      [--targetWrite TARGETWRITE]
+                                      [--maxReadUnits MAXREADUNITS]
+                                      [--maxWriteUnits MAXWRITEUNITS]
+                                      [--checkGSI CHECKGSI] [--dry-run]
+manage_dynamodb_autoscaling.py: error: unrecognized arguments: --initialReadUnits 7 --initialWriteUnits 7
 
-  if [ $? -eq 0 ]; then
-    if [ "$DRY_RUN" = true ]; then
-      echo "Dry run: would delete replication config for $bucket"
-      echo "$(date): Dry run - replication config exists for $bucket" >> "$LOG_FILE"
-    else
-      echo "Deleting replication config for $bucket"
-      aws s3api delete-bucket-replication --bucket "$bucket" --no-verify-ssl
-      echo "$(date): Deleted replication config for $bucket" >> "$LOG_FILE"
-    fi
-  elif echo "$output" | grep -q "NoSuchReplicationConfiguration"; then
-    echo "No replication config for $bucket"
-    echo "$(date): No replication config for $bucket" >> "$LOG_FILE"
-  else
-    echo "Error: $output"
-    echo "$(date): Error checking $bucket - $output" >> "$LOG_FILE"
-  fi
-done
+##[error]Bash exited with code '2'.
+Finishing: Configure DynamoDB Auto Scaling
