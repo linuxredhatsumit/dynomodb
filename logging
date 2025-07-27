@@ -1,137 +1,20 @@
-{
-    "Statement": [
-        {
-            "Action": [
-                "kms:Decrypt",
-                "kms:Encrypt",
-                "kms:GenerateDataKey"
-            ],
-            "Effect": "Allow",
-            "Resource": [
-                "arn:aws:kms:ap-south-1:483584640083:key/fd55a4ac-4afd-467f-b41d-ce6881f6cd61",
-                "arn:aws:kms:ap-south-1:483584640083:key/cc498c37-f3b6-4dfa-a9fb-4e98996be115"
-            ]
-        },
-        {
-            "Action": [
-                "ssm:DescribeParameters",
-                "secretsmanager:DescribeSecret",
-                "secretsmanager:GetSecretValue"
-            ],
-            "Effect": "Allow",
-            "Resource": [
-                "arn:aws:secretsmanager:ap-south-1:483584640083:secret:dev/istio_codec/symmetric-mIBuc8",
-                "arn:aws:secretsmanager:ap-south-1:483584640083:secret:dev/istio_codec/hybrid-tUT4KP"
-            ]
-        },
-        {
-            "Action": [
-                "appconfig:ListTagsForResource",
-                "appconfig:GetHostedConfigurationVersion",
-                "appconfig:GetDeployment",
-                "appconfig:ListEnvironments",
-                "appconfig:StartDeployment",
-                "appconfig:GetExtensionAssociation",
-                "appconfig:GetLatestConfiguration",
-                "appconfig:ListDeployments",
-                "appconfig:GetExtension",
-                "appconfig:GetEnvironment",
-                "appconfig:GetDeploymentStrategy",
-                "appconfig:ListConfigurationProfiles",
-                "appconfig:GetConfiguration",
-                "appconfig:GetApplication",
-                "appconfig:GetConfigurationProfile",
-                "appconfig:ListHostedConfigurationVersions",
-                "appconfig:StartConfigurationSession"
-            ],
-            "Effect": "Allow",
-            "Resource": [
-                "arn:aws:appconfig:ap-south-1:483584640083:application/3f0aioi",
-                "arn:aws:appconfig:ap-south-1:483584640083:application/3f0aioi/configurationprofile/*",
-                "arn:aws:appconfig:ap-south-1:483584640083:application/3f0aioi/environment/*",
-                "arn:aws:appconfig:ap-south-1:483584640083:application/3tpx908",
-                "arn:aws:appconfig:ap-south-1:483584640083:application/3tpx908/configurationprofile/*",
-                "arn:aws:appconfig:ap-south-1:483584640083:application/3tpx908/environment/*"
-            ]
-        },
-        {
-            "Action": [
-                "kafka-cluster:Connect"
-            ],
-            "Effect": "Allow",
-            "Resource": [
-                "arn:aws:kafka:ap-south-1:483584640083:cluster/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4"
-            ]
-        },
-        {
-            "Action": [
-                "kafka-cluster:DescribeTopic",
-                "kafka-cluster:WriteData",
-                "kafka-cluster:WriteDataIdempotently"
-            ],
-            "Effect": "Allow",
-            "Resource": [
-                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/cros-account-master-events-dlq-dev",
-                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/cros-transaction-events-dlq-dev",
-                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/k811-dc-events-dlq-dev",
-                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/k811-cc-events-dlq-dev",
-                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/finacle-account-master-events-dev",
-                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/finacle-transaction-events-dev",
-                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/dc-transaction-events-dev",
-                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/cc-transaction-events-dev"
-            ]
-        },
-        {
-            "Action": [
-                "kafka-cluster:DescribeTopic",
-                "kafka-cluster:ReadData",
-                "kafka-cluster:DescribeGroup",
-                "kafka-cluster:AlterGroup"
-            ],
-            "Effect": "Allow",
-            "Resource": [
-                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/cros-account-master-events-dlq-dev",
-                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/cros-transaction-events-dlq-dev",
-                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/k811-dc-events-dlq-dev",
-                "arn:aws:kafka:ap-south-1:483584640083:topic/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/k811-cc-events-dlq-dev",
-                "arn:aws:kafka:ap-south-1:483584640083:group/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/k811-balance-events-ingestor-dev1",
-                "arn:aws:kafka:ap-south-1:483584640083:group/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/k811-transaction-events-ingestor-dev1",
-                "arn:aws:kafka:ap-south-1:483584640083:group/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/k811-dc-events-ingestor-dev",
-                "arn:aws:kafka:ap-south-1:483584640083:group/k811-onb-msk-gg-cluster/346cc863-4329-41c0-b28f-04b49737304f-4/k811-cc-events-ingestor-dev"
-            ]
-        },
-        {
-            "Action": [
-                "dynamodb:Query",
-                "dynamodb:UpdateItem",
-                "dynamodb:PutItem",
-                "dynamodb:GetItem",
-                "dynamodb:BatchWriteItem",
-                "dynamodb:ListContributorInsights",
-                "dynamodb:ListGlobalTables",
-                "dynamodb:ListTables",
-                "dynamodb:ListBackups",
-                "dynamodb:ListImports",
-                "dynamodb:ListExports",
-                "dynamodb:Scan"
-            ],
-            "Effect": "Allow",
-            "Resource": [
-                "arn:aws:dynamodb:ap-south-1:483584640083:table/Product_Reco_Leads*"
-            ]
-        },
-        {
-            "Action": [
-                "s3:GetObject",
-                "s3:ListBucket",
-                "s3:PutObject"
-            ],
-            "Effect": "Allow",
-            "Resource": [
-                "arn:aws:s3:::kotak-811-cdp-mis-fileupload",
-                "arn:aws:s3:::kotak-811-cdp-mis-fileupload/dsg_physical_channels/vector_files_to_upload/current_file/*"
-            ]
-        }
-    ],
-    "Version": "2012-10-17"
-}
+Request for Code Review - DynamoDB Auto Scaling Script (UAT Tested)
+
+Dear Team,
+
+I hope this email finds you well. I’ve recently enhanced the DynamoDB Auto Scaling Management script by integrating initialReadUnits and initialWriteUnits parameters to allow custom initial capacity settings when switching to PROVISIONED mode. The updated script has been thoroughly tested in the UAT environment and is now functioning as expected. I’d like to request your review to ensure it aligns with our quality standards before we proceed to production.
+
+The script has been validated against a comprehensive set of edge cases to ensure robustness. The covered scenarios include:
+
+Successful switching from PAY_PER_REQUEST to PROVISIONED mode with custom initialReadUnits and initialWriteUnits values.
+Handling GSI configurations, including cases with valid throughput settings (ReadCapacityUnits and WriteCapacityUnits) and invalid settings that trigger appropriate error handling.
+Managing mode switch failures, especially when GSIs are present, with logging to identify issues without halting execution.
+Auto-scaling registration for both table-level capacities (Read and Write) and GSI-level capacities, including edge cases where minimum and maximum capacities are set to the same value.
+Dry-run mode operation to simulate changes without applying them, ensuring no unintended modifications.
+Recovery from delayed mode propagation, where the table status becomes ACTIVE but the billing mode lags.
+Validation of GSI name and count mismatches between the table and configuration file, with proper error reporting.
+The updated code is committed to the development branch. Please focus your review on the update_billing_mode, wait_for_table_active, and main functions, where the new parameters and logic have been integrated. I’ve reverted the wait logic to its original infinite loop to maintain stability while adding a post-wait mode verification for visibility. UAT logs are available upon request if you need to dive deeper into the test results.
+
+Please provide your feedback, suggestions, or any concerns by EOD Tuesday, July 29, 2025, to allow time for adjustments. Feel free to reach out if you need clarification or assistance accessing the code or logs.
+
+Thank you for your time and support in this process!
