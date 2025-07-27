@@ -1,39 +1,38 @@
 Parent pipeline used these runtime parameters
-tableName : "ankur_test"
+tableName : "global_scaling_inidex_test"
 region : "ap-south-1"
 readMode : "provisioned"
 writeMode : "provisioned"
 minRead : "1"
 maxRead : "1"
-targetRead : "65"
+targetRead : "40"
 minWrite : "1"
 maxWrite : "1"
-targetWrite : "65"
-checkGSI : "false"
+targetWrite : "40"
+checkGSI : "true"
 BRANCH_NAME : "development"
-maxReadUnits : "0"
-maxWriteUnits : "0"
-initialReadUnits : "7"
-initialWriteUnits : "7"
+maxReadUnits : "1"
+maxWriteUnits : "1"
+initialReadUnits : "5"
+initialWriteUnits : "5"
 
-below error
-
+below is error
 
 
 Running DynamoDB Auto Scaling Management Script
-Command arguments: --tableName ankur_test       --region ap-south-1       --readMode provisioned       --writeMode provisioned       --minRead 1       --maxRead 1       --targetRead 65       --minWrite 1       --maxWrite 1       --targetWrite 65       --checkGSI False --initialReadUnits 7 --initialWriteUnits 7
-usage: manage_dynamodb_autoscaling.py [-h] --tableName TABLENAME --region
-                                      REGION --readMode {ondemand,provisioned}
-                                      --writeMode {ondemand,provisioned}
-                                      [--minRead MINREAD] [--maxRead MAXREAD]
-                                      [--targetRead TARGETREAD]
-                                      [--minWrite MINWRITE]
-                                      [--maxWrite MAXWRITE]
-                                      [--targetWrite TARGETWRITE]
-                                      [--maxReadUnits MAXREADUNITS]
-                                      [--maxWriteUnits MAXWRITEUNITS]
-                                      [--checkGSI CHECKGSI] [--dry-run]
-manage_dynamodb_autoscaling.py: error: unrecognized arguments: --initialReadUnits 7 --initialWriteUnits 7
+Command arguments: --tableName global_scaling_inidex_test       --region ap-south-1       --readMode provisioned       --writeMode provisioned       --minRead 1       --maxRead 1       --targetRead 40       --minWrite 1       --maxWrite 1       --targetWrite 40       --checkGSI True --initialReadUnits 5 --initialWriteUnits 5
+{"timestamp": "2025-07-27 15:02:57", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"args\", \"message\": \"Received arguments: tableName=global_scaling_inidex_test, region=ap-south-1, readMode=provisioned, writeMode=provisioned, minRead=1, maxRead=1, targetRead=40, minWrite=1, maxWrite=1, targetWrite=40, maxReadUnits=0, maxWriteUnits=0, checkGSI=True, dry-run=False, initialReadUnits=5, initialWriteUnits=5\"}"}
+{"timestamp": "2025-07-27 15:02:57", "level": "INFO", "context": "autoscaling", "message": "Found credentials in environment variables."}
+{"timestamp": "2025-07-27 15:02:57", "level": "INFO", "context": "autoscaling", "message": "Found credentials from IAM Role: vpn-access"}
+{"timestamp": "2025-07-27 15:02:58", "level": "INFO", "context": "config.load", "message": "Looking for config file at: /home/app_user/workspace/Agent1/_work/355/s/k811-ddb-index/global_scaling_inidex_test/scaling.json"}
+{"timestamp": "2025-07-27 15:02:58", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"config.load\", \"message\": \"Successfully loaded and validated GSI config with 2 indexes\"}"}
+{"timestamp": "2025-07-27 15:02:58", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"config.validate\", \"message\": \"GSI configuration validation successful\", \"indexes\": [\"referee-Index\", \"referrer-Index\"]}"}
+{"timestamp": "2025-07-27 15:02:58", "level": "INFO", "context": "mode_change", "message": "Switching from PAY_PER_REQUEST to PROVISIONED mode"}
+{"timestamp": "2025-07-27 15:02:58", "level": "INFO", "context": "update_billing_mode", "message": "Switching table to PROVISIONED mode..."}
+{"timestamp": "2025-07-27 15:03:00", "level": "INFO", "context": "update_billing_mode", "message": "Table and GSIs switched to PROVISIONED."}
+{"timestamp": "2025-07-27 15:03:00", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"table.verification\", \"message\": \"Final table configuration\", \"TableName\": \"global_scaling_inidex_test\", \"BillingMode\": \"PAY_PER_REQUEST\", \"ReadCapacityUnits\": 0, \"WriteCapacityUnits\": 0, \"MaxReadRequestUnits\": 1, \"MaxWriteRequestUnits\": 1}"}
+{"timestamp": "2025-07-27 15:03:00", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"autoscaling.register.dynamodb:table:ReadCapacityUnits\", \"message\": \"Registering scalable target: min=1, max=1, target=40\"}"}
+{"timestamp": "2025-07-27 15:03:00", "level": "ERROR", "context": "autoscaling", "message": "{\"context\": \"autoscaling.register.dynamodb:table:ReadCapacityUnits\", \"error\": \"An error occurred (ValidationException) when calling the RegisterScalableTarget operation: Validation failed for scalable target. Reason: PAY_PER_REQUEST table mode is not scalable.\"}"}
 
-##[error]Bash exited with code '2'.
+##[error]Bash exited with code '1'.
 Finishing: Configure DynamoDB Auto Scaling
