@@ -1,3 +1,85 @@
-adf
+app_user@KBUTEC81L20293:~$ kuat get all -n coralogix
+NAME                                                     READY   STATUS    RESTARTS      AGE
+pod/coralogix-opentelemetry-agent-265hx                  1/1     Running   0             94m
+pod/coralogix-opentelemetry-agent-2w422                  1/1     Running   0             4h20m
+pod/coralogix-opentelemetry-agent-4gq8q                  1/1     Running   0             58m
+pod/coralogix-opentelemetry-agent-528dk                  1/1     Running   0             4h21m
+pod/coralogix-opentelemetry-agent-52m5v                  1/1     Running   0             4h21m
+pod/coralogix-opentelemetry-agent-5n49n                  1/1     Running   0             4h23m
+pod/coralogix-opentelemetry-agent-5nms5                  1/1     Running   0             4h23m
+pod/coralogix-opentelemetry-agent-5nsfq                  1/1     Running   0             64m
+pod/coralogix-opentelemetry-agent-5zr8k                  1/1     Running   0             4h20m
+pod/coralogix-opentelemetry-agent-6dssg                  1/1     Running   0             4h23m
+pod/coralogix-opentelemetry-agent-876r5                  1/1     Running   0             21m
+pod/coralogix-opentelemetry-agent-8cnhj                  1/1     Running   0             20h
+pod/coralogix-opentelemetry-agent-9sr4v                  1/1     Running   0             20h
+pod/coralogix-opentelemetry-agent-9vjsx                  1/1     Running   0             20h
+pod/coralogix-opentelemetry-agent-bmnmz                  1/1     Running   0             4h21m
+pod/coralogix-opentelemetry-agent-c5r8m                  1/1     Running   0             4h21m
+pod/coralogix-opentelemetry-agent-cttsd                  1/1     Running   0             4h21m
+pod/coralogix-opentelemetry-agent-dm9p4                  1/1     Running   0             4h23m
+pod/coralogix-opentelemetry-agent-gfrj5                  1/1     Running   0             4h20m
+pod/coralogix-opentelemetry-agent-gjvcn                  1/1     Running   0             4h20m
+pod/coralogix-opentelemetry-agent-gwzrb                  1/1     Running   0             4h20m
+pod/coralogix-opentelemetry-agent-h6h9p                  1/1     Running   0             4h21m
+pod/coralogix-opentelemetry-agent-hkxx2                  1/1     Running   0             4h21m
+pod/coralogix-opentelemetry-agent-hllr8                  1/1     Running   0             151m
+pod/coralogix-opentelemetry-agent-hwh6f                  1/1     Running   0             4h20m
+pod/coralogix-opentelemetry-agent-jhr2z                  1/1     Running   0             4h23m
+pod/coralogix-opentelemetry-agent-jvxbk                  1/1     Running   0             54m
+pod/coralogix-opentelemetry-agent-lp8wv                  1/1     Running   0             4h20m
+pod/coralogix-opentelemetry-agent-lv58j                  1/1     Running   0             4h20m
+pod/coralogix-opentelemetry-agent-lxm75                  1/1     Running   0             4h20m
+pod/coralogix-opentelemetry-agent-n77t7                  1/1     Running   0             20h
+pod/coralogix-opentelemetry-agent-pl2j5                  1/1     Running   0             4h21m
+pod/coralogix-opentelemetry-agent-qv9qk                  1/1     Running   0             4h23m
+pod/coralogix-opentelemetry-agent-r9kfs                  1/1     Running   0             4h19m
+pod/coralogix-opentelemetry-agent-s7gtg                  1/1     Running   1 (90m ago)   4h19m
+pod/coralogix-opentelemetry-agent-smn6q                  1/1     Running   0             20h
+pod/coralogix-opentelemetry-agent-tcgwp                  1/1     Running   0             4h20m
+pod/coralogix-opentelemetry-agent-tvvqn                  1/1     Running   0             4h21m
+pod/coralogix-opentelemetry-agent-vfcmn                  1/1     Running   0             4h21m
+pod/coralogix-opentelemetry-agent-vrspd                  1/1     Running   0             4h23m
+pod/coralogix-opentelemetry-agent-vv7j7                  1/1     Running   0             4h20m
+pod/coralogix-opentelemetry-agent-x7tjb                  1/1     Running   0             20h
+pod/coralogix-opentelemetry-agent-xbzd2                  1/1     Running   0             4h20m
+pod/coralogix-opentelemetry-agent-xkblm                  1/1     Running   0             135m
+pod/coralogix-opentelemetry-agent-xqqg4                  1/1     Running   0             4h21m
+pod/coralogix-opentelemetry-agent-xxbkz                  1/1     Running   0             4h23m
+pod/coralogix-opentelemetry-agent-zcv8v                  1/1     Running   0             55m
+pod/coralogix-opentelemetry-agent-zfd75                  1/1     Running   0             20h
+pod/coralogix-opentelemetry-collector-8589cdbb47-rbvkf   1/1     Running   0             12h
+pod/coralogix-opentelemetry-gateway-747cb76d98-lvqfn     1/1     Running   0             20h
+pod/coralogix-opentelemetry-gateway-747cb76d98-m7jnm     1/1     Running   0             15h
+pod/coralogix-opentelemetry-gateway-747cb76d98-qf8cw     1/1     Running   0             18h
 
+NAME                                        TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)    AGE
+service/coralogix-opentelemetry-agent       ClusterIP   172.20.225.66   <none>        4318/TCP   34d
+service/coralogix-opentelemetry-collector   ClusterIP   172.20.150.41   <none>        4317/TCP   230d
+service/coralogix-opentelemetry-gateway     ClusterIP   None            <none>        4317/TCP   230d
 
+NAME                                           DESIRED   CURRENT   READY   UP-TO-DATE   AVAILABLE   NODE SELECTOR            AGE
+daemonset.apps/coralogix-opentelemetry-agent   48        48        48      48           48          kubernetes.io/os=linux   230d
+
+NAME                                                READY   UP-TO-DATE   AVAILABLE   AGE
+deployment.apps/coralogix-opentelemetry-collector   1/1     1            1           230d
+deployment.apps/coralogix-opentelemetry-gateway     3/3     3            3           230d
+
+NAME                                                           DESIRED   CURRENT   READY   AGE
+replicaset.apps/coralogix-opentelemetry-collector-757fb46f5    0         0         0       230d
+replicaset.apps/coralogix-opentelemetry-collector-76f985f576   0         0         0       42h
+replicaset.apps/coralogix-opentelemetry-collector-7d46748559   0         0         0       8d
+replicaset.apps/coralogix-opentelemetry-collector-8568c47bfd   0         0         0       230d
+replicaset.apps/coralogix-opentelemetry-collector-8589cdbb47   1         1         1       23h
+replicaset.apps/coralogix-opentelemetry-collector-85d78b4cbc   0         0         0       30d
+replicaset.apps/coralogix-opentelemetry-gateway-556f44b7fc     0         0         0       5d23h
+replicaset.apps/coralogix-opentelemetry-gateway-5b5f46d6d5     0         0         0       5d21h
+replicaset.apps/coralogix-opentelemetry-gateway-64d97cdd6f     0         0         0       4d15h
+replicaset.apps/coralogix-opentelemetry-gateway-66c7b5f8cc     0         0         0       30d
+replicaset.apps/coralogix-opentelemetry-gateway-6846b8887d     0         0         0       4d15h
+replicaset.apps/coralogix-opentelemetry-gateway-6b7c6d8494     0         0         0       5d21h
+replicaset.apps/coralogix-opentelemetry-gateway-6d7d744657     0         0         0       8d
+replicaset.apps/coralogix-opentelemetry-gateway-747cb76d98     3         3         3       23h
+replicaset.apps/coralogix-opentelemetry-gateway-75cb95f76      0         0         0       5d14h
+replicaset.apps/coralogix-opentelemetry-gateway-7948597c8c     0         0         0       5d21h
+replicaset.apps/coralogix-opentelemetry-gateway-97cb5cb58      0         0         0       42h
