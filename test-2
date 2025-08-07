@@ -1,189 +1,157 @@
-trigger: none
+app_user@KBUTEC81L20293:~$ helm repo list | grep coralogix
+coralogix-charts-virtual                                        https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
+coralogix                                                       https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
+coralogix-uat                                                   https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
+app_user@KBUTEC81L20293:~$ helm list | grep coralogix
+app_user@KBUTEC81L20293:~$ helm list -n coralogix | grep coralogix
+otel-coralogix-integration      coralogix       23              2025-08-06 10:56:53.632641396 +0000 UTC deployed        otel-integration-0.0.208
+app_user@KBUTEC81L20293:~$
 
-# pool and agent details.
-variables:
-  - group: Kotak-ECR-Credentials
-  # Agent pool details
-  - name: POOL_NAME
-    value: k811-devops
-  - name: AGENT_IN_AGENTPOOL
-    value: 'Linux-Agent1'
-  # python version to use from _tool
-  - name: PYTHON_VERSION
-    value: '3.10'
-  - name: ROLE_NAME
-    value: EKS_Setup_Role
-  - name: SOURCE_ACCOUNT_NAME
-    value: NON_PROD
-  - name: AWS_ACCOUNT_ID
-    value: "483584640083"
-  - name: REPOSITORY_NAME
-    value: k811-ddb-index
 
-pool:
-  name: $(POOL_NAME)
-  demands:
-    - agent.name -equals $(AGENT_IN_AGENTPOOL)
+below is value.yaml
+global:
+  clusterName: uat-kotak811
+  collectionInterval: 60s
+  domain: coralogix.in
+opentelemetry-agent:
+  config:
+    processors:
+      filter/drop-istio-proxy:
+        logs:
+          exclude:
+            match_type: regexp
+            resource_attributes:
+            - key: k8s.container.name
+              value: .*istio-proxy.*
+      transform/remove-loglabels:
+        error_mode: ignore
+        log_statements:
+        - context: log
+          statements:
+          - delete_key(attributes, "host.image.id")
+          - delete_key(attributes, "log.file.path")
+          - delete_key(attributes, "log.iostream")
+          - delete_key(attributes, "time")
+          - delete_key(resource.attributes, "k8s.pod.uid")
+          - delete_key(resource.attributes, "cloud.account.id")
+          - delete_key(resource.attributes, "cloud.platform")
+          - delete_key(resource.attributes, "cloud.availability.zone")
+          - delete_key(resource.attributes, "cloud.availability_zone")
+          - delete_key(resource.attributes, "os.type")
+          - delete_key(resource.attributes, "cloud.provider")
+          - delete_key(resource.attributes, "cloud.region")
+          - delete_key(resource.attributes, "host.type")
+      transform/service_name:
+        error_mode: silent
+        trace_statements:
+        - context: span
+          statements:
+          - set(resource.attributes["service.name"], resource.attributes["k8s.deployment.name"])
+            where resource.attributes["k8s.deployment.name"] != nil
+    receivers:
+      prometheus/istio:
+        config:
+          scrape_configs:
+            - job_name: 'istio-sidecars'
+              metrics_path: /stats/prometheus
+              scrape_interval: 30s
+              kubernetes_sd_configs:
+                - role: pod
+              relabel_configs:
+                - source_labels: [__meta_kubernetes_pod_container_name]
+                  regex: istio-proxy
+                  action: keep
+                - source_labels: [__meta_kubernetes_pod_ip]
+                  target_label: __address__
+                  replacement: $1:15020
+    service:
+      pipelines:
+        logs:
+          exporters:
+          - coralogix
+          processors:
+          - k8sattributes
+          - resourcedetection/env
+          - resourcedetection/region
+          - transform/remove-loglabels
+          - filter/drop-istio-proxy
+          - batch
+        metrics:
+          exporters:
+          - coralogix
+          receivers:
+          - prometheus/istio
+        traces:
+          exporters:
+          - loadbalancing
+          processors:
+          - resource/metadata
+          - resourcedetection/region
+          - resourcedetection/env
+          - k8sattributes
+          - transform/k8s_attributes
+          - transform/service_name
+          - transform/semconv
+          - batch
+  enabled: true
+  mode: daemonset
+  presets:
+    coralogixExporter:
+      enabled: true
+      pipelines:
+      - none
+      privateKey: ${env:CORALOGIX_PRIVATE_KEY}
+    loadBalancing:
+      enabled: true
+      hostname: coralogix-opentelemetry-gateway
+      routingKey: traceID
+    spanMetrics:
+      enabled: true
+opentelemetry-agent-windows:
+  enabled: false
+opentelemetry-cluster-collector:
+  enabled: true
+opentelemetry-gateway:
+  config:
+    processors:
+      tail_sampling:
+        decision_wait: 15s
+        num_traces: 100000
+        policies:
+        - and:
+            and_sub_policy:
+            - name: service-name-policy
+              string_attribute:
+                key: service.name
+                values:
+                - k811-ms-upi-payments
+                - k811-ms-notifications
+                - k811-ms-users
+                - k811-upi-payments
+                - k811-upi-processor
+                - k811-notifications
+                - k811-rewards-journey
+              type: string_attribute
+            - name: errors-policy
+              status_code:
+                status_codes:
+                - ERROR
+              type: status_code
+            - name: randomized-policy
+              probabilistic:
+                sampling_percentage: 0.1
+              type: probabilistic
+          name: custom-policy
+          type: and
+        - name: errors-policy
+          status_code:
+            status_codes:
+            - ERROR
+          type: status_code
+        - name: randomized-policy
+          probabilistic:
+            sampling_percentage: 1
+          type: probabilistic
+  enabled: true
+  replicaCount: 3
 
-parameters:
-  - name: tableName
-    type: string
-    displayName: DynamoDB Table Name
-  - name: region
-    type: string
-    displayName: AWS Region
-  - name: readMode
-    type: string
-    displayName: Read Capacity Mode
-    values: [ondemand, provisioned]
-  - name: writeMode
-    type: string
-    displayName: Write Capacity Mode
-    values: [ondemand, provisioned]
-  - name: minRead
-    type: number
-    displayName: Minimum Read Capacity
-    default: 5
-  - name: maxRead
-    type: number
-    displayName: Maximum Read Capacity
-    default: 100
-  - name: targetRead
-    type: number
-    displayName: Target Read Utilization (%)
-    default: 70
-  - name: minWrite
-    type: number
-    displayName: Minimum Write Capacity
-    default: 5
-  - name: maxWrite
-    type: number
-    displayName: Maximum Write Capacity
-    default: 100
-  - name: targetWrite
-    type: number
-    displayName: Target Write Utilization (%)
-    default: 70
-  - name: checkGSI
-    type: boolean
-    displayName: Check GSI Configuration
-    default: true
-  - name: BRANCH_NAME
-    displayName: GSI Config Branch
-    type: string
-    default: development
-  - name: maxReadUnits
-    type: number
-    displayName: Max Read Request Units (ondemand only)
-    default: 0
-  - name: maxWriteUnits
-    type: number
-    displayName: Max Write Request Units (ondemand only)
-    default: 0
-  - name: initialReadUnits
-    type: number
-    displayName: Initial Read Capacity Units (provisioned only)
-    default: 5
-  - name: initialWriteUnits
-    type: number
-    displayName: Initial Write Capacity Units (provisioned only)
-    default: 5
-
-stages:
-  - stage: DynamoDBOperation
-    jobs:
-      - deployment: ExecuteDynamoDBOperation
-        displayName: "Execute DynamoDB Operation"
-        environment: non-prod-Dynamodb-approval
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - checkout: self
-                  displayName: 'Checkout repository'
-
-                - script: |
-                    set -e
-                    rm -rf $(REPOSITORY_NAME)
-                    git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b ${{ parameters.BRANCH_NAME }}
-                  env:
-                    Build_SourcesDirectory: $(Build.SourcesDirectory)
-                    REPOSITORY_NAME: $(REPOSITORY_NAME)
-                    PAT: $(PAT)  # Assuming PAT is in the variable group
-                  condition: and(succeeded(), eq(${{ parameters.checkGSI }}, true))
-                  displayName: "Clone GSI Config Repo"
-
-                - script: |
-                    unset AWS_SESSION_TOKEN
-                    unset AWS_SECRET_ACCESS_KEY
-                    unset AWS_ACCESS_KEY_ID
-                    CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
-                    export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-                    export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-                    export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-                    # Change to the dynamodb-scale directory
-                    cd others/dynamodb-scale &&
-                    echo "Setting up Python Environment"
-                    python3 -m venv dynomoscaleenv
-                    source dynomoscaleenv/bin/activate
-                    pip3 install boto3 requests --upgrade
-                  displayName: 'Execute Python Script for DynamoDB Operation'
-
-                - script: |
-                    set -e
-                    unset AWS_SESSION_TOKEN
-                    unset AWS_SECRET_ACCESS_KEY
-                    unset AWS_ACCESS_KEY_ID
-                    CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
-                    export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-                    export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-                    export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-                    cd others/dynamodb-scale
-                    source dynomoscaleenv/bin/activate
-                    echo "Running DynamoDB Auto Scaling Management Script"
-                    
-                    # Validate max units parameters
-                    if [ "${{ parameters.readMode }}" = "ondemand" ] && [ "${{ parameters.writeMode }}" = "ondemand" ]; then
-                      if [ "${{ parameters.maxReadUnits }}" -gt 0 ] || [ "${{ parameters.maxWriteUnits }}" -gt 0 ]; then
-                        if [ "${{ parameters.maxReadUnits }}" -le 0 ] || [ "${{ parameters.maxWriteUnits }}" -le 0 ]; then
-                          echo "##vso[task.logissue type=error]Both maxReadUnits and maxWriteUnits must be specified and > 0 if either is specified"
-                          exit 1
-                        fi
-                        echo "Using maximum read/write request units: ${{ parameters.maxReadUnits }}/${{ parameters.maxWriteUnits }}"
-                      else
-                        echo "No maximum read/write request units specified (or values are 0). Using default on-demand settings."
-                      fi
-                    fi
-                    
-                    # Build the command with optional parameters
-                    ARGS="--tableName ${{ parameters.tableName }} \
-                          --region ${{ parameters.region }} \
-                          --readMode ${{ parameters.readMode }} \
-                          --writeMode ${{ parameters.writeMode }} \
-                          --minRead ${{ parameters.minRead }} \
-                          --maxRead ${{ parameters.maxRead }} \
-                          --targetRead ${{ parameters.targetRead }} \
-                          --minWrite ${{ parameters.minWrite }} \
-                          --maxWrite ${{ parameters.maxWrite }} \
-                          --targetWrite ${{ parameters.targetWrite }} \
-                          --checkGSI ${{ parameters.checkGSI }}"
-                    
-                    # Add maxReadUnits and maxWriteUnits only if both are > 0 and mode is ondemand
-                    if [ "${{ parameters.readMode }}" = "ondemand" ] && [ "${{ parameters.writeMode }}" = "ondemand" ] && \
-                       [ "${{ parameters.maxReadUnits }}" -gt 0 ] && [ "${{ parameters.maxWriteUnits }}" -gt 0 ]; then
-                      ARGS="$ARGS --maxReadUnits ${{ parameters.maxReadUnits }} --maxWriteUnits ${{ parameters.maxWriteUnits }}"
-                    fi
-                    
-                    # Add initialReadUnits and initialWriteUnits only if mode is provisioned
-                    if [ "${{ parameters.readMode }}" = "provisioned" ] || [ "${{ parameters.writeMode }}" = "provisioned" ]; then
-                      ARGS="$ARGS --initialReadUnits ${{ parameters.initialReadUnits }} --initialWriteUnits ${{ parameters.initialWriteUnits }}"
-                    fi
-                    
-                    # Debug the raw and expanded command
-                    echo "Command arguments: $ARGS"
-                    # Run the command with quoted ARGS
-                    python3 manage_dynamodb_autoscaling.py $ARGS
-                  env:
-                    Build_SourcesDirectory: $(Build.SourcesDirectory)
-                    REPOSITORY_NAME: $(REPOSITORY_NAME)
-                  displayName: "Configure DynamoDB Auto Scaling"
