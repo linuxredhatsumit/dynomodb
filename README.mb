@@ -1,356 +1,239 @@
-#######################################################################################
-# IAM assumable role with custom policies to access AWS secrets manager from appconfig
-#######################################################################################
-resource "aws_iam_role" "appconfig_role" {
-    count              = try(var.appconfig_profile["create_rds_profile"], false) || try(var.appconfig_profile["create_msk_profile"], false) == true ? 1 : 0 
-    name               = "k811-${var.k811_service_name}-appconfig-role-${local.env}"
-    provider           = aws.primary
-    assume_role_policy = data.aws_iam_policy_document.appconfig_trust_policy[0].json
-    tags = {
-    resource-name = "k811-${var.k811_service_name}-appconfig-role-${local.env}"
+local.tf
+locals {
+  namespace                               = "prod"
+  primary_region                          = "ap-south-1"
+  secondary_region                        = "ap-south-2"
+  account_id                              = "718378052708"
+  primary_kms_key_arn                     = "arn:aws:kms:ap-south-1:718378052708:key/b1cd0da6-3b5d-4b78-9f93-d347f890d67f"
+  primary_kms_key_id                      = split("/", local.primary_kms_key_arn)[1]
+  secondary_kms_key_arn                   = "arn:aws:kms:ap-south-2:718378052708:key/eafbd87b-66d1-4247-a3a7-2dffd82fa4b4"
+  secondary_kms_key_id                    = split("/", local.secondary_kms_key_arn)[1]
+  primary_oidc_id                         = "A6EF97FA425FCC08AA3373B0E990BBFF"
+  secondary_oidc_id                       = "2AC1353141D7F74326DB4FFFA2A00C83"
+  env                                     = "prod"
+  primary_vpc_endpoint                    = "vpce-0dd48c345b6248c37" 
+  primary_custom_authorizer_lambda_name   = "API-to-Cognito-Lambda-Prod-onb"
+  primary_custom_authorizer_name          = "prod-kotak811-custom-authorizer"
+  primary_scc_authorizer_name             = "scc-onb-custom-prod-authorizer"
+  primary_scc_authorizer_lambda_name      = "API-to-Cognito-Lambda-SCC-ONB"
+  secondary_vpc_endpoint                  = "vpce-04925324d24ea9b64"
+  secondary_custom_authorizer_lambda_name = "API-to-Cognito-Lambda-Prod-onb"
+  secondary_custom_authorizer_name        = "prod-kotak811-custom-authorizer"
+  secondary_scc_authorizer_name           = "scc-onb-custom-prod-authorizer"
+  secondary_scc_authorizer_lambda_name    = "API-to-Cognito-Lambda-SCC-ONB"
+  appconfig_iam_resources                 = concat(
+    try(var.appconfig_profile["create_msk_profile"], false) ? [module.primary_secrets_manager_msk[0].secret_arn] : [],
+    try(var.appconfig_profile["create_rds_profile"], false) ? [module.primary_secrets_manager_rds[0].secret_arn] : [],
+    try(var.appconfig_profile["create_msk_profile"], false) && var.create_in_secondary ? [module.secondary_secrets_manager_msk[0].secret_arn] : [],
+    try(var.appconfig_profile["create_rds_profile"], false) && var.create_in_secondary ? [module.secondary_secrets_manager_rds[0].secret_arn] : []
+  )
+  appconfig_ids                           = var.create_in_secondary ? ["arn:aws:appconfig:${local.primary_region}:${local.account_id}:application/${var.primary_appconfig_id}/*", "arn:aws:appconfig:${local.secondary_region}:${local.account_id}:application/${var.secondary_appconfig_id}/*"] : ["arn:aws:appconfig:${local.primary_region}:${local.account_id}:application/${var.primary_appconfig_id}/*"]
+  appconfig_kms_source                    = var.create_in_secondary ? ["secretsmanager.${local.primary_region}.amazonaws.com", "secretsmanager.${local.secondary_region}.amazonaws.com"] : ["secretsmanager.${local.primary_region}.amazonaws.com"]
+  appconfig_kms_keys                      = var.create_in_secondary ? [local.primary_kms_key_arn, local.secondary_kms_key_arn] : [local.primary_kms_key_arn]
+  sns_topic_default_policy = {
+      pub = {
+        actions = [
+            "SNS:GetTopicAttributes",
+            "SNS:SetTopicAttributes",
+            "SNS:AddPermission",
+            "SNS:RemovePermission",
+            "SNS:DeleteTopic",
+            "SNS:Subscribe",
+            "SNS:ListSubscriptionsByTopic",
+            "SNS:Publish"
+        ]
+        principals = [{
+            type        = "AWS"
+            identifiers = ["*"]
+        }]
+        conditions = [{
+            "test"     = "StringEquals"
+            "values"   = ["${local.account_id}"]
+            "variable" = "AWS:SourceOwner"
+        }
+      ]
     }
-}
-
-resource "aws_iam_policy" "appconfig_policy" {
-    count         = try(var.appconfig_profile["create_rds_profile"], false) || try(var.appconfig_profile["create_msk_profile"], false) == true ? 1 : 0 
-    name          = "k811-${var.k811_service_name}-appconfig-policy-${local.env}"
-    provider      = aws.primary
-    description   = "Customized policy for the ${var.k811_service_name} appconfig to access AWS secrets manager."
-    policy        = data.aws_iam_policy_document.appconfig_policy_document[0].json
-    tags = {
-    resource-name = "k811-${var.k811_service_name}-appconfig-policy-${local.env}"
-    }
-}
-
-resource "aws_iam_role_policy_attachment" "appconfig_role_attachment" {
-    count      = try(var.appconfig_profile["create_rds_profile"], false) || try(var.appconfig_profile["create_msk_profile"], false) == true ? 1 : 0
-    provider   = aws.primary
-    role       = aws_iam_role.appconfig_role[0].name
-    policy_arn = aws_iam_policy.appconfig_policy[0].arn
-    depends_on = [ aws_iam_role.appconfig_role[0], aws_iam_policy.appconfig_policy[0] ]
-}
-
-# #######################################################
-# Null resource to wait till IAM propagation is complete
-# #######################################################
-resource "null_resource" "wait_for_iam_propagation" {
-    count      = try(var.appconfig_profile["create_rds_profile"], false) || try(var.appconfig_profile["create_msk_profile"], false) == true ? 1 : 0
-    triggers   = {
-        role_name          = aws_iam_role.appconfig_role[0].name
-        assume_role_policy = sha1(data.aws_iam_policy_document.appconfig_trust_policy[0].json)
-        inline_policy      = sha1(jsonencode(data.aws_iam_policy_document.appconfig_policy_document[0].json))
-    }
-    depends_on = [ aws_iam_role.appconfig_role[0], aws_iam_policy.appconfig_policy[0], aws_iam_role_policy_attachment.appconfig_role_attachment[0] ]
-    provisioner "local-exec" {
-      command = "sleep 30"
-    }
-}
-
-# ######################################################
-# Appconfig MSK & RDS secrets manager in primary region
-# ######################################################
-resource "random_password" "msk_passwd" {
-    count   = try(var.appconfig_profile["create_msk_profile"], false) == true ? 1 : 0
-    length  = 16
-    special = false
-}
-
-resource "random_password" "rds_passwd" {
-    count   = try(var.appconfig_profile["create_rds_profile"], false) == true ? 1 : 0
-    length  = 16
-    special = false
-}
-
-module "primary_secrets_manager_msk" {
-    count                   = try(var.appconfig_profile["create_msk_profile"], false) == true ? 1 : 0
-    source                  = "git::https://kmbl-devops@dev.azure.com/kmbl-devops/kotak811-devops-codebase/_git/k811-terraform-modules//modules/secrets-manager?ref=v1.0.0"
-    providers               = { aws = aws.primary }
-    name                    = "${replace("AmazonMSK_${var.k811_service_name}_${local.env}", "-", "_")}"
-    description             = "K811 ONB secret manager for ${var.k811_service_name} MSK user."
-    recovery_window_in_days = 0
-    kms_key_id              = local.primary_kms_key_arn
-    create_policy           = false
-    block_public_policy     = true
-    enable_rotation         = false
-    secret_string = jsonencode({
-    username    = "msk-user-${var.k811_service_name}-${local.env}"
-    password    = random_password.msk_passwd[0].result
-    })
-    tags = {
-    resource-name = "${replace("AmazonMSK_${var.k811_service_name}_${local.env}", "-", "_")}"
-    }
-}
-
-module "primary_secrets_manager_rds" {
-    count                   = try(var.appconfig_profile["create_rds_profile"], false) == true ? 1 : 0
-    source                  = "git::https://kmbl-devops@dev.azure.com/kmbl-devops/kotak811-devops-codebase/_git/k811-terraform-modules//modules/secrets-manager?ref=v1.0.0"
-    providers               = { aws = aws.primary }
-    name                    = "onb/${local.env}/${var.k811_service_name}"
-    description             = "K811 ONB secret manager for ${var.k811_service_name} RDS user."
-    recovery_window_in_days = 0
-    kms_key_id              = local.primary_kms_key_arn
-    create_policy           = false
-    block_public_policy     = true
-    enable_rotation         = false
-    secret_string           = jsonencode({
-    username                = "${replace("${var.k811_service_name}_user_${local.env}", "-", "_")}"
-    password                = random_password.rds_passwd[0].result
-    host                    = "prod-onb-db.kotak811.com"
-    port                    = "5435"
-    dbClusterIdentifier     = "k811-onb-prod-aurora-psql"
-    engine                  = "postgres"
-    proxy_port              = "5432"
-    DB_DRIVER               = "org.postgresql.Driver"
-    DB_NAME                 = "811_onb_${replace("${var.k811_service_name}_${local.env}", "-", "_")}"
-    DB_URL                  = "jdbc:postgresql://prod-onb-db.kotak811.com:5435/811_onb_${replace("${var.k811_service_name}_${local.env}", "-", "_")}"
-    CLIENT_ID               = ""
-    CLIENT_SECRET           = ""
-    DB_AES_KEY              = ""
-    API_AES_KEY             = ""
-    })
-    tags = {
-    resource-name = "onb/${local.env}/${var.k811_service_name}"
-    }
-}
-############################################
-module "primary_secrets_manager_common" {
-    count                   = try(var.appconfig_profile["create_rds_profile"], false) == true ? 1 : 0
-    source                  = "git::https://kmbl-devops@dev.azure.com/kmbl-devops/kotak811-devops-codebase/_git/k811-terraform-modules//modules/secrets-manager?ref=v1.0.0"
-    providers               = { aws = aws.primary }
-    name                    = "finbridge-connector-common-secrets-prod"
-    description             = "K811 ONB secret manager for ${var.k811_service_name} common secrets user."
-    recovery_window_in_days = 0
-    kms_key_id              = local.primary_kms_key_arn
-    create_policy           = false
-    block_public_policy     = true
-    enable_rotation         = false
-    secret_string           = jsonencode({
-        FIU_PRODUCT_ID = ""
-
-        FIU_PRODUCT_PRIVATE_KEY = ""
-
-        FIU_SERVICE_PUBLIC_KEY = ""
-
-        FIU_TEMPLATE_IDS_0 = ""
-
-        FIU_CONFIG_KEY_FORMAT = ""
-
-        FIU_BASE_URL = ""
-
-        API_CLIENTS = ""
+  }
+  sns_details = null                               // SNS to be created. EXCLUSIVELY set this to null if SNS creation need to be avoided
     
-    })
-    tags = {
-    resource-name = "onb/${local.env}/${var.k811_service_name}"
-    }
-}
-
-# ########################################################
-# Appconfig profile for secrets manager in primary region
-# ########################################################
-resource "aws_appconfig_configuration_profile" "primary_msk_profile" {
-    count              = try(var.appconfig_profile["create_msk_profile"], false) == true ? 1 : 0
-    provider           = aws.primary
-    name               = "k811-${var.k811_service_name}-msk-secrets-${local.env}"
-    application_id     = var.primary_appconfig_id
-    description        = "K811 ONB ${var.k811_service_name} appconfig MSK secrets configuration profile for ${local.env}"
-    location_uri       = module.primary_secrets_manager_msk[0].secret_arn
-    retrieval_role_arn = aws_iam_role.appconfig_role[0].arn
-    depends_on         = [aws_iam_role.appconfig_role[0], aws_iam_policy.appconfig_policy[0], aws_iam_role_policy_attachment.appconfig_role_attachment[0], module.primary_secrets_manager_msk[0], null_resource.wait_for_iam_propagation[0]]
-    tags = {
-    resource-name = "k811-${var.k811_service_name}-msk-secrets-${local.env}"
-    }
-}
-
-resource "aws_appconfig_configuration_profile" "primary_rds_profile" {
-    count              = try(var.appconfig_profile["create_rds_profile"], false) == true ? 1 : 0
-    provider           = aws.primary
-    name               = "k811-${var.k811_service_name}-rds-secrets-${local.env}"
-    application_id     = var.primary_appconfig_id
-    description        = "K811 ONB ${var.k811_service_name} appconfig RDS secrets configuration profile for ${local.env}"
-    location_uri       = module.primary_secrets_manager_rds[0].secret_arn
-    retrieval_role_arn = aws_iam_role.appconfig_role[0].arn
-    depends_on         = [aws_iam_role.appconfig_role[0], aws_iam_policy.appconfig_policy[0], aws_iam_role_policy_attachment.appconfig_role_attachment[0], module.primary_secrets_manager_rds[0], null_resource.wait_for_iam_propagation[0]]
-    tags = {
-    resource-name = "k811-${var.k811_service_name}-rds-secrets-${local.env}"
-    }
-}
-
-#######################
-resource "aws_appconfig_configuration_profile" "primary_common_secrets_profile" {
-    count              = try(var.appconfig_profile["create_rds_profile"], false) == true ? 1 : 0
-    provider           = aws.primary
-    name               = "finbridge-connector-common-secrets-prod"
-    application_id     = var.primary_appconfig_id
-    description        = "K811 ONB ${var.k811_service_name} appconfig common secrets configuration profile for ${local.env}"
-    location_uri       = module.primary_secrets_manager_common[0].secret_arn
-    retrieval_role_arn = aws_iam_role.appconfig_role[0].arn
-    depends_on         = [aws_iam_role.appconfig_role[0], aws_iam_policy.appconfig_policy[0], aws_iam_role_policy_attachment.appconfig_role_attachment[0], module.primary_secrets_manager_common[0], null_resource.wait_for_iam_propagation[0]]
-    tags = {
-    resource-name = "k811-${var.k811_service_name}-common-secrets-${local.env}"
-    }
 }
 
 
-# ########################################################
-# Appconfig MSK & RDS secrets manager in secondary region
-# ########################################################
-module "secondary_secrets_manager_msk" {
-    count                   = try(var.appconfig_profile["create_msk_profile"], false) && var.create_in_secondary == true ? 1 : 0
-    source                  = "git::https://kmbl-devops@dev.azure.com/kmbl-devops/kotak811-devops-codebase/_git/k811-terraform-modules//modules/secrets-manager?ref=v1.0.0"
-    providers               = { aws = aws.secondary }
-    name                    = "${replace("AmazonMSK_${var.k811_service_name}_${local.env}", "-", "_")}"
-    description             = "K811 ONB secret manager for ${var.k811_service_name} MSK user."
-    recovery_window_in_days = 0
-    kms_key_id              = local.secondary_kms_key_arn
-    create_policy           = false
-    block_public_policy     = true
-    enable_rotation         = false
-    secret_string = jsonencode({
-    username    = "msk-user-${var.k811_service_name}-${local.env}"
-    password    = random_password.msk_passwd[0].result
-    })
-    tags = {
-    resource-name = "${replace("AmazonMSK_${var.k811_service_name}_${local.env}", "-", "_")}"
+data.tf
+data "aws_caller_identity" "current" {}
+
+data "aws_partition" "current" {}
+
+data "aws_iam_policy_document" "appconfig_trust_policy" {
+    count   = try(var.appconfig_profile["create_rds_profile"], false) || try(var.appconfig_profile["create_msk_profile"], false) == true ? 1 : 0 
+    version = "2012-10-17"
+    statement {
+    effect = "Allow"
+    principals {
+        type        = "Service"
+        identifiers = ["appconfig.amazonaws.com"]
+    }
+    actions = ["sts:AssumeRole"]
+    condition {
+        test     = "StringEquals"
+        variable = "aws:SourceAccount"
+        values   = [local.account_id]
+    }
+    condition {
+        test     = "ArnLike"
+        variable = "aws:SourceArn"
+        values   = local.appconfig_ids
+    }
     }
 }
 
-module "secondary_secrets_manager_rds" {
-    count                   = try(var.appconfig_profile["create_rds_profile"], false) && var.create_in_secondary == true ? 1 : 0
-    source                  = "git::https://kmbl-devops@dev.azure.com/kmbl-devops/kotak811-devops-codebase/_git/k811-terraform-modules//modules/secrets-manager?ref=v1.0.0"
-    providers               = { aws = aws.secondary }
-    name                    = "onb/${local.env}/${var.k811_service_name}"
-    description             = "K811 ONB secret manager for ${var.k811_service_name} RDS user."
-    recovery_window_in_days = 0
-    kms_key_id              = local.secondary_kms_key_arn
-    create_policy           = false
-    block_public_policy     = true
-    enable_rotation         = false
-    secret_string           = jsonencode({
-    username                = "${replace("${var.k811_service_name}_user_${local.env}", "-", "_")}"
-    password                = random_password.rds_passwd[0].result
-    host                    = "prod-onb-db.kotak811.com"
-    port                    = "5435"
-    dbClusterIdentifier     = "k811-onb-prod-aurora-psql"
-    engine                  = "postgres"
-    proxy_port              = "5432"
-    DB_DRIVER               = "org.postgresql.Driver"
-    DB_NAME                 = "811_onb_${replace("${var.k811_service_name}_${local.env}", "-", "_")}"
-    DB_URL                  = "jdbc:postgresql://prod-onb-db.kotak811.com:5435/811_onb_${replace("${var.k811_service_name}_${local.env}", "-", "_")}"
-    CLIENT_ID               = ""
-    CLIENT_SECRET           = ""
-    DB_AES_KEY              = ""
-    API_AES_KEY             = ""
-    })
-    tags = {
-    resource-name = "onb/${local.env}/${var.k811_service_name}"
+data "aws_iam_policy_document" "appconfig_policy_document" {
+    count   = try(var.appconfig_profile["create_rds_profile"], false) || try(var.appconfig_profile["create_msk_profile"], false) == true ? 1 : 0 
+    version = "2012-10-17"
+    statement {
+    effect = "Allow"
+    actions = ["kms:Decrypt"]
+    resources = local.appconfig_kms_keys
+    condition {
+        test     = "StringLike"
+        variable = "kms:ViaService"
+        values   = local.appconfig_kms_source
+    }
+    }
+    statement {
+    effect    = "Allow"
+    actions   = ["secretsmanager:GetSecretValue"]
+    resources = local.appconfig_iam_resources
     }
 }
 
-###################
-module "secondary_secrets_manager_common" {
-    count                   = try(var.appconfig_profile["create_rds_profile"], false) && var.create_in_secondary == true ? 1 : 0
-    source                  = "git::https://kmbl-devops@dev.azure.com/kmbl-devops/kotak811-devops-codebase/_git/k811-terraform-modules//modules/secrets-manager?ref=v1.0.0"
-    providers               = { aws = aws.secondary }
-    name                    = "finbridge-connector-common-secrets-prod"
-    description             = "K811 ONB secret manager for ${var.k811_service_name} common user."
-    recovery_window_in_days = 0
-    kms_key_id              = local.secondary_kms_key_arn
-    create_policy           = false
-    block_public_policy     = true
-    enable_rotation         = false
-    secret_string           = jsonencode({
-        FIU_PRODUCT_ID = ""
-
-        FIU_PRODUCT_PRIVATE_KEY = ""
-
-        FIU_SERVICE_PUBLIC_KEY = ""
-
-        FIU_TEMPLATE_IDS_0 = ""
-
-        FIU_CONFIG_KEY_FORMAT = ""
-
-        FIU_BASE_URL = ""
-
-        API_CLIENTS = ""        
-    
-    })
-    tags = {
-    resource-name = "onb/${local.env}/${var.k811_service_name}"
+data "aws_iam_policy_document" "s3_trust_policy" {
+    for_each = var.create_in_secondary ? var.s3_details : {}
+    statement {
+    effect = "Allow"
+    principals {
+        type        = "Service"
+        identifiers = ["s3.amazonaws.com"]
+    }
+    actions = ["sts:AssumeRole"]
     }
 }
 
-# ##########################################################
-# Appconfig profile for secrets manager in secondary region
-# ##########################################################
-resource "aws_appconfig_configuration_profile" "secondary_msk_profile" {
-    count              = try(var.appconfig_profile["create_msk_profile"], false) && var.create_in_secondary == true ? 1 : 0
-    provider           = aws.secondary
-    name               = "k811-${var.k811_service_name}-msk-secrets-${local.env}"
-    application_id     = var.secondary_appconfig_id
-    description        = "K811 ONB ${var.k811_service_name} appconfig MSK secrets configuration profile for ${local.env}"
-    location_uri       = module.secondary_secrets_manager_msk[0].secret_arn
-    retrieval_role_arn = aws_iam_role.appconfig_role[0].arn
-    depends_on         = [aws_iam_role.appconfig_role[0], aws_iam_policy.appconfig_policy[0], aws_iam_role_policy_attachment.appconfig_role_attachment[0], module.secondary_secrets_manager_msk[0], null_resource.wait_for_iam_propagation[0]]
-    tags = {
-    resource-name = "k811-${var.k811_service_name}-msk-secrets-${local.env}"
+data "aws_iam_policy_document" "s3_crr_policy" {
+    for_each = var.create_in_secondary ? var.s3_details : {}
+    version  = "2012-10-17"
+    statement {
+    effect = "Allow"
+    actions = [
+        "s3:ListBucket",
+        "s3:GetReplicationConfiguration",
+        "s3:GetObjectVersionForReplication",
+        "s3:GetObjectVersionAcl",
+        "s3:GetObjectVersionTagging",
+        "s3:GetObjectRetention",
+        "s3:GetObjectLegalHold"
+    ]
+    resources = [
+        "${module.primary_s3[each.key].s3_bucket_arn}",
+        "${module.primary_s3[each.key].s3_bucket_arn}/*",
+        "${module.secondary_s3[each.key].s3_bucket_arn}",
+        "${module.secondary_s3[each.key].s3_bucket_arn}/*"
+    ]
+    }
+    statement {
+    effect = "Allow"
+    actions = [
+        "s3:ReplicateObject",
+        "s3:ReplicateDelete",
+        "s3:ReplicateTags",
+        "s3:ObjectOwnerOverrideToBucketOwner"
+    ]
+    resources = [
+        "${module.primary_s3[each.key].s3_bucket_arn}/*",
+        "${module.secondary_s3[each.key].s3_bucket_arn}/*"
+    ]
     }
 }
 
-resource "aws_appconfig_configuration_profile" "secondary_rds_profile" {
-    count              = try(var.appconfig_profile["create_rds_profile"], false) && var.create_in_secondary == true ? 1 : 0
-    provider           = aws.secondary
-    name               = "k811-${var.k811_service_name}-rds-secrets-${local.env}"
-    application_id     = var.secondary_appconfig_id
-    description        = "K811 ONB ${var.k811_service_name} appconfig RDS secrets configuration profile for ${local.env}"
-    location_uri       = module.secondary_secrets_manager_rds[0].secret_arn
-    retrieval_role_arn = aws_iam_role.appconfig_role[0].arn
-    depends_on         = [aws_iam_role.appconfig_role[0], aws_iam_policy.appconfig_policy[0], aws_iam_role_policy_attachment.appconfig_role_attachment[0], module.secondary_secrets_manager_rds[0], null_resource.wait_for_iam_propagation[0]]
-    tags = {
-    resource-name = "k811-${var.k811_service_name}-rds-secrets-${local.env}"
+varialble.tf
+
+variable "k811_service_name" {
+    type        = string
+    description = "The service name in snake case format (e.g., abc-def)"
+    validation {
+        condition     = can(regex("^[a-z0-9]+(-[a-z0-9]+)*$", var.k811_service_name))
+        error_message = "The k811_service_name must be in snake case format (e.g., abc-def)."
     }
 }
 
-###############
-resource "aws_appconfig_configuration_profile" "secondary_common_secrets_profile" {
-    count              = try(var.appconfig_profile["create_rds_profile"], false) && var.create_in_secondary == true ? 1 : 0
-    provider           = aws.secondary
-    name               = "finbridge-connector-common-secrets-prod"
-    application_id     = var.secondary_appconfig_id
-    description        = "K811 ONB ${var.k811_service_name} appconfig common secrets configuration profile for ${local.env}"
-    location_uri       = module.secondary_secrets_manager_common[0].secret_arn
-    retrieval_role_arn = aws_iam_role.appconfig_role[0].arn
-    depends_on         = [aws_iam_role.appconfig_role[0], aws_iam_policy.appconfig_policy[0], aws_iam_role_policy_attachment.appconfig_role_attachment[0], module.secondary_secrets_manager_common[0], null_resource.wait_for_iam_propagation[0]]
-    tags = {
-    resource-name = "k811-${var.k811_service_name}-common-secrets-${local.env}"
+variable "create_in_secondary" {
+    type        = bool
+    description = "Whether to create the resource in secondary region"
+    default     = false
+}
+
+variable "created_date" {
+    type        = string
+    description = "Date on which the resource is created in mm-dd-yyyy format"
+    validation {
+        condition     = can(regex("^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])-[0-9]{4}$", var.created_date))
+        error_message = "The created_date must be in mm-dd-yyyy format."
     }
 }
 
+variable "ticket_id" {
+    type        = string
+    description = "JIRA tracker ID for the resource"
+    validation {
+        condition     = can(regex("^DEVOPS-", var.ticket_id))
+        error_message = "The ticket_id must start with DEVOPS-"
+    }
+}
 
+variable "application_manager" {
+    type = string
+    description = "K811 application manager for the project"
+    validation {
+        condition     = contains(["Anilkumar Singam", "Shivam Gupta", "Ram Singh", "Hussain Pithawala"], var.application_manager)
+        error_message = "Invalid application manager. Must be one of: Anilkumar Singam, Shivam Gupta, Ram Singh, Hussain Pithawala"
+    }
+}
 
-Below error
+variable "ecr_name" {
+    type = string
+    description = "Name of the ECR to be created"
+}
 
-module.primary_api_gateway[0].aws_api_gateway_method_settings.all[0]: Modifications complete after 0s [id=2omcaqqeee-finbridge-connector-api-gw-stage-*/*]
-╷
-│ Error: creating AppConfig Configuration Profile (finbridge-connector-common-secrets-prod) for Application (t8j1qb7): operation error AppConfig: CreateConfigurationProfile, https response error StatusCode: 400, RequestID: c6a7071e-8ea5-416f-9100-5b1b23e8a8c9, BadRequestException: User: arn:aws:sts::718378052708:assumed-role/k811-finbridge-connector-appconfig-role-prod/AwsAppConfig-ConfigurationRetriever is not authorized to perform: secretsmanager:GetSecretValue on resource: arn:aws:secretsmanager:ap-south-1:718378052708:secret:finbridge-connector-common-secrets-prod-UexKgA because no identity-based policy allows the secretsmanager:GetSecretValue action (Service: AWSSecretsManager; Status Code: 400; Error Code: AccessDeniedException; Request ID: 5f197d50-02d5-42a8-b9c8-5d10691daed7; Proxy: null)
-│ 
-│   with aws_appconfig_configuration_profile.primary_common_secrets_profile[0],
-│   on appconfig-secrets.tf line 180, in resource "aws_appconfig_configuration_profile" "primary_common_secrets_profile":
-│  180: resource "aws_appconfig_configuration_profile" "primary_common_secrets_profile" {
-│ 
-╵
-╷
-│ Error: creating AppConfig Configuration Profile (finbridge-connector-common-secrets-prod) for Application (8okz38n): operation error AppConfig: CreateConfigurationProfile, https response error StatusCode: 400, RequestID: a5b14493-5066-41ff-9c6d-506b23716e14, BadRequestException: User: arn:aws:sts::718378052708:assumed-role/k811-finbridge-connector-appconfig-role-prod/AwsAppConfig-ConfigurationRetriever is not authorized to perform: secretsmanager:GetSecretValue on resource: arn:aws:secretsmanager:ap-south-2:718378052708:secret:finbridge-connector-common-secrets-prod-i5rbDZ because no identity-based policy allows the secretsmanager:GetSecretValue action (Service: AWSSecretsManager; Status Code: 400; Error Code: AccessDeniedException; Request ID: ca73acf0-227d-4daa-909d-aeb5ed25186a; Proxy: null)
-│ 
-│   with aws_appconfig_configuration_profile.secondary_common_secrets_profile[0],
-│   on appconfig-secrets.tf line 315, in resource "aws_appconfig_configuration_profile" "secondary_common_secrets_profile":
-│  315: resource "aws_appconfig_configuration_profile" "secondary_common_secrets_profile" {
-│ 
-╵
-╷
-│ Error: updating API Gateway Stage (ags-ikf6nfifha-finbridge-connector-api-gw-stage): operation error API Gateway: UpdateStage, https response error StatusCode: 400, RequestID: 102bc263-35bc-4636-b7b0-5c9ec794589b, BadRequestException: Deployment id does not exist
-│ 
-│   with module.secondary_api_gateway[0].aws_api_gateway_stage.this[0],
-│   on .terraform/modules/secondary_api_gateway/modules/apigateway/main.tf line 81, in resource "aws_api_gateway_stage" "this":
-│   81: resource "aws_api_gateway_stage" "this" {
-│ 
+variable "api_gateway_details" {
+    type        = any
+    description = "Details of API Gateway to be created"
+    default     = null
+}
+
+variable "sqs_details" {
+    type        = any
+    description = "Details of SQS to be created"
+    default     = {}
+}
+
+variable "s3_details" {
+    type        = any
+    description = "Details of S3 to be created"
+    default     = {}
+}
+
+variable "primary_appconfig_id" {
+    type        = string
+    description = "ID of the appconfig for the application to be deployed in primary region"
+}
+
+variable "secondary_appconfig_id" {
+    type        = string
+    description = "ID of the appconfig for the application to be deployed in secondary region"
+}
+
+variable "appconfig_profile" {
+    type        = any
+    description = "Profile of the appconfig for the application to be deployed"
+    default     = {}
+}
