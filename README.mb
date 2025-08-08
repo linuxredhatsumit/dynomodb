@@ -1,239 +1,61 @@
-local.tf
-locals {
-  namespace                               = "prod"
-  primary_region                          = "ap-south-1"
-  secondary_region                        = "ap-south-2"
-  account_id                              = "718378052708"
-  primary_kms_key_arn                     = "arn:aws:kms:ap-south-1:718378052708:key/b1cd0da6-3b5d-4b78-9f93-d347f890d67f"
-  primary_kms_key_id                      = split("/", local.primary_kms_key_arn)[1]
-  secondary_kms_key_arn                   = "arn:aws:kms:ap-south-2:718378052708:key/eafbd87b-66d1-4247-a3a7-2dffd82fa4b4"
-  secondary_kms_key_id                    = split("/", local.secondary_kms_key_arn)[1]
-  primary_oidc_id                         = "A6EF97FA425FCC08AA3373B0E990BBFF"
-  secondary_oidc_id                       = "2AC1353141D7F74326DB4FFFA2A00C83"
-  env                                     = "prod"
-  primary_vpc_endpoint                    = "vpce-0dd48c345b6248c37" 
-  primary_custom_authorizer_lambda_name   = "API-to-Cognito-Lambda-Prod-onb"
-  primary_custom_authorizer_name          = "prod-kotak811-custom-authorizer"
-  primary_scc_authorizer_name             = "scc-onb-custom-prod-authorizer"
-  primary_scc_authorizer_lambda_name      = "API-to-Cognito-Lambda-SCC-ONB"
-  secondary_vpc_endpoint                  = "vpce-04925324d24ea9b64"
-  secondary_custom_authorizer_lambda_name = "API-to-Cognito-Lambda-Prod-onb"
-  secondary_custom_authorizer_name        = "prod-kotak811-custom-authorizer"
-  secondary_scc_authorizer_name           = "scc-onb-custom-prod-authorizer"
-  secondary_scc_authorizer_lambda_name    = "API-to-Cognito-Lambda-SCC-ONB"
-  appconfig_iam_resources                 = concat(
-    try(var.appconfig_profile["create_msk_profile"], false) ? [module.primary_secrets_manager_msk[0].secret_arn] : [],
-    try(var.appconfig_profile["create_rds_profile"], false) ? [module.primary_secrets_manager_rds[0].secret_arn] : [],
-    try(var.appconfig_profile["create_msk_profile"], false) && var.create_in_secondary ? [module.secondary_secrets_manager_msk[0].secret_arn] : [],
-    try(var.appconfig_profile["create_rds_profile"], false) && var.create_in_secondary ? [module.secondary_secrets_manager_rds[0].secret_arn] : []
-  )
-  appconfig_ids                           = var.create_in_secondary ? ["arn:aws:appconfig:${local.primary_region}:${local.account_id}:application/${var.primary_appconfig_id}/*", "arn:aws:appconfig:${local.secondary_region}:${local.account_id}:application/${var.secondary_appconfig_id}/*"] : ["arn:aws:appconfig:${local.primary_region}:${local.account_id}:application/${var.primary_appconfig_id}/*"]
-  appconfig_kms_source                    = var.create_in_secondary ? ["secretsmanager.${local.primary_region}.amazonaws.com", "secretsmanager.${local.secondary_region}.amazonaws.com"] : ["secretsmanager.${local.primary_region}.amazonaws.com"]
-  appconfig_kms_keys                      = var.create_in_secondary ? [local.primary_kms_key_arn, local.secondary_kms_key_arn] : [local.primary_kms_key_arn]
-  sns_topic_default_policy = {
-      pub = {
-        actions = [
-            "SNS:GetTopicAttributes",
-            "SNS:SetTopicAttributes",
-            "SNS:AddPermission",
-            "SNS:RemovePermission",
-            "SNS:DeleteTopic",
-            "SNS:Subscribe",
-            "SNS:ListSubscriptionsByTopic",
-            "SNS:Publish"
-        ]
-        principals = [{
-            type        = "AWS"
-            identifiers = ["*"]
-        }]
-        conditions = [{
-            "test"     = "StringEquals"
-            "values"   = ["${local.account_id}"]
-            "variable" = "AWS:SourceOwner"
+k811_service_name      = "finbridge-connector" // Poject Name to be deployed like ddlm, ksec, upi-payments etc
+ticket_id              = "DEVOPS-7685"    // JIRA ID
+created_date           = "07-17-2025"     // Date of creation exclusively in mm-dd-yyyy format
+application_manager    = "Anilkumar Singam"
+
+ecr_name               = "811prodonb/finbridge-connector"
+primary_appconfig_id   = "t8j1qb7"                     // Update with the app config id in secondary region for application created
+secondary_appconfig_id = "8okz38n"                    // Update with the app config id in secondary region for application created
+
+create_in_secondary = true                           // If set to true then creates in secondary region else defaults to false
+
+# sqs_details = {                                     // SQS to be created. Remove/ comment this attribute if not needed
+#     "finbridge-connector-sqs1" = {
+#         name         = "finbridge-connector-sqs-1"
+#     },
+#     "finbridge-connector-sqs2" = {
+#         name         = "finbridge-connector-sqs-2"
+#     }
+# }
+
+api_gateway_details = {                                          // API GW to be created. Remove/ comment this attribute if not needed
+    stage_name               = "finbridge-connector-api-gw-stage"
+    # create_custom_authorizer = true                              // If true, then created custom authorizer
+    # create_scc_authorizer    = true                              // If true, then created scc authorizer
+    create_key_authorizer    = false                            // If true, then created api key based authorizer (Both primary and secondary will have same key value)
+    primary_custom_domains = {                                   // Custom domains to create in primary
+        # domain1 = {
+        #     name = "811appumami.uat.kotak811.com"
+        #     key  = "finbridge-connector"
+        # },
+        domain1 = {
+            name = "811onb.kotak811.com"
+            key  = "finbridge-pl"
         }
-      ]
     }
-  }
-  sns_details = null                               // SNS to be created. EXCLUSIVELY set this to null if SNS creation need to be avoided
-    
-}
-
-
-data.tf
-data "aws_caller_identity" "current" {}
-
-data "aws_partition" "current" {}
-
-data "aws_iam_policy_document" "appconfig_trust_policy" {
-    count   = try(var.appconfig_profile["create_rds_profile"], false) || try(var.appconfig_profile["create_msk_profile"], false) == true ? 1 : 0 
-    version = "2012-10-17"
-    statement {
-    effect = "Allow"
-    principals {
-        type        = "Service"
-        identifiers = ["appconfig.amazonaws.com"]
-    }
-    actions = ["sts:AssumeRole"]
-    condition {
-        test     = "StringEquals"
-        variable = "aws:SourceAccount"
-        values   = [local.account_id]
-    }
-    condition {
-        test     = "ArnLike"
-        variable = "aws:SourceArn"
-        values   = local.appconfig_ids
-    }
+    secondary_custom_domains = {                                 // Custom domains to create in secondary
+        domain1 = {
+            name = "811onb.kotak811.com"
+            key  = "finbridge-pl"
+        }
+        # domain2 = {
+        #     name = "811onb.uat.kotak811.com"
+        #     key  = "sample-key-path"
+        # },
+        # domain3 = {
+        #     name = "811appumami-dr.uat.kotak811.com"
+        #     key  = "sample-key-path"
+        # }
     }
 }
 
-data "aws_iam_policy_document" "appconfig_policy_document" {
-    count   = try(var.appconfig_profile["create_rds_profile"], false) || try(var.appconfig_profile["create_msk_profile"], false) == true ? 1 : 0 
-    version = "2012-10-17"
-    statement {
-    effect = "Allow"
-    actions = ["kms:Decrypt"]
-    resources = local.appconfig_kms_keys
-    condition {
-        test     = "StringLike"
-        variable = "kms:ViaService"
-        values   = local.appconfig_kms_source
-    }
-    }
-    statement {
-    effect    = "Allow"
-    actions   = ["secretsmanager:GetSecretValue"]
-    resources = local.appconfig_iam_resources
-    }
+appconfig_profile = {                                           // App config secrets profile for MSK & RDS
+    create_msk_profile = true
+    create_rds_profile = true
 }
 
-data "aws_iam_policy_document" "s3_trust_policy" {
-    for_each = var.create_in_secondary ? var.s3_details : {}
-    statement {
-    effect = "Allow"
-    principals {
-        type        = "Service"
-        identifiers = ["s3.amazonaws.com"]
-    }
-    actions = ["sts:AssumeRole"]
-    }
-}
-
-data "aws_iam_policy_document" "s3_crr_policy" {
-    for_each = var.create_in_secondary ? var.s3_details : {}
-    version  = "2012-10-17"
-    statement {
-    effect = "Allow"
-    actions = [
-        "s3:ListBucket",
-        "s3:GetReplicationConfiguration",
-        "s3:GetObjectVersionForReplication",
-        "s3:GetObjectVersionAcl",
-        "s3:GetObjectVersionTagging",
-        "s3:GetObjectRetention",
-        "s3:GetObjectLegalHold"
-    ]
-    resources = [
-        "${module.primary_s3[each.key].s3_bucket_arn}",
-        "${module.primary_s3[each.key].s3_bucket_arn}/*",
-        "${module.secondary_s3[each.key].s3_bucket_arn}",
-        "${module.secondary_s3[each.key].s3_bucket_arn}/*"
-    ]
-    }
-    statement {
-    effect = "Allow"
-    actions = [
-        "s3:ReplicateObject",
-        "s3:ReplicateDelete",
-        "s3:ReplicateTags",
-        "s3:ObjectOwnerOverrideToBucketOwner"
-    ]
-    resources = [
-        "${module.primary_s3[each.key].s3_bucket_arn}/*",
-        "${module.secondary_s3[each.key].s3_bucket_arn}/*"
-    ]
-    }
-}
-
-varialble.tf
-
-variable "k811_service_name" {
-    type        = string
-    description = "The service name in snake case format (e.g., abc-def)"
-    validation {
-        condition     = can(regex("^[a-z0-9]+(-[a-z0-9]+)*$", var.k811_service_name))
-        error_message = "The k811_service_name must be in snake case format (e.g., abc-def)."
-    }
-}
-
-variable "create_in_secondary" {
-    type        = bool
-    description = "Whether to create the resource in secondary region"
-    default     = false
-}
-
-variable "created_date" {
-    type        = string
-    description = "Date on which the resource is created in mm-dd-yyyy format"
-    validation {
-        condition     = can(regex("^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])-[0-9]{4}$", var.created_date))
-        error_message = "The created_date must be in mm-dd-yyyy format."
-    }
-}
-
-variable "ticket_id" {
-    type        = string
-    description = "JIRA tracker ID for the resource"
-    validation {
-        condition     = can(regex("^DEVOPS-", var.ticket_id))
-        error_message = "The ticket_id must start with DEVOPS-"
-    }
-}
-
-variable "application_manager" {
-    type = string
-    description = "K811 application manager for the project"
-    validation {
-        condition     = contains(["Anilkumar Singam", "Shivam Gupta", "Ram Singh", "Hussain Pithawala"], var.application_manager)
-        error_message = "Invalid application manager. Must be one of: Anilkumar Singam, Shivam Gupta, Ram Singh, Hussain Pithawala"
-    }
-}
-
-variable "ecr_name" {
-    type = string
-    description = "Name of the ECR to be created"
-}
-
-variable "api_gateway_details" {
-    type        = any
-    description = "Details of API Gateway to be created"
-    default     = null
-}
-
-variable "sqs_details" {
-    type        = any
-    description = "Details of SQS to be created"
-    default     = {}
-}
-
-variable "s3_details" {
-    type        = any
-    description = "Details of S3 to be created"
-    default     = {}
-}
-
-variable "primary_appconfig_id" {
-    type        = string
-    description = "ID of the appconfig for the application to be deployed in primary region"
-}
-
-variable "secondary_appconfig_id" {
-    type        = string
-    description = "ID of the appconfig for the application to be deployed in secondary region"
-}
-
-variable "appconfig_profile" {
-    type        = any
-    description = "Profile of the appconfig for the application to be deployed"
-    default     = {}
-}
+# s3_details = {                                                  // Name of s3 to be created (By default it creates CRR is create_in_secondary is set to true)
+#     "finbridge-connector" = {
+#         name = "finbridge-connector"
+#     }
+# }
