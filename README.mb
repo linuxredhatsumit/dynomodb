@@ -1,10 +1,8 @@
- appconfig_iam_resources                 = concat(
-    try(var.appconfig_profile["create_msk_profile"], false) ? [module.primary_secrets_manager_msk[0].secret_arn] : [],
-    try(var.appconfig_profile["create_rds_profile"], false) ? [module.primary_secrets_manager_rds[0].secret_arn] : [],
-    try(var.appconfig_profile["create_msk_profile"], false) && var.create_in_secondary ? [module.secondary_secrets_manager_msk[0].secret_arn] : [],
-    try(var.appconfig_profile["create_rds_profile"], false) && var.create_in_secondary ? [module.secondary_secrets_manager_rds[0].secret_arn] : []
-  )
-  appconfig_ids                           = var.create_in_secondary ? ["arn:aws:appconfig:${local.primary_region}:${local.account_id}:application/${var.primary_appconfig_id}/*", "arn:aws:appconfig:${local.secondary_region}:${local.account_id}:application/${var.secondary_appconfig_id}/*"] : ["arn:aws:appconfig:${local.primary_region}:${local.account_id}:application/${var.primary_appconfig_id}/*"]
-  appconfig_kms_source                    = var.create_in_secondary ? ["secretsmanager.${local.primary_region}.amazonaws.com", "secretsmanager.${local.secondary_region}.amazonaws.com"] : ["secretsmanager.${local.primary_region}.amazonaws.com"]
-  appconfig_kms_keys                      = var.create_in_secondary ? [local.primary_kms_key_arn, local.secondary_kms_key_arn] : [local.primary_kms_key_arn]
-  sns_topic_default_policy = {
+appconfig_iam_resources = concat(
+  try(var.appconfig_profile["create_msk_profile"], false) ? [module.primary_secrets_manager_msk[0].secret_arn] : [],
+  try(var.appconfig_profile["create_rds_profile"], false) ? [module.primary_secrets_manager_rds[0].secret_arn] : [],
+  try(var.appconfig_profile["create_common_profile"], false) ? [module.primary_secrets_manager_common[0].secret_arn] : [],
+  try(var.appconfig_profile["create_msk_profile"], false) && var.create_in_secondary ? [module.secondary_secrets_manager_msk[0].secret_arn] : [],
+  try(var.appconfig_profile["create_rds_profile"], false) && var.create_in_secondary ? [module.secondary_secrets_manager_rds[0].secret_arn] : [],
+  try(var.appconfig_profile["create_common_profile"], false) && var.create_in_secondary ? [module.secondary_secrets_manager_common[0].secret_arn] : []
+)
