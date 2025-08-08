@@ -1,61 +1,10 @@
-k811_service_name      = "finbridge-connector" // Poject Name to be deployed like ddlm, ksec, upi-payments etc
-ticket_id              = "DEVOPS-7685"    // JIRA ID
-created_date           = "07-17-2025"     // Date of creation exclusively in mm-dd-yyyy format
-application_manager    = "Anilkumar Singam"
-
-ecr_name               = "811prodonb/finbridge-connector"
-primary_appconfig_id   = "t8j1qb7"                     // Update with the app config id in secondary region for application created
-secondary_appconfig_id = "8okz38n"                    // Update with the app config id in secondary region for application created
-
-create_in_secondary = true                           // If set to true then creates in secondary region else defaults to false
-
-# sqs_details = {                                     // SQS to be created. Remove/ comment this attribute if not needed
-#     "finbridge-connector-sqs1" = {
-#         name         = "finbridge-connector-sqs-1"
-#     },
-#     "finbridge-connector-sqs2" = {
-#         name         = "finbridge-connector-sqs-2"
-#     }
-# }
-
-api_gateway_details = {                                          // API GW to be created. Remove/ comment this attribute if not needed
-    stage_name               = "finbridge-connector-api-gw-stage"
-    # create_custom_authorizer = true                              // If true, then created custom authorizer
-    # create_scc_authorizer    = true                              // If true, then created scc authorizer
-    create_key_authorizer    = false                            // If true, then created api key based authorizer (Both primary and secondary will have same key value)
-    primary_custom_domains = {                                   // Custom domains to create in primary
-        # domain1 = {
-        #     name = "811appumami.uat.kotak811.com"
-        #     key  = "finbridge-connector"
-        # },
-        domain1 = {
-            name = "811onb.kotak811.com"
-            key  = "finbridge-pl"
-        }
-    }
-    secondary_custom_domains = {                                 // Custom domains to create in secondary
-        domain1 = {
-            name = "811onb.kotak811.com"
-            key  = "finbridge-pl"
-        }
-        # domain2 = {
-        #     name = "811onb.uat.kotak811.com"
-        #     key  = "sample-key-path"
-        # },
-        # domain3 = {
-        #     name = "811appumami-dr.uat.kotak811.com"
-        #     key  = "sample-key-path"
-        # }
-    }
-}
-
-appconfig_profile = {                                           // App config secrets profile for MSK & RDS
-    create_msk_profile = true
-    create_rds_profile = true
-}
-
-# s3_details = {                                                  // Name of s3 to be created (By default it creates CRR is create_in_secondary is set to true)
-#     "finbridge-connector" = {
-#         name = "finbridge-connector"
-#     }
-# }
+ appconfig_iam_resources                 = concat(
+    try(var.appconfig_profile["create_msk_profile"], false) ? [module.primary_secrets_manager_msk[0].secret_arn] : [],
+    try(var.appconfig_profile["create_rds_profile"], false) ? [module.primary_secrets_manager_rds[0].secret_arn] : [],
+    try(var.appconfig_profile["create_msk_profile"], false) && var.create_in_secondary ? [module.secondary_secrets_manager_msk[0].secret_arn] : [],
+    try(var.appconfig_profile["create_rds_profile"], false) && var.create_in_secondary ? [module.secondary_secrets_manager_rds[0].secret_arn] : []
+  )
+  appconfig_ids                           = var.create_in_secondary ? ["arn:aws:appconfig:${local.primary_region}:${local.account_id}:application/${var.primary_appconfig_id}/*", "arn:aws:appconfig:${local.secondary_region}:${local.account_id}:application/${var.secondary_appconfig_id}/*"] : ["arn:aws:appconfig:${local.primary_region}:${local.account_id}:application/${var.primary_appconfig_id}/*"]
+  appconfig_kms_source                    = var.create_in_secondary ? ["secretsmanager.${local.primary_region}.amazonaws.com", "secretsmanager.${local.secondary_region}.amazonaws.com"] : ["secretsmanager.${local.primary_region}.amazonaws.com"]
+  appconfig_kms_keys                      = var.create_in_secondary ? [local.primary_kms_key_arn, local.secondary_kms_key_arn] : [local.primary_kms_key_arn]
+  sns_topic_default_policy = {
