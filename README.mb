@@ -1,8 +1,3 @@
-appconfig_iam_resources = concat(
-  try(var.appconfig_profile["create_msk_profile"], false) ? [module.primary_secrets_manager_msk[0].secret_arn] : [],
-  try(var.appconfig_profile["create_rds_profile"], false) ? [module.primary_secrets_manager_rds[0].secret_arn] : [],
-  try(var.appconfig_profile["create_common_profile"], false) ? [module.primary_secrets_manager_common[0].secret_arn] : [],
-  try(var.appconfig_profile["create_msk_profile"], false) && var.create_in_secondary ? [module.secondary_secrets_manager_msk[0].secret_arn] : [],
-  try(var.appconfig_profile["create_rds_profile"], false) && var.create_in_secondary ? [module.secondary_secrets_manager_rds[0].secret_arn] : [],
-  try(var.appconfig_profile["create_common_profile"], false) && var.create_in_secondary ? [module.secondary_secrets_manager_common[0].secret_arn] : []
-)
+Caused by: software.amazon.awssdk.services.appconfigdata.model.AppConfigDataException: User: arn:aws:sts::718378052708:assumed-role/onb-stateless-ond-eks-node-group-20230202120857207700000008/i-0b6dbfbf2e4f23e30 is not authorized to perform: appconfig:StartConfigurationSession on resource: arn:aws:appconfig:ap-south-1:718378052708:application/t8j1qb7/environment/s6g3edt/configuration/p8etik2 because no identity-based policy allows the appconfig:StartConfigurationSession action (Service: AppConfigData, Status Code: 403, Request ID: b1456c57-377f-41a7-8269-7826fa0a1762)
+        at software.amazon.awssdk.core.internal.http.CombinedResponseHandler.handleErrorResponse(CombinedResponseHandler.java:124) ~[sdk-core-2.29.50.jar!/:na]
+        at software.amazon.awssdk.core.internal.http.CombinedResponseHandler.handleRespo
