@@ -1,3 +1,64 @@
-Caused by: software.amazon.awssdk.services.appconfigdata.model.AppConfigDataException: User: arn:aws:sts::718378052708:assumed-role/onb-stateless-ond-eks-node-group-20230202120857207700000008/i-0b6dbfbf2e4f23e30 is not authorized to perform: appconfig:StartConfigurationSession on resource: arn:aws:appconfig:ap-south-1:718378052708:application/t8j1qb7/environment/s6g3edt/configuration/p8etik2 because no identity-based policy allows the appconfig:StartConfigurationSession action (Service: AppConfigData, Status Code: 403, Request ID: b1456c57-377f-41a7-8269-7826fa0a1762)
-        at software.amazon.awssdk.core.internal.http.CombinedResponseHandler.handleErrorResponse(CombinedResponseHandler.java:124) ~[sdk-core-2.29.50.jar!/:na]
-        at software.amazon.awssdk.core.internal.http.CombinedResponseHandler.handleRespo
+{
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Action": [
+          "kms:Decrypt",
+          "kms:Encrypt",
+          "kms:GenerateDataKey"
+        ],
+        "Effect": "Allow",
+        "Resource": [
+          "arn:aws:kms:ap-south-1:718378052708:key/b1cd0da6-3b5d-4b78-9f93-d347f890d67f",
+          "arn:aws:kms:ap-south-1:718378052708:key/ba03ab1d-5c6d-4b04-825d-abde7173b3bf",
+          "arn:aws:kms:ap-south-1:718378052708:key/8f358152-c866-42c6-b9ed-b2369aa9d1d5",
+          "arn:aws:kms:ap-south-2:718378052708:key/eafbd87b-66d1-4247-a3a7-2dffd82fa4b4"
+        ]
+      },
+      {
+        "Sid": "VisualEditor5",
+        "Effect": "Allow",
+        "Action": [
+          "appconfig:ListEnvironments",
+          "appconfig:ListTagsForResource",
+          "appconfig:StartDeployment",
+          "appconfig:GetExtensionAssociation",
+          "appconfig:GetLatestConfiguration",
+          "appconfig:ListDeployments",
+          "appconfig:GetExtension",
+          "appconfig:GetDeployment",
+          "appconfig:GetEnvironment",
+          "appconfig:GetDeploymentStrategy",
+          "appconfig:GetHostedConfigurationVersion",
+          "appconfig:ListConfigurationProfiles",
+          "appconfig:GetConfiguration",
+          "appconfig:GetApplication",
+          "appconfig:GetConfigurationProfile",
+          "appconfig:ListHostedConfigurationVersions",
+          "appconfig:StartConfigurationSession"
+        ],
+        "Resource": [
+          "arn:aws:appconfig:ap-south-1:718378052708:application/t8j1qb7",
+          "arn:aws:appconfig:ap-south-1:718378052708:application/t8j1qb7/configurationprofile/*",
+          "arn:aws:appconfig:ap-south-1:718378052708:application/t8j1qb7/environment/*",
+          "arn:aws:appconfig:ap-south-2:718378052708:application/kgtjtzt",
+          "arn:aws:appconfig:ap-south-2:718378052708:application/kgtjtzt/configurationprofile/*",
+          "arn:aws:appconfig:ap-south-2:718378052708:application/kgtjtzt/environment/*"
+        ]
+      },
+      {
+        "Effect": "Allow",
+        "Action": [
+          "ssm:DescribeParameters",
+          "secretsmanager:DescribeSecret",
+          "secretsmanager:GetSecretValue"
+        ],
+        "Resource": [
+          "arn:aws:secretsmanager:ap-south-1:718378052708:secret:prod/istio_codec/symmetric20240618165134578300000001-IVANgl",
+          "arn:aws:secretsmanager:ap-south-1:718378052708:secret:prod/istio_codec/hybrid-G6qoWv",
+          "arn:aws:secretsmanager:ap-south-2:718378052708:secret:prod/istio_codec/symmetric20240618165134578300000001-IVANgl",
+          "arn:aws:secretsmanager:ap-south-2:718378052708:secret:prod/istio_codec/hybrid-G6qoWv"
+        ]
+      }
+    ]
+  }
