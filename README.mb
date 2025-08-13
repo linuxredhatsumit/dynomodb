@@ -1,44 +1,19 @@
-#######################################################
-# Custom Authorizer + Trigger for Api to Cognito Lambda
-########################################################
-resource "aws_api_gateway_authorizer" "custom_authorizer" {
-    count                            = try(var.api_gateway_details["create_custom_authorizer"], false) == true ? 1 : 0
-    name                             = local.custom_authorizer_name
-    rest_api_id                      = module.api_gateway[0].id
-    type                             = "REQUEST"
-    identity_validation_expression   = "^(Bearer )[a-zA-Z0-9\\-_]+?\\.[a-zA-Z0-9\\-_]+?\\.([a-zA-Z0-9\\-_]+)$"
-    identity_source                  = "method.request.header.Authorization"
-    authorizer_uri                   = "arn:aws:apigateway:${local.region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${local.region}:${local.account_id}:function:${local.authorizer_lambda_name}/invocations"
-    authorizer_result_ttl_in_seconds = "60"
-}
+module.api_gateway[0].null_resource.latest_apigw_deployed_file: Creating...
+module.api_gateway[0].null_resource.latest_apigw_deployed_file: Provisioning with 'local-exec'...
+module.api_gateway[0].null_resource.latest_apigw_deployed_file (local-exec): Executing: ["/bin/sh" "-c" "aws apigateway get-deployments --rest-api-id e7whq5z3b6 --region ap-south-1| jq -rj '.items|sort_by(.createdDate)[-1].id' > /Users/KMBL350986/kotak-811-terraform/env/kotak811-uat/ONB-Project/811-onb-motor-insurance/api_deploy_id_811-onb-motor-insurance"]
+aws_api_gateway_authorizer.scc_custom_authorizer[0]: Creating...
+module.api_gateway[0].aws_api_gateway_rest_api_policy.this[0]: Modifying... [id=e7whq5z3b6]
+module.api_gateway[0].aws_api_gateway_rest_api_policy.this[0]: Modifications complete after 0s [id=e7whq5z3b6]
 
-resource "aws_lambda_permission" "lambda_permission" {
-    count         = try(var.api_gateway_details["create_custom_authorizer"], false) == true ? 1 : 0
-    action        = "lambda:InvokeFunction"
-    function_name = local.authorizer_lambda_name
-    principal     = "apigateway.amazonaws.com"
-    source_arn    = "${module.api_gateway[0].execution_arn}/authorizers/${aws_api_gateway_authorizer.custom_authorizer[count.index].id}"
-    depends_on    = [ aws_api_gateway_authorizer.custom_authorizer[0] ]
-}
-
-###################################################################
-# SCC Custom Authorizer + Trigger for Api to SCC authorizer Lambda
-###################################################################
-resource "aws_api_gateway_authorizer" "scc_custom_authorizer" {
-  count                            = try(var.api_gateway_details["create_scc_authorizer"], false) == true ? 1 : 0
-  name                             = local.scc_authorizer_name
-  rest_api_id                      = module.api_gateway[0].id
-  identity_validation_expression   = "^(Bearer )[a-zA-Z0-9\\-_]+?\\.[a-zA-Z0-9\\-_]+?\\.([a-zA-Z0-9\\-_]+)$"
-  type                             = "REQUEST"
-  identity_source                  = "method.request.header.Authorization"
-  authorizer_uri                   = "arn:aws:apigateway:${local.region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${local.region}:483584640083:function:${local.scc_authorizer_lambda_name}/invocations"
-  authorizer_result_ttl_in_seconds = "60"
-}
-resource "aws_lambda_permission" "lambda_permission_scc" {
-  count         = try(var.api_gateway_details["create_scc_authorizer"], false) == true ? 1 : 0
-  action        = "lambda:InvokeFunction"
-  function_name = local.scc_authorizer_lambda_name
-  principal     = "apigateway.amazonaws.com"
-  source_arn    = "${module.api_gateway[0].execution_arn}/authorizers/${aws_api_gateway_authorizer.scc_custom_authorizer[count.index].id}"
-  depends_on    = [ aws_api_gateway_authorizer.scc_custom_authorizer[0] ]
-}
+module.api_gateway[0].null_resource.latest_apigw_deployed_file (local-exec): SSL validation failed for https://apigateway.ap-south-1.amazonaws.com/restapis/e7whq5z3b6/deployments [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:1010)
+module.api_gateway[0].null_resource.latest_apigw_deployed_file: Creation complete after 2s [id=535415237697044296]
+module.api_gateway[0].data.local_file.latest_apigw_deployed_id: Reading...
+module.api_gateway[0].data.local_file.latest_apigw_deployed_id: Read complete after 0s [id=da39a3ee5e6b4b0d3255bfef95601890afd80709]
+╷
+│ Error: creating API Gateway Authorizer (scc-onb-uat-custom-authorizer): operation error API Gateway: CreateAuthorizer, https response error StatusCode: 400, RequestID: 3c27ae7e-fb6e-4eac-86dd-3f4dd6920838, BadRequestException: Authorizer name must be unique. Authorizer scc-onb-uat-custom-authorizer already exists in this RestApi.
+│ 
+│   with aws_api_gateway_authorizer.scc_custom_authorizer[0],
+│   on apigw.tf line 158, in resource "aws_api_gateway_authorizer" "scc_custom_authorizer":
+│  158: resource "aws_api_gateway_authorizer" "scc_custom_authorizer" {
+│ 
+╵
