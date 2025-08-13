@@ -1,64 +1,24 @@
-{
-    "Version": "2012-10-17",
-    "Statement": [
-      {
-        "Action": [
-          "kms:Decrypt",
-          "kms:Encrypt",
-          "kms:GenerateDataKey"
-        ],
-        "Effect": "Allow",
-        "Resource": [
-          "arn:aws:kms:ap-south-1:718378052708:key/b1cd0da6-3b5d-4b78-9f93-d347f890d67f",
-          "arn:aws:kms:ap-south-1:718378052708:key/ba03ab1d-5c6d-4b04-825d-abde7173b3bf",
-          "arn:aws:kms:ap-south-1:718378052708:key/8f358152-c866-42c6-b9ed-b2369aa9d1d5",
-          "arn:aws:kms:ap-south-2:718378052708:key/eafbd87b-66d1-4247-a3a7-2dffd82fa4b4"
-        ]
-      },
-      {
-        "Sid": "VisualEditor5",
-        "Effect": "Allow",
-        "Action": [
-          "appconfig:ListEnvironments",
-          "appconfig:ListTagsForResource",
-          "appconfig:StartDeployment",
-          "appconfig:GetExtensionAssociation",
-          "appconfig:GetLatestConfiguration",
-          "appconfig:ListDeployments",
-          "appconfig:GetExtension",
-          "appconfig:GetDeployment",
-          "appconfig:GetEnvironment",
-          "appconfig:GetDeploymentStrategy",
-          "appconfig:GetHostedConfigurationVersion",
-          "appconfig:ListConfigurationProfiles",
-          "appconfig:GetConfiguration",
-          "appconfig:GetApplication",
-          "appconfig:GetConfigurationProfile",
-          "appconfig:ListHostedConfigurationVersions",
-          "appconfig:StartConfigurationSession"
-        ],
-        "Resource": [
-          "arn:aws:appconfig:ap-south-1:718378052708:application/t8j1qb7",
-          "arn:aws:appconfig:ap-south-1:718378052708:application/t8j1qb7/configurationprofile/*",
-          "arn:aws:appconfig:ap-south-1:718378052708:application/t8j1qb7/environment/*",
-          "arn:aws:appconfig:ap-south-2:718378052708:application/kgtjtzt",
-          "arn:aws:appconfig:ap-south-2:718378052708:application/kgtjtzt/configurationprofile/*",
-          "arn:aws:appconfig:ap-south-2:718378052708:application/kgtjtzt/environment/*"
-        ]
-      },
-      {
-        "Effect": "Allow",
-        "Action": [
-          "ssm:DescribeParameters",
-          "secretsmanager:DescribeSecret",
-          "secretsmanager:GetSecretValue"
-        ],
-        "Resource": [
-          "arn:aws:secretsmanager:ap-south-1:718378052708:secret:prod/istio_codec/symmetric20240618165134578300000001-IVANgl",
-          "arn:aws:secretsmanager:ap-south-1:718378052708:secret:prod/istio_codec/hybrid-G6qoWv",
-          "arn:aws:secretsmanager:ap-south-2:718378052708:secret:prod/istio_codec/symmetric20240618165134578300000001-IVANgl",
-          "arn:aws:secretsmanager:ap-south-2:718378052708:secret:prod/istio_codec/hybrid-G6qoWv"
-        ]
-      }
-    ]
-  }
+│ Error: creating API Gateway Authorizer (scc-onb-uat-custom-authorizer): operation error API Gateway: CreateAuthorizer, https response error StatusCode: 400, RequestID: 3c27ae7e-fb6e-4eac-86dd-3f4dd6920838, BadRequestException: Authorizer name must be unique. Authorizer scc-onb-uat-custom-authorizer already exists in this RestApi.
+│ 
+│   with aws_api_gateway_authorizer.scc_custom_authorizer[0],
+│   on apigw.tf line 158, in resource "aws_api_gateway_authorizer" "scc_custom_authorizer":
+│  158: resource "aws_api_gateway_authorizer" "scc_custom_authorizer" {
+│ 
+resource "aws_api_gateway_authorizer" "scc_custom_authorizer" {
+  count                            = try(var.api_gateway_details["create_scc_authorizer"], false) == true ? 1 : 0
+  name                             = local.scc_authorizer_name
+  rest_api_id                      = module.api_gateway[0].id
+  identity_validation_expression   = "^(Bearer )[a-zA-Z0-9\\-_]+?\\.[a-zA-Z0-9\\-_]+?\\.([a-zA-Z0-9\\-_]+)$"
+  type                             = "REQUEST"
+  identity_source                  = "method.request.header.Authorization"
+  authorizer_uri                   = "arn:aws:apigateway:${local.region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${local.region}:483584640083:function:${local.scc_authorizer_lambda_name}/invocations"
+  authorizer_result_ttl_in_seconds = "60"
+}
+resource "aws_lambda_permission" "lambda_permission_scc" {
+  count         = try(var.api_gateway_details["create_scc_authorizer"], false) == true ? 1 : 0
+  action        = "lambda:InvokeFunction"
+  function_name = local.scc_authorizer_lambda_name
+  principal     = "apigateway.amazonaws.com"
+  source_arn    = "${module.api_gateway[0].execution_arn}/authorizers/${aws_api_gateway_authorizer.scc_custom_authorizer[count.index].id}"
+  depends_on    = [ aws_api_gateway_authorizer.scc_custom_authorizer[0] ]
+}
