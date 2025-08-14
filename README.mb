@@ -1,19 +1,247 @@
-module.api_gateway[0].null_resource.latest_apigw_deployed_file: Creating...
-module.api_gateway[0].null_resource.latest_apigw_deployed_file: Provisioning with 'local-exec'...
-module.api_gateway[0].null_resource.latest_apigw_deployed_file (local-exec): Executing: ["/bin/sh" "-c" "aws apigateway get-deployments --rest-api-id e7whq5z3b6 --region ap-south-1| jq -rj '.items|sort_by(.createdDate)[-1].id' > /Users/KMBL350986/kotak-811-terraform/env/kotak811-uat/ONB-Project/811-onb-motor-insurance/api_deploy_id_811-onb-motor-insurance"]
-aws_api_gateway_authorizer.scc_custom_authorizer[0]: Creating...
-module.api_gateway[0].aws_api_gateway_rest_api_policy.this[0]: Modifying... [id=e7whq5z3b6]
-module.api_gateway[0].aws_api_gateway_rest_api_policy.this[0]: Modifications complete after 0s [id=e7whq5z3b6]
+External VA - Excel Maintained
+External VA
+iip-dr.uat.kotak811.com
+iip-dr.uat.kotak811.com
+ 
+HSTS Missing From HTTPS Server (RFC 6797)
+|_http-server-header: cloudflare
+| http-security-headers:
+| Strict_Transport_Security:
+| HSTS not configured in HTTPS Server
+| X_Frame_Options:
+| Header: X-Frame-Options: SAMEORIGIN
+| Description: The browser must not display this content in any frame from a page of different origin than the content itself.
+| Cache_Control:
+| Header: Cache-Control: max-age=15
+| Expires:
+|_ Header: Expires: Fri, 23 May 2025 10:12:43 GMT
 
-module.api_gateway[0].null_resource.latest_apigw_deployed_file (local-exec): SSL validation failed for https://apigateway.ap-south-1.amazonaws.com/restapis/e7whq5z3b6/deployments [SSL: CERTIFICATE_VERIFY_FAILED] certificate verify failed: self-signed certificate in certificate chain (_ssl.c:1010)
-module.api_gateway[0].null_resource.latest_apigw_deployed_file: Creation complete after 2s [id=535415237697044296]
-module.api_gateway[0].data.local_file.latest_apigw_deployed_id: Reading...
-module.api_gateway[0].data.local_file.latest_apigw_deployed_id: Read complete after 0s [id=da39a3ee5e6b4b0d3255bfef95601890afd80709]
-╷
-│ Error: creating API Gateway Authorizer (scc-onb-uat-custom-authorizer): operation error API Gateway: CreateAuthorizer, https response error StatusCode: 400, RequestID: 3c27ae7e-fb6e-4eac-86dd-3f4dd6920838, BadRequestException: Authorizer name must be unique. Authorizer scc-onb-uat-custom-authorizer already exists in this RestApi.
-│ 
-│   with aws_api_gateway_authorizer.scc_custom_authorizer[0],
-│   on apigw.tf line 158, in resource "aws_api_gateway_authorizer" "scc_custom_authorizer":
-│  158: resource "aws_api_gateway_authorizer" "scc_custom_authorizer" {
-│ 
-╵
+
+above is reported by security scan team below is config
+resource "aws_cloudfront_response_headers_policy" "iip-dr-uat-policy" {
+  name = "iip-uat-dt-response-headers-policy"
+  comment = "for uat dr iip response headers policy"
+  cors_config {
+    access_control_allow_credentials = false
+    access_control_allow_headers {
+      items = ["*"]
+    }
+    access_control_allow_methods {
+      items = ["ALL"]
+    }
+
+    access_control_allow_origins {
+      items = ["iip-dr.uat.kotak811.com", "811appumami-dr.uat.kotak811.com", "iip.uat.kotak811.com", "811appumami-dr.uat.kotak811.com"]
+    }
+    access_control_max_age_sec = "600"
+    
+    origin_override = true
+  }
+  security_headers_config {
+    strict_transport_security {
+      access_control_max_age_sec = "31536000"
+      preload = true
+      include_subdomains = true
+      override = true
+    }
+    xss_protection {
+      protection = true
+      mode_block = true
+      override = true
+    }
+    content_type_options {
+      override = true
+    }
+    frame_options{
+      frame_option = "SAMEORIGIN"
+      override = true
+    }
+    content_security_policy {
+      content_security_policy = "script-src 'none';object-src 'none'; script-src-elem 'self' 'unsafe-inline' 'unsafe-eval' https://in1.clevertap-prod.com/a https://www.googletagmanager.com/gtm.js *.visualwebsiteoptimizer.com app.vwo.com *;worker-src 'self' blob:;"
+      override = true
+    }
+  }
+  custom_headers_config {
+    items {
+      header   = "AllowedMethods"
+      override = false
+      value    = "[\"GET\", \"POST\", \"PUT\"]"
+    }
+    items {
+      header   = "AllowedHeaders"
+      override = false
+      value    = "[\"Origin\", \"Content-Type\", \"traceparent\", \"tracestate\"]"
+    }
+    items {
+      header   = "ExposeHeaders"
+      override = false
+      value    = "[\"traceparent\", \"tracestate\"]"
+    }
+    items {
+      header   = "AllowCredentials"
+      override = false
+      value    = true
+    }
+    items {
+      header   = "AllowedOrigins"
+      override = false
+      value    = "*"
+    }
+    items {
+      header   = "MaxAgeSeconds"
+      override = false
+      value    = "3600"
+    }
+    items {
+      header   = "Pragma"
+      override = false
+      value    = "no-cache"
+    }
+    items {
+      header   = "Cache-Control"
+      override = false
+      value    = "no-store, no-cache, must-revalidate, max-age=0, post-check=0, pre-check=0"
+    }
+  }
+}
+
+module "cloudfront" {
+  source = "../../../../../terraform-modules/cloudfront"
+
+  comment                        = "uat dr insurance-frontend-application-uat"
+  enabled                        = true
+  http_version                   = "http2and3"
+  is_ipv6_enabled                = false
+  price_class                    = "PriceClass_200"
+  retain_on_delete               = false
+  wait_for_deployment            = false
+  aliases                        = ["iip-dr.uat.kotak811.com"]
+  create_monitoring_subscription = true
+
+  create_origin_access_control = true
+  origin_access_control = {
+    insurance-frontend-application-uat-dr = {
+      description      = "CloudFront access to S3"
+      origin_type      = "s3"
+      signing_behavior = "always"
+      signing_protocol = "sigv4"
+    }
+  }
+  origin = {
+    insurance-frontend-application-uat-dr = {
+      domain_name           = module.s3_bucket.s3_bucket_bucket_regional_domain_name
+      origin_access_control = "insurance-frontend-application-uat-dr"
+    }
+  }
+
+  default_cache_behavior = {
+    target_origin_id           = "insurance-frontend-application-uat-dr"
+    allowed_methods            = ["GET", "HEAD", "OPTIONS"]
+    cached_methods             = ["GET", "HEAD"]
+    compress                   = true
+    query_string               = true
+    viewer_protocol_policy     = "redirect-to-https"
+    response_headers_policy_id = resource.aws_cloudfront_response_headers_policy.iip-dr-uat-policy.id
+  }
+
+  ordered_cache_behavior = [{
+    path_pattern               = "/*.css"
+    target_origin_id           = "insurance-frontend-application-uat-dr"
+    allowed_methods            = ["GET", "HEAD"]
+    cached_methods             = ["GET", "HEAD"]
+    compress                   = true
+    query_string               = true
+    viewer_protocol_policy     = "redirect-to-https"
+    use_forwarded_values       = false
+    cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+    response_headers_policy_id = "67f7725c-6f97-4210-82d7-5512b31e9d03"
+    },
+    {
+      path_pattern               = "/*.js"
+      target_origin_id           = "insurance-frontend-application-uat-dr"
+      allowed_methods            = ["GET", "HEAD"]
+      cached_methods             = ["GET", "HEAD"]
+      compress                   = true
+      query_string               = true
+      viewer_protocol_policy     = "redirect-to-https"
+      use_forwarded_values       = false
+      cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+      response_headers_policy_id = "338586db-bc3b-418b-a2bd-f54c22e8bedf"
+    },
+    {
+      path_pattern               = "/*.png"
+      target_origin_id           = "insurance-frontend-application-uat-dr"
+      allowed_methods            = ["GET", "HEAD"]
+      cached_methods             = ["GET", "HEAD"]
+      compress                   = true
+      query_string               = true
+      viewer_protocol_policy     = "redirect-to-https"
+      use_forwarded_values       = false
+      cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+      response_headers_policy_id = "67f7725c-6f97-4210-82d7-5512b31e9d03"
+    },
+    {
+      path_pattern               = "/*.jpg"
+      target_origin_id           = "insurance-frontend-application-uat-dr"
+      allowed_methods            = ["GET", "HEAD"]
+      cached_methods             = ["GET", "HEAD"]
+      compress                   = true
+      query_string               = true
+      viewer_protocol_policy     = "redirect-to-https"
+      use_forwarded_values       = false
+      cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6"
+      response_headers_policy_id = "67f7725c-6f97-4210-82d7-5512b31e9d03"
+  }]
+
+  viewer_certificate = {
+    acm_certificate_arn      = "arn:aws:acm:us-east-1:483584640083:certificate/b581a8cf-b290-4470-a3cc-bfd0cf5e4780"
+    ssl_support_method       = "sni-only"
+    minimum_protocol_version = "TLSv1.2_2021"
+  }
+
+  default_root_object = "index.html"
+
+  custom_error_response = [{
+    error_code            = 403
+    response_code         = 200
+    error_caching_min_ttl = 5
+    response_page_path    = "/index.html"
+  }]
+
+  tags = local.tags
+}
+
+below is termianl responce 
+
+KMBL350986@KBMK24-00000929 811apppurezento.kotak811.com % curl -I https://iip-dr.uat.kotak811.com
+
+HTTP/2 200 
+content-type: text/html
+content-length: 1115
+date: Thu, 14 Aug 2025 07:01:57 GMT
+last-modified: Fri, 21 Feb 2025 04:46:35 GMT
+etag: "596a9763524cb32e2811e558843f2436"
+x-amz-server-side-encryption: AES256
+x-amz-version-id: GHNHOUadiHDxYQgVGHK6MFCThd.jxnZk
+accept-ranges: bytes
+server: AmazonS3
+x-cache: Miss from cloudfront
+via: 1.1 3a2bb5bb725c81e445351e6220d093cc.cloudfront.net (CloudFront)
+x-amz-cf-pop: BOM78-P5
+alt-svc: h3=":443"; ma=86400
+x-amz-cf-id: xkWwTGE5o8x4-LPBNB6qwpqg0AyjrAArP_Z9G_F70074rlSupVbhrw==
+x-xss-protection: 1; mode=block
+x-frame-options: SAMEORIGIN
+content-security-policy: script-src 'none';object-src 'none'; script-src-elem 'self' 'unsafe-inline' 'unsafe-eval' https://in1.clevertap-prod.com/a https://www.googletagmanager.com/gtm.js *.visualwebsiteoptimizer.com app.vwo.com *;worker-src 'self' blob:;
+x-content-type-options: nosniff
+strict-transport-security: max-age=31536000; includeSubDomains; preload
+allowcredentials: true
+allowedheaders: ["Origin", "Content-Type", "traceparent", "tracestate"]
+allowedmethods: ["GET", "POST", "PUT"]
+allowedorigins: *
+cache-control: no-store, no-cache, must-revalidate, max-age=0, post-check=0, pre-check=0
+exposeheaders: ["traceparent", "tracestate"]
+maxageseconds: 3600
+pragma: no-cache
+vary: Origin
+
