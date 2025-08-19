@@ -1,240 +1,38 @@
-1. Objective
 
-To standardize Helm chart distribution and secure sensitive configurations in our EKS clusters by:
-
-Hosting Helm charts in an S3-based Helm repository.
-
-Managing sensitive keys (e.g., Coralogix private key) in AWS Secrets Manager.
-
-Using AppConfig for dynamic configuration delivery.
-
-Leveraging IAM Roles for Service Accounts (IRSA) to securely fetch secrets without hardcoding keys.
-
-
-
----
-
-2. Use Case
-
-We need to deploy the Coralogix OpenTelemetry Helm chart to multiple environments (UAT, Prod).
-
-The Helm chart must be reusable from a central repository.
-
-Secrets (private keys) must not be committed into Git or Helm values.yaml.
-
-Applications should fetch secrets dynamically using AppConfig + IRSA.
-
-
-
----
-
-3. High-Level Architecture
-
-
-
-Flow:
-
-1. Terraform provisions:
-
-S3 bucket (Helm repo storage).
-
-Secrets Manager (Coralogix private key).
-
-AppConfig configuration profile referencing Secrets Manager.
-
-IAM Role + Policy with access to Secrets Manager + AppConfig.
-
-Kubernetes ServiceAccount annotated with IAM Role (IRSA).
-
-
-
-2. CI/CD pipeline packages Helm chart (helm package → helm repo index) and uploads .tgz and index.yaml into the S3 bucket.
-
-
-3. Kubernetes workloads (via Helm chart) run with ServiceAccount that has IAM role access.
-
-
-4. Workloads fetch secrets via AppConfig at runtime.
-
-
-
-
----
-
-4. Components
-
-4.1 S3 Helm Repository
-
-Terraform:
-
-resource "aws_s3_bucket" "helm_repo" {
-  bucket = "my-helm-charts-prod"
-  force_destroy = true
-}
-
-resource "aws_s3_bucket_versioning" "helm_repo_versioning" {
-  bucket = aws_s3_bucket.helm_repo.id
-  versioning_configuration {
-    status = "Enabled"
-  }
-}
-
-resource "aws_s3_bucket_policy" "helm_repo_policy" {
-  bucket = aws_s3_bucket.helm_repo.id
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect = "Allow"
-        Principal = "*"
-        Action   = "s3:GetObject"
-        Resource = "${aws_s3_bucket.helm_repo.arn}/*"
-      }
-    ]
-  })
-}
-
-Helm repo usage:
-
-helm repo add my-charts https://my-helm-charts-prod.s3.ap-south-1.amazonaws.com
-
-
----
-
-4.2 Secrets Manager
-
-Store Coralogix key securely:
-
-resource "aws_secretsmanager_secret" "coralogix_key" {
-  name = "coralogix/prod/private_key"
-}
-
-resource "aws_secretsmanager_secret_version" "coralogix_key_version" {
-  secret_id     = aws_secretsmanager_secret.coralogix_key.id
-  secret_string = "YOUR_CORALOGIX_PRIVATE_KEY"
-}
-
-
----
-
-4.3 AppConfig
-
-Reference Secrets Manager in AppConfig:
-
-resource "aws_appconfig_application" "otel_app" {
-  name        = "otel-config"
-  description = "AppConfig for OTel Helm charts"
-}
-
-resource "aws_appconfig_environment" "otel_env" {
-  application_id = aws_appconfig_application.otel_app.id
-  name           = "prod"
-}
-
-resource "aws_appconfig_configuration_profile" "otel_profile" {
-  application_id = aws_appconfig_application.otel_app.id
-  name           = "coralogix-config"
-  location_uri   = "arn:aws:secretsmanager:ap-south-1:123456789012:secret:coralogix/prod/private_key"
-  type           = "AWS.Freeform"
-}
-
-
----
-
-4.4 IAM Role + IRSA
-
-IAM Policy:
-
-resource "aws_iam_policy" "otel_policy" {
-  name = "otel-appconfig-secrets-access"
-  policy = jsonencode({
-    Version = "2012-10-17"
-    Statement = [
-      {
-        Effect   = "Allow"
-        Action   = [
-          "appconfig:GetConfiguration",
-          "secretsmanager:GetSecretValue"
-        ]
-        Resource = "*"
-      }
-    ]
-  })
-}
-
-IAM Role for SA:
-
-resource "aws_iam_role" "otel_irsa_role" {
-  name               = "otel-irsa-role"
-  assume_role_policy = data.aws_iam_policy_document.otel_assume.json
-}
-
-data "aws_iam_policy_document" "otel_assume" {
-  statement {
-    effect = "Allow"
-    principals {
-      type        = "Federated"
-      identifiers = [aws_iam_openid_connect_provider.eks.arn]
-    }
-    actions = ["sts:AssumeRoleWithWebIdentity"]
-  }
-}
-
-
----
-
-4.5 Kubernetes Service Account
-
-Helm chart template (templates/serviceaccount.yaml):
-
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  name: otel-agent
-  annotations:
-    eks.amazonaws.com/role-arn: arn:aws:iam::<account_id>:role/otel-irsa-role
-
-
----
-
-5. CI/CD Pipeline
-
-1. Package Helm chart:
-
-helm package ./charts/opentelemetry
-
-
-2. Update index:
-
-helm repo index . --url https://my-helm-charts-prod.s3.ap-south-1.amazonaws.com
-
-
-3. Upload to S3:
-
-aws s3 cp . s3://my-helm-charts-prod/ --recursive --exclude "*" --include "*.tgz" --include "index.yaml"
-
-
-
-
----
-
-6. Benefits
-
-Secure: No private key in values.yaml or repo.
-
-Scalable: Central S3 repo for all Helm charts.
-
-Dynamic: Secrets managed via AppConfig + Secrets Manager.
-
-Cloud-native: Uses IRSA for fine-grained IAM permissions.
-
-Reusable: Same pipeline and chart for all environments (UAT, Prod).
-
-
-
----
-
-👉 Sumit, this is now production-ready with S3 repo approach and can be published to your Confluence.
-
-Do you also want me to re-render the updated diagram (PNG) with S3 instead of ECR so it’s fully aligned before you publish?
-
+  - script: |
+      pwd
+      unset AWS_SESSION_TOKEN
+      unset AWS_SECRET_ACCESS_KEY
+      unset AWS_ACCESS_KEY_ID
+      CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+      export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+      export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+      export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+      helm s3 init $(HELM_S3BUCKET_URL)
+      helm repo add $(ENV)-$(SERVICE_NAME) $(HELM_S3BUCKET_URL) 
+      helm package $(HELM_CHARTS_PATH)/
+      helm s3 push --force $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz $(ENV)-$(SERVICE_NAME)
+      aws s3 ls $(HELM_S3BUCKET_URL) 
+      helm repo update 
+      helm search repo $(ENV)-$(SERVICE_NAME)
+    displayName: "Production Charts Push To S3"
+    workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
+
+
+
+
+ - script: |
+      pwd
+      unset AWS_SESSION_TOKEN
+      unset AWS_SECRET_ACCESS_KEY
+      unset AWS_ACCESS_KEY_ID
+      CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
+      export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+      export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+      export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+      rm -rf $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/*.tgz
+      helm repo update
+      helm fetch $(ENV)-$(SERVICE_NAME)/$(SERVICE_NAME)
+      tar -xvf $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
+      helm upgrade --install $(ENV)-$(SERVICE_NAME) $(SERVICE_NAME)/ -f $(SERVICE_NAME)/$(ENV)-values.yaml --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH)  --wait --timeout 3m
+    displayName: "Production Helm Charts Deployment"
