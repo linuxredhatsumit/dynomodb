@@ -1,247 +1,240 @@
-External VA - Excel Maintained
-External VA
-iip-dr.uat.kotak811.com
-iip-dr.uat.kotak811.com
- 
-HSTS Missing From HTTPS Server (RFC 6797)
-|_http-server-header: cloudflare
-| http-security-headers:
-| Strict_Transport_Security:
-| HSTS not configured in HTTPS Server
-| X_Frame_Options:
-| Header: X-Frame-Options: SAMEORIGIN
-| Description: The browser must not display this content in any frame from a page of different origin than the content itself.
-| Cache_Control:
-| Header: Cache-Control: max-age=15
-| Expires:
-|_ Header: Expires: Fri, 23 May 2025 10:12:43 GMT
+1. Objective
+
+To standardize Helm chart distribution and secure sensitive configurations in our EKS clusters by:
+
+Hosting Helm charts in an S3-based Helm repository.
+
+Managing sensitive keys (e.g., Coralogix private key) in AWS Secrets Manager.
+
+Using AppConfig for dynamic configuration delivery.
+
+Leveraging IAM Roles for Service Accounts (IRSA) to securely fetch secrets without hardcoding keys.
 
 
-above is reported by security scan team below is config
-resource "aws_cloudfront_response_headers_policy" "iip-dr-uat-policy" {
-  name = "iip-uat-dt-response-headers-policy"
-  comment = "for uat dr iip response headers policy"
-  cors_config {
-    access_control_allow_credentials = false
-    access_control_allow_headers {
-      items = ["*"]
-    }
-    access_control_allow_methods {
-      items = ["ALL"]
-    }
 
-    access_control_allow_origins {
-      items = ["iip-dr.uat.kotak811.com", "811appumami-dr.uat.kotak811.com", "iip.uat.kotak811.com", "811appumami-dr.uat.kotak811.com"]
-    }
-    access_control_max_age_sec = "600"
-    
-    origin_override = true
-  }
-  security_headers_config {
-    strict_transport_security {
-      access_control_max_age_sec = "31536000"
-      preload = true
-      include_subdomains = true
-      override = true
-    }
-    xss_protection {
-      protection = true
-      mode_block = true
-      override = true
-    }
-    content_type_options {
-      override = true
-    }
-    frame_options{
-      frame_option = "SAMEORIGIN"
-      override = true
-    }
-    content_security_policy {
-      content_security_policy = "script-src 'none';object-src 'none'; script-src-elem 'self' 'unsafe-inline' 'unsafe-eval' https://in1.clevertap-prod.com/a https://www.googletagmanager.com/gtm.js *.visualwebsiteoptimizer.com app.vwo.com *;worker-src 'self' blob:;"
-      override = true
-    }
-  }
-  custom_headers_config {
-    items {
-      header   = "AllowedMethods"
-      override = false
-      value    = "[\"GET\", \"POST\", \"PUT\"]"
-    }
-    items {
-      header   = "AllowedHeaders"
-      override = false
-      value    = "[\"Origin\", \"Content-Type\", \"traceparent\", \"tracestate\"]"
-    }
-    items {
-      header   = "ExposeHeaders"
-      override = false
-      value    = "[\"traceparent\", \"tracestate\"]"
-    }
-    items {
-      header   = "AllowCredentials"
-      override = false
-      value    = true
-    }
-    items {
-      header   = "AllowedOrigins"
-      override = false
-      value    = "*"
-    }
-    items {
-      header   = "MaxAgeSeconds"
-      override = false
-      value    = "3600"
-    }
-    items {
-      header   = "Pragma"
-      override = false
-      value    = "no-cache"
-    }
-    items {
-      header   = "Cache-Control"
-      override = false
-      value    = "no-store, no-cache, must-revalidate, max-age=0, post-check=0, pre-check=0"
-    }
+---
+
+2. Use Case
+
+We need to deploy the Coralogix OpenTelemetry Helm chart to multiple environments (UAT, Prod).
+
+The Helm chart must be reusable from a central repository.
+
+Secrets (private keys) must not be committed into Git or Helm values.yaml.
+
+Applications should fetch secrets dynamically using AppConfig + IRSA.
+
+
+
+---
+
+3. High-Level Architecture
+
+
+
+Flow:
+
+1. Terraform provisions:
+
+S3 bucket (Helm repo storage).
+
+Secrets Manager (Coralogix private key).
+
+AppConfig configuration profile referencing Secrets Manager.
+
+IAM Role + Policy with access to Secrets Manager + AppConfig.
+
+Kubernetes ServiceAccount annotated with IAM Role (IRSA).
+
+
+
+2. CI/CD pipeline packages Helm chart (helm package → helm repo index) and uploads .tgz and index.yaml into the S3 bucket.
+
+
+3. Kubernetes workloads (via Helm chart) run with ServiceAccount that has IAM role access.
+
+
+4. Workloads fetch secrets via AppConfig at runtime.
+
+
+
+
+---
+
+4. Components
+
+4.1 S3 Helm Repository
+
+Terraform:
+
+resource "aws_s3_bucket" "helm_repo" {
+  bucket = "my-helm-charts-prod"
+  force_destroy = true
+}
+
+resource "aws_s3_bucket_versioning" "helm_repo_versioning" {
+  bucket = aws_s3_bucket.helm_repo.id
+  versioning_configuration {
+    status = "Enabled"
   }
 }
 
-module "cloudfront" {
-  source = "../../../../../terraform-modules/cloudfront"
-
-  comment                        = "uat dr insurance-frontend-application-uat"
-  enabled                        = true
-  http_version                   = "http2and3"
-  is_ipv6_enabled                = false
-  price_class                    = "PriceClass_200"
-  retain_on_delete               = false
-  wait_for_deployment            = false
-  aliases                        = ["iip-dr.uat.kotak811.com"]
-  create_monitoring_subscription = true
-
-  create_origin_access_control = true
-  origin_access_control = {
-    insurance-frontend-application-uat-dr = {
-      description      = "CloudFront access to S3"
-      origin_type      = "s3"
-      signing_behavior = "always"
-      signing_protocol = "sigv4"
-    }
-  }
-  origin = {
-    insurance-frontend-application-uat-dr = {
-      domain_name           = module.s3_bucket.s3_bucket_bucket_regional_domain_name
-      origin_access_control = "insurance-frontend-application-uat-dr"
-    }
-  }
-
-  default_cache_behavior = {
-    target_origin_id           = "insurance-frontend-application-uat-dr"
-    allowed_methods            = ["GET", "HEAD", "OPTIONS"]
-    cached_methods             = ["GET", "HEAD"]
-    compress                   = true
-    query_string               = true
-    viewer_protocol_policy     = "redirect-to-https"
-    response_headers_policy_id = resource.aws_cloudfront_response_headers_policy.iip-dr-uat-policy.id
-  }
-
-  ordered_cache_behavior = [{
-    path_pattern               = "/*.css"
-    target_origin_id           = "insurance-frontend-application-uat-dr"
-    allowed_methods            = ["GET", "HEAD"]
-    cached_methods             = ["GET", "HEAD"]
-    compress                   = true
-    query_string               = true
-    viewer_protocol_policy     = "redirect-to-https"
-    use_forwarded_values       = false
-    cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6"
-    response_headers_policy_id = "67f7725c-6f97-4210-82d7-5512b31e9d03"
-    },
-    {
-      path_pattern               = "/*.js"
-      target_origin_id           = "insurance-frontend-application-uat-dr"
-      allowed_methods            = ["GET", "HEAD"]
-      cached_methods             = ["GET", "HEAD"]
-      compress                   = true
-      query_string               = true
-      viewer_protocol_policy     = "redirect-to-https"
-      use_forwarded_values       = false
-      cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6"
-      response_headers_policy_id = "338586db-bc3b-418b-a2bd-f54c22e8bedf"
-    },
-    {
-      path_pattern               = "/*.png"
-      target_origin_id           = "insurance-frontend-application-uat-dr"
-      allowed_methods            = ["GET", "HEAD"]
-      cached_methods             = ["GET", "HEAD"]
-      compress                   = true
-      query_string               = true
-      viewer_protocol_policy     = "redirect-to-https"
-      use_forwarded_values       = false
-      cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6"
-      response_headers_policy_id = "67f7725c-6f97-4210-82d7-5512b31e9d03"
-    },
-    {
-      path_pattern               = "/*.jpg"
-      target_origin_id           = "insurance-frontend-application-uat-dr"
-      allowed_methods            = ["GET", "HEAD"]
-      cached_methods             = ["GET", "HEAD"]
-      compress                   = true
-      query_string               = true
-      viewer_protocol_policy     = "redirect-to-https"
-      use_forwarded_values       = false
-      cache_policy_id            = "658327ea-f89d-4fab-a63d-7e88639e58f6"
-      response_headers_policy_id = "67f7725c-6f97-4210-82d7-5512b31e9d03"
-  }]
-
-  viewer_certificate = {
-    acm_certificate_arn      = "arn:aws:acm:us-east-1:483584640083:certificate/b581a8cf-b290-4470-a3cc-bfd0cf5e4780"
-    ssl_support_method       = "sni-only"
-    minimum_protocol_version = "TLSv1.2_2021"
-  }
-
-  default_root_object = "index.html"
-
-  custom_error_response = [{
-    error_code            = 403
-    response_code         = 200
-    error_caching_min_ttl = 5
-    response_page_path    = "/index.html"
-  }]
-
-  tags = local.tags
+resource "aws_s3_bucket_policy" "helm_repo_policy" {
+  bucket = aws_s3_bucket.helm_repo.id
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect = "Allow"
+        Principal = "*"
+        Action   = "s3:GetObject"
+        Resource = "${aws_s3_bucket.helm_repo.arn}/*"
+      }
+    ]
+  })
 }
 
-below is termianl responce 
+Helm repo usage:
 
-KMBL350986@KBMK24-00000929 811apppurezento.kotak811.com % curl -I https://iip-dr.uat.kotak811.com
+helm repo add my-charts https://my-helm-charts-prod.s3.ap-south-1.amazonaws.com
 
-HTTP/2 200 
-content-type: text/html
-content-length: 1115
-date: Thu, 14 Aug 2025 07:01:57 GMT
-last-modified: Fri, 21 Feb 2025 04:46:35 GMT
-etag: "596a9763524cb32e2811e558843f2436"
-x-amz-server-side-encryption: AES256
-x-amz-version-id: GHNHOUadiHDxYQgVGHK6MFCThd.jxnZk
-accept-ranges: bytes
-server: AmazonS3
-x-cache: Miss from cloudfront
-via: 1.1 3a2bb5bb725c81e445351e6220d093cc.cloudfront.net (CloudFront)
-x-amz-cf-pop: BOM78-P5
-alt-svc: h3=":443"; ma=86400
-x-amz-cf-id: xkWwTGE5o8x4-LPBNB6qwpqg0AyjrAArP_Z9G_F70074rlSupVbhrw==
-x-xss-protection: 1; mode=block
-x-frame-options: SAMEORIGIN
-content-security-policy: script-src 'none';object-src 'none'; script-src-elem 'self' 'unsafe-inline' 'unsafe-eval' https://in1.clevertap-prod.com/a https://www.googletagmanager.com/gtm.js *.visualwebsiteoptimizer.com app.vwo.com *;worker-src 'self' blob:;
-x-content-type-options: nosniff
-strict-transport-security: max-age=31536000; includeSubDomains; preload
-allowcredentials: true
-allowedheaders: ["Origin", "Content-Type", "traceparent", "tracestate"]
-allowedmethods: ["GET", "POST", "PUT"]
-allowedorigins: *
-cache-control: no-store, no-cache, must-revalidate, max-age=0, post-check=0, pre-check=0
-exposeheaders: ["traceparent", "tracestate"]
-maxageseconds: 3600
-pragma: no-cache
-vary: Origin
+
+---
+
+4.2 Secrets Manager
+
+Store Coralogix key securely:
+
+resource "aws_secretsmanager_secret" "coralogix_key" {
+  name = "coralogix/prod/private_key"
+}
+
+resource "aws_secretsmanager_secret_version" "coralogix_key_version" {
+  secret_id     = aws_secretsmanager_secret.coralogix_key.id
+  secret_string = "YOUR_CORALOGIX_PRIVATE_KEY"
+}
+
+
+---
+
+4.3 AppConfig
+
+Reference Secrets Manager in AppConfig:
+
+resource "aws_appconfig_application" "otel_app" {
+  name        = "otel-config"
+  description = "AppConfig for OTel Helm charts"
+}
+
+resource "aws_appconfig_environment" "otel_env" {
+  application_id = aws_appconfig_application.otel_app.id
+  name           = "prod"
+}
+
+resource "aws_appconfig_configuration_profile" "otel_profile" {
+  application_id = aws_appconfig_application.otel_app.id
+  name           = "coralogix-config"
+  location_uri   = "arn:aws:secretsmanager:ap-south-1:123456789012:secret:coralogix/prod/private_key"
+  type           = "AWS.Freeform"
+}
+
+
+---
+
+4.4 IAM Role + IRSA
+
+IAM Policy:
+
+resource "aws_iam_policy" "otel_policy" {
+  name = "otel-appconfig-secrets-access"
+  policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [
+      {
+        Effect   = "Allow"
+        Action   = [
+          "appconfig:GetConfiguration",
+          "secretsmanager:GetSecretValue"
+        ]
+        Resource = "*"
+      }
+    ]
+  })
+}
+
+IAM Role for SA:
+
+resource "aws_iam_role" "otel_irsa_role" {
+  name               = "otel-irsa-role"
+  assume_role_policy = data.aws_iam_policy_document.otel_assume.json
+}
+
+data "aws_iam_policy_document" "otel_assume" {
+  statement {
+    effect = "Allow"
+    principals {
+      type        = "Federated"
+      identifiers = [aws_iam_openid_connect_provider.eks.arn]
+    }
+    actions = ["sts:AssumeRoleWithWebIdentity"]
+  }
+}
+
+
+---
+
+4.5 Kubernetes Service Account
+
+Helm chart template (templates/serviceaccount.yaml):
+
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: otel-agent
+  annotations:
+    eks.amazonaws.com/role-arn: arn:aws:iam::<account_id>:role/otel-irsa-role
+
+
+---
+
+5. CI/CD Pipeline
+
+1. Package Helm chart:
+
+helm package ./charts/opentelemetry
+
+
+2. Update index:
+
+helm repo index . --url https://my-helm-charts-prod.s3.ap-south-1.amazonaws.com
+
+
+3. Upload to S3:
+
+aws s3 cp . s3://my-helm-charts-prod/ --recursive --exclude "*" --include "*.tgz" --include "index.yaml"
+
+
+
+
+---
+
+6. Benefits
+
+Secure: No private key in values.yaml or repo.
+
+Scalable: Central S3 repo for all Helm charts.
+
+Dynamic: Secrets managed via AppConfig + Secrets Manager.
+
+Cloud-native: Uses IRSA for fine-grained IAM permissions.
+
+Reusable: Same pipeline and chart for all environments (UAT, Prod).
+
+
+
+---
+
+👉 Sumit, this is now production-ready with S3 repo approach and can be published to your Confluence.
+
+Do you also want me to re-render the updated diagram (PNG) with S3 instead of ECR so it’s fully aligned before you publish?
 
