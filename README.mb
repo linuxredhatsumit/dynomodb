@@ -1,278 +1,129 @@
-provider "aws" {
-  region = local.region
-}
+2025-08-20T10:40:23.1113187Z ##[section]Starting: Git Clone $(k811-config-service_repository_name) repository
+2025-08-20T10:40:23.1117473Z ==============================================================================
+2025-08-20T10:40:23.1117647Z Task : Command line
+2025-08-20T10:40:23.1117698Z Description : Run a command line script using Bash on Linux and macOS and cmd.exe on Windows
+2025-08-20T10:40:23.1117784Z Version : 2.250.1
+2025-08-20T10:40:23.1117828Z Author : Microsoft Corporation
+2025-08-20T10:40:23.1117879Z Help : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/command-line
+2025-08-20T10:40:23.1117961Z ==============================================================================
+2025-08-20T10:40:23.2771312Z Generating script.
+2025-08-20T10:40:23.2777734Z ========================== Starting Command Output ===========================
+2025-08-20T10:40:23.2792497Z [command]/usr/bin/bash --noprofile --norc /home/app_user/workspace/Agent4/_work/_temp/826a7aa2-7851-497b-b15d-cfdb17fa4388.sh
+2025-08-20T10:40:23.2968608Z /home/app_user/workspace/Agent4/_work/_temp/826a7aa2-7851-497b-b15d-cfdb17fa4388.sh: line 2: k811-config-service_repository_name: command not found
+2025-08-20T10:40:23.3036400Z /home/app_user/workspace/Agent4/_work/_temp/826a7aa2-7851-497b-b15d-cfdb17fa4388.sh: line 3: k811-config-service_repository_name: command not found
+2025-08-20T10:40:23.3061576Z Cloning into '_git'...
+2025-08-20T10:40:24.0848740Z fatal: repository 'https://kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/' not found
+2025-08-20T10:40:24.0936748Z ##[error]Bash exited with code '128'.
+2025-08-20T10:40:24.0980860Z ##[section]Finishing: Git Clone $(k811-config-service_repository_name) repository
 
-locals {
-  region = "ap-south-1"
-  name = "coralogix"
-  ecr_name   = "coralogix/coralogix_dev"
-  role_name = "coraloigx-dev-eks-sa"
-  sa_name   =  "coraloigx-dev-sa"
-  kms_key_arn = "arn:aws:kms:ap-south-1:483584640083:key/fd55a4ac-4afd-467f-b41d-ce6881f6cd61"
-  env ="dev"
-  dev_oidc_id = "0D04991F1AA697F7FD8125ABFBEE2857"
+bliew is pipeline
+trigger: none
+variables:
+- group: Kotak-ECR-Credentials
+- group: onb-811-services
+- name: ENV
+value: dev-arm
+# ApiGW variables
+- name: apigw_env
+value: dev
+#pool details
+- name: POOL_NAME
+value: 'K811-DevOps'
+# Docker details
+- name: AWS_REGION
+value: ap-south-1
+- name: AWS_ACCOUNT_ID
+value: '483584640083'
+# For AWS Role Access
+- name: ROLE_NAME
+value: EKS_Setup_Role
+# Dockerfile Path
+- name: DOCKERFILE_PATH
+value: docker/app/Dockerfile
+# helm related variables
+- name: HELM_CHARTS_PATH
+value: helm-charts/k811-config-service/charts
+- name: HELM_S3BUCKET_URL
+value: s3://kotak811-helmcharts/dev/k811-config-service/
+- name: KUBE_CONFIG_PATH
+value: /home/app_user/.kube/config-dev-arm
+- name: NAMESPACE
+value: dev
 
-  tags = {
-    application-name         = "811 Onboarding App"
-    entity                   = "KMBL"
-    application-id           = "APP-01783"
-    application-owner        = "Devops"
-    application-manager      = "Ravi P. Srivastav"
-    vertical-tlt             = "Amlan Mandal"
-    application-rating       = "high"
-    ticket-id                = "DEVOPS-9241"
-    environment              = "dev"
-    project-name             = "Coralogix"
-    Name                     = "ecr-sa-coralogix"
-    budget-type              = "rtb"
-    monitoring               = "yes"
-    db-engine                = "NA"
-    created-date             = "18-07-2025"
-    instance-node-type       = "NA"
-    backup                   = "no"
-    scheduler-start          = "NA"
-    scheduler-stop           = "NA"
-    end-date                 = "NA"
-    created-by-terraform     = "yes"
-    terraform-version        = "1.11.4"
-    resource-name            = "ecr-sa-dev"
-    project-811              = "CORALOGIX"
-  }
-}
+parameters:
+- name: service
+displayName: 'Service Name'
+type: string
+default: 'k811-config-service'
+values:
+- k811-config-service
+- name: Env
+displayName: Env
+type: string
+default: dev-arm
+- name: BRANCH_NAME
+displayName: BRANCH_NAME
+type: string
+default: development
+- name: CheckMarxScan
+displayName: CheckMarxScan
+type: boolean
+default: false
+- name: RunAPIGWDeploy
+displayName: 'APIGW Deploy'
+type: boolean
+default: false
+- name: RestartPod
+displayName: 'Restart Service'
+type: boolean
+default: false
+- name: ServiceBuild
+displayName: ServiceBuild
+type: boolean
+default: false
+- name: ENABLE_ISTIO
+displayName: Custom Istio Image
+type: boolean
+default: 'false'
 
-data "aws_caller_identity" "current" {}
-data "aws_partition" "current" {}
+pool:
+name: $(POOL_NAME)
 
-################################################################################
-# ECR Repository
-################################################################################
+stages:
+- template: ../templates/dev/pod-restart.yaml
+parameters:
+RestartPod: '${{ parameters.RestartPod }}'
+ServiceBuild: '${{ parameters.ServiceBuild }}'
+service: '${{ parameters.service }}'
 
-module "ecr_disabled" {
-  source = "../../../terraform-modules/ecr"
+- template: ../templates/dev/checkmarx-scan-dev.yaml
+parameters:
+CheckMarxScan: '${{ parameters.CheckMarxScan }}'
+service: '${{ parameters.service }}'
 
-  create = false
-}
+- template: ../templates/dev/docker-build-dev.yaml
+parameters:
+BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
+ServiceBuild: '${{ parameters.ServiceBuild }}'
+service: '${{ parameters.service }}'
 
-module "ecr" {
-  source = "../../../terraform-modules/ecr"
+- template: ../templates/dev/helm-build-dev.yaml
+parameters:
+Env: '${{ parameters.Env }}'
+BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
+ServiceBuild: '${{ parameters.ServiceBuild }}'
+service: '${{ parameters.service }}'
+ENABLE_ISTIO: '${{ parameters.ENABLE_ISTIO }}'
+ISTIO_IMAGE: '$(ECR_ISTIO_ENHANCED_IMAGE_TAG)'
 
-  repository_name = local.ecr_name
+- template: ../templates/dev/apigateway-deploy-dev.yaml
+parameters:
+BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
+RunAPIGWDeploy: '${{ parameters.RunAPIGWDeploy }}'
+service: '${{ parameters.service }}'
 
-  repository_read_write_access_arns = [
-    "arn:${data.aws_partition.current.partition}:iam::${data.aws_caller_identity.current.account_id}:root"
-    ]
-
-  create_lifecycle_policy = false
-  repository_force_delete = true
-
-  repository_encryption_type    = "KMS"
-  repository_kms_key = local.kms_key_arn
-
-  tags = local.tags
-}
-
-###############################
-# IAM Role for onb-dev SA
-###############################
-module "eks_sa_iam_role" {
-  source = "../../../terraform-modules/iam/modules/iam-assumable-role-with-oidc"
-
-  create_role = true
-
-  role_name = local.role_name
-
-  provider_urls = ["oidc.eks.ap-south-1.amazonaws.com/id/${local.dev_oidc_id}"]
-
-  role_policy_arns = [
-    module.iam_policy.arn
-  ]
-
-  oidc_fully_qualified_subjects = ["system:serviceaccount:${local.env}:${local.sa_name}"]
-
-  tags = local.tags
-}
-
-#########################################
-# IAM policy
-#########################################
-module "iam_policy" {
-  source = "../../../terraform-modules/iam/modules/iam-policy"
-
-  name        = "${local.role_name}-policy"
-  path        = "/"
-  description = "Customized policy for the ${local.role_name} to access aws services"
-
-  policy = <<EOF
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Action": [
-                "kms:Decrypt",
-                "kms:Encrypt",
-                "kms:GenerateDataKey"
-            ],
-            "Effect": "Allow",
-            "Resource": [
-                "arn:aws:kms:ap-south-1:483584640083:key/fd55a4ac-4afd-467f-b41d-ce6881f6cd61",
-                "arn:aws:kms:ap-south-1:483584640083:key/cc498c37-f3b6-4dfa-a9fb-4e98996be115"
-            ]
-        },       
-        {
-            "Action": [
-                "appconfig:ListTagsForResource",
-                "appconfig:GetHostedConfigurationVersion",
-                "appconfig:GetDeployment",
-                "appconfig:ListEnvironments",
-                "appconfig:StartDeployment",
-                "appconfig:GetExtensionAssociation",
-                "appconfig:GetLatestConfiguration",
-                "appconfig:ListDeployments",
-                "appconfig:GetExtension",
-                "appconfig:GetEnvironment",
-                "appconfig:GetDeploymentStrategy",
-                "appconfig:ListConfigurationProfiles",
-                "appconfig:GetConfiguration",
-                "appconfig:GetApplication",
-                "appconfig:GetConfigurationProfile",
-                "appconfig:ListHostedConfigurationVersions",
-                "appconfig:StartConfigurationSession"
-            ],
-            "Effect": "Allow",
-            "Resource": [
-                "arn:aws:appconfig:ap-south-1:483584640083:application/hpvzqlc",
-                "arn:aws:appconfig:ap-south-1:483584640083:application/hpvzqlc/configurationprofile/*",
-                "arn:aws:appconfig:ap-south-1:483584640083:application/hpvzqlc/environment/*"
-            ]
-        },
-        {
-          "Action": [
-              "s3:ListBucket",
-              "s3:GetObject",
-              "s3:PutObject"
-          ],
-          "Effect": "Allow",
-          "Resource": [
-              "arn:aws:s3:::811-coralogix-dev",
-              "arn:aws:s3:::811-coralogix-dev/*"
-          ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-              "secretsmanager:GetSecretValue"
-            ],
-            "Resource": [
-              "arn:aws:secretsmanager:ap-south-1:483584640083:secret:coralogix-dKXGxg"
-            ]
-       } 
-    ]
-}
-EOF
-   tags = local.tags
-}
-
-###################R
-module "secrets_manager_key" {
-  source = "../../../terraform-modules/secrets-manager"
-
-  # Secret
-  name                    = local.name
-  description             = "Secret for dev coralogix key"
-  recovery_window_in_days = 0
-  kms_key_id              = "arn:aws:kms:ap-south-1:483584640083:key/aa24dda9-74b3-44c1-b6c6-311903b381cd"
-  # Policy
-  create_policy       = false
-  block_public_policy = true
-  enable_rotation = false
-
-  secret_string = jsonencode({
-    CORALOGIX_DEV_KEY                      = ""
-    
-  })
-
-  tags = local.tags
-}
-
-
-
-
-#############
-module "iam_assumable_role_custom" {
-  source = "../../../terraform-modules/iam/modules/iam-assumable-role"
-
-  role_name               = "coraloigx-dev-eks"
-  create_role             = true
-  create_instance_profile = true
-  role_requires_mfa       = false
-  #depends_on = [time_sleep.wait_10_seconds]
-
-  #   create_custom_role_trust_policy = true
-  custom_role_trust_policy = <<EOF
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Principal": {
-                "Service": "appconfig.amazonaws.com"
-            },
-            "Action": "sts:AssumeRole",
-            "Condition": {
-                "StringEquals": {
-                    "aws:SourceAccount": "483584640083"
-                },
-                "ArnLike": {
-                    "aws:SourceArn": 
-                    [ 
-                      "arn:aws:appconfig:ap-south-1:483584640083:application/hpvzqlc/*"
-                    ]
-
-                }
-            }
-        }
-    ]
-}
-EOF
-
-
-  custom_role_policy_arns = [
-    module.iam_policy.arn
-  ]
-
-  tags = local.tags
-
-}
-
-##########
-
-
-resource "aws_appconfig_configuration_profile" "key_profile" {
-  name           = "coralogix-dev-secret"
-  application_id = "hpvzqlc"
-  description    = "coralogix-dev-secret"
-  location_uri   = "arn:aws:secretsmanager:ap-south-1:483584640083:secret:coralogix-dKXGxg"
-  retrieval_role_arn = module.iam_assumable_role_custom.iam_role_arn
-  #depends_on = [time_sleep.wait_10_seconds]
-  tags = local.tags
-  depends_on = [ module.iam_assumable_role_custom ]
-}
-terraform {
-  backend "s3" {
-      bucket            = "kotak811-terraform-state"
-      key               = "kotak811/env/kotak811-dev/ecr_sa-role/onb-dev-coralogix/ecr_sa.tfstate"
-      region            = "ap-south-1"
-      dynamodb_table    = "tf-up-and-run-locks"
-      encrypt           = true
-    }
-}
-
-
-
-belw is error
-Error: creating AppConfig Configuration Profile (coralogix-dev-secret) for Application (hpvzqlc): operation error AppConfig: CreateConfigurationProfile, https response error StatusCode: 400, RequestID: ee0472ea-fc03-45cc-bbe4-226c78351a91, BadRequestException: Access to KMS is not allowed (Service: AWSSecretsManager; Status Code: 400; Error Code: AccessDeniedException; Request ID: d2364f6c-5c63-41f3-8041-71fe2a2d35a0; Proxy: null)
-│ 
-│   with aws_appconfig_configuration_profile.key_profile,
-│   on main.tf line 250, in resource "aws_appconfig_configuration_profile" "key_profile":
-│  250: resource "aws_appconfig_configuration_profile" "key_profile" {
-│ 
+- template: ../templates/dev/prisma-scan-dev.yaml
+parameters:
+BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
+ServiceBuild: '${{ parameters.ServiceBuild }}'
+service: '${{ parameters.service }}'
