@@ -1,3 +1,11 @@
-helm repo add dev-coralogix-s3 https://kotak811-helmcharts.s3.ap-south-1.amazonaws.com/dev/coralogix-dev
-helm repo update
-helm search repo dev-coralogix-s3/otel-integration
+app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$ helm repo add dev-coralogix-s3 https://kotak811-helmcharts.s3.ap-south-1.amazonaws.com/dev/coralogix-dev
+Error: looks like "https://kotak811-helmcharts.s3.ap-south-1.amazonaws.com/dev/coralogix-dev" is not a valid chart repository or cannot be reached: failed to fetch https://kotak811-helmcharts.s3.ap-south-1.amazonaws.com/dev/coralogix-dev/index.yaml : 403 Forbidden
+app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$ aws s3 ls https://kotak811-helmcharts.s3.ap-south-1.amazonaws.com/dev/coralogix-dev
+
+Parameter validation failed:
+Invalid bucket name "https:": Bucket name must match the regex "^[a-zA-Z0-9.\-_]{1,255}$" or be an ARN matching the regex "^arn:(aws).*:(s3|s3-object-lambda):[a-z\-0-9]*:[0-9]{12}:accesspoint[/:][a-zA-Z0-9\-.]{1,63}$|^arn:(aws).*:s3-outposts:[a-z\-0-9]+:[0-9]{12}:outpost[/:][a-zA-Z0-9\-]{1,63}[/:]accesspoint[/:][a-zA-Z0-9\-]{1,63}$"
+app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$ aws s3 ls https://kotak811-helmcharts.s3.ap-south-1.amazonaws.com/dev/coral^Cix-dev
+app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$ aws s3 ls s3://kotak811-helmcharts/dev/coralogix-dev/
+2025-08-23 10:45:24       2312 index.yaml
+2025-08-23 10:44:46     326625 otel-integration-0.0.168.tgz
+app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$
