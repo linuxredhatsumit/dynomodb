@@ -1,181 +1,138 @@
-Title:
-
-EKS Coralogix Integration with AWS AppConfig, Secrets Manager, IRSA, and Helm ECR Repository
-
-1. Objective
-
-The purpose of this document is to outline the production-level setup for integrating Coralogix in an Amazon EKS cluster using a vendored Helm chart hosted in Amazon ECR, while securely managing secrets through AWS Secrets Manager and configuration via AWS AppConfig, accessed using IAM Roles for Service Accounts (IRSA).
-
-2. Use Case
-
-Centralized logging and monitoring in EKS with Coralogix OpenTelemetry Integration.
-
-Secure retrieval of sensitive data (CORALOGIX_PRIVATE_KEY) from AWS Secrets Manager.
-
-Environment-specific configuration through AWS AppConfig.
-
-Chart version management by hosting Helm charts in a private ECR Helm repository.
-
-Fully automated and secure setup without storing secrets in values.yaml.
-
-3. Architecture Overview
-
-High-Level Flow:
-
-Helm chart (infra/coralogix/) is vendored into our Git repo and uploaded to an Amazon ECR Helm repository.
-
-Application pods are deployed via Helm with a Kubernetes Service Account (SA) linked to an IRSA role.
-
-IRSA role has IAM permissions to:
-
-Fetch configuration from AWS AppConfig.
-
-Access the Coralogix private key stored in AWS Secrets Manager.
-
-AppConfig references the Secrets Manager ARN for the CORALOGIX_PRIVATE_KEY.
-
-OpenTelemetry agent in the pod reads the configuration and pushes logs/metrics/traces to Coralogix.
-
-4. Components
-4.1 Helm Chart
-
-Path: infra/coralogix/
-Structure:
-
-infra/
-└── coralogix/
-    ├── Chart.yaml
-    ├── templates/
-    │   ├── serviceaccount.yaml
-    │   ├── configmap-appconfig.yaml
-    │   └── secret-coralogix.yaml (if using K8s secret injection)
-    ├── values/
-    │   ├── uat.yaml
-    │   ├── prod.yaml
-    └── helm-release.yaml
-
-
-Chart.yaml – Chart metadata, references upstream chart if wrapping.
-
-templates/ – Contains additional K8s manifests such as:
-
-ServiceAccount with IRSA annotation.
-
-ConfigMap to load AppConfig parameters.
-
-Optional Secret manifest if needed.
-
-values/ – Environment-specific values (uat.yaml, prod.yaml).
-
-4.2 AWS AppConfig
-
-Stores Coralogix configuration JSON (non-secret).
-
-Has an attribute that references the CORALOGIX_PRIVATE_KEY stored in Secrets Manager.
-
-4.3 AWS Secrets Manager
-
-Stores CORALOGIX_PRIVATE_KEY.
-
-Accessible only via IRSA role attached to the Kubernetes ServiceAccount.
-
-4.4 IRSA (IAM Roles for Service Accounts)
-
-Role permissions:
-
-appconfig:GetConfiguration
-
-secretsmanager:GetSecretValue
-
-Trust policy for EKS OIDC provider.
-
-4.5 ECR Helm Repository
-
-Private ECR registry to host packaged Helm charts.
-
-Version-controlled chart images in OCI format.
-
-5. Deployment Flow
-
-Vendoring the Chart
-
-helm pull <upstream-chart> --untar
-mv otel-integration infra/coralogix/
-
-
-Package Helm Chart
-
-helm package infra/coralogix/
-
-
-Push Chart to ECR
-
-aws ecr create-repository --repository-name helm/coralogix --region ap-south-1
-
-aws ecr get-login-password --region ap-south-1 | helm registry login \
-    --username AWS \
-    --password-stdin <AWS_ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com
-
-helm push coralogix-<version>.tgz oci://<AWS_ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/helm/coralogix
-
-
-Create Secrets Manager Entry
-
-aws secretsmanager create-secret \
-  --name coralogix/prod/private_key \
-  --secret-string "<PRIVATE_KEY>"
-
-
-Create AppConfig Application & Environment
-
-Store JSON config referencing Secrets Manager ARN.
-
-Create IRSA Role
-
-Attach IAM policy for AppConfig & Secrets Manager.
-
-Annotate ServiceAccount in Helm chart.
-
-Deploy via Helm from ECR
-
-helm registry login <AWS_ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com
-helm upgrade --install coralogix oci://<AWS_ACCOUNT_ID>.dkr.ecr.ap-south-1.amazonaws.com/helm/coralogix \
-  -f values/prod.yaml
-
-6. High-Level Architecture Diagram
-
-(Insert updated ECR-based diagram here)
-
-Diagram Components:
-
-EKS Cluster
-
-Service Account with IRSA Role
-
-AWS AppConfig
-
-AWS Secrets Manager
-
-Amazon ECR Helm Repo
-
-Coralogix
-
-7. Security Considerations
-
-Secrets are never stored in values.yaml or Git.
-
-IRSA ensures least privilege and no static AWS credentials in pods.
-
-ECR Helm repo is private and version-controlled.
-
-Access to AppConfig and Secrets Manager is scoped only to required namespaces/service accounts.
-
-8. Benefits
-
-Security: No hardcoded secrets, IAM-based access.
-
-Maintainability: Versioned Helm charts in ECR.
-
-Flexibility: Environment-specific configs via AppConfig.
-
-Scalability: Works seamlessly across UAT/Prod.
+value.yaml-----
+global:
+  clusterName: k811-eks-onb-dev
+  collectionInterval: 60s
+  domain: coralogix.in
+opentelemetry-agent:
+  config:
+    processors:
+      transform/remove-loglabels:
+        error_mode: ignore
+        log_statements:
+        - context: resource
+          statements:
+          - delete_key(attributes, "host.image.id")
+          - delete_key(attributes, "k8s.pod.uid")
+          - delete_key(attributes, "cloud.account.id")
+          - delete_key(attributes, "cloud.platform")
+          - delete_key(attributes, "cloud.availability.zone")
+          - delete_key(attributes, "cloud.availability_zone")
+          - delete_key(attributes, "os.type")
+          - delete_key(attributes, "cloud.provider")
+          - delete_key(attributes, "cloud.region")
+          - delete_key(attributes, "host.type")
+    service:
+      pipelines:
+        logs:
+          processors:
+          - k8sattributes
+          - resourcedetection/env
+          - resourcedetection/region
+          - batch
+          - transform/remove-loglabels
+        traces:
+          exporters:
+          - loadbalancing
+  enabled: true
+  mode: daemonset
+  presets:
+    loadBalancing:
+      enabled: true
+      hostname: coralogix-opentelemetry-gateway
+      routingKey: traceID
+    spanMetrics:
+      enabled: true
+opentelemetry-agent-windows:
+  enabled: false
+opentelemetry-cluster-collector:
+  enabled: true
+opentelemetry-gateway:
+  config:
+    processors:
+      tail_sampling:
+        policies:
+        - name: errors-policy
+          status_code:
+            status_codes:
+            - ERROR
+          type: status_code
+        - name: randomized-policy
+          probabilistic:
+            sampling_percentage: 10
+          type: probabilistic
+  enabled: true
+  replicaCount: 3
+
+serviceaccount:
+  name: coraloigx-dev-sa
+  enabled: true
+  role: arn:aws:iam::483584640083:role/coraloigx-dev-eks-sa
+rolebinding: coraloigx-dev-rb
+
+appconfig:
+  APPCONFIG_ENABLED: "true"
+  APPCONFIG_ENVIRONMENT: "development"
+  APPCONFIG_APPLICATION: "coralogix"
+
+
+
+template/config.yaml-----
+{{- if not .Values.ssmParameter.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Chart.Name }}-configmap
+  namespace: {{ .Values.namespace }}
+data:
+  {{- range $key, $value := .Values.appconfig }}
+  {{ $key }}: {{ $value | toString | quote }}
+  {{- end }}
+{{- end }}
+
+
+templae/rolebanding.yaml
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Values.rolebinding }}
+  namespace: {{ .Values.namespace }}
+subjects:
+- kind: ServiceAccount
+  name: {{ .Values.serviceaccount.name }}
+  namespace: {{ .Values.namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Values.role.name }}
+
+templte/servcieaccount.yaml----
+{{- if .Values.serviceaccount.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  annotations: 
+    eks.amazonaws.com/role-arn: {{ .Values.serviceaccount.role }}
+  name: {{ .Values.serviceaccount.name }}
+  namespace: {{ .Values.namespace }}
+{{- end }}
+
+templte/_hleper.tpl
+#templates/helpers.tpl
+{{/* vim: set filetype=mustache: */}}
+{{/*
+Expand the name of the chart.
+*/}}
+{{- define "name" -}}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+{{/*
+Create a default fully qualified app name.
+We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
+*/}}
+{{- define "fullname" -}}
+{{- $name := default .Chart.Name .Values.nameOverride -}}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- end -}}
+
+  APPCONFIG_PROFILE: "coralogix-dev-secret"
