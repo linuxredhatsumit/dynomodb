@@ -1,9 +1,14 @@
-value.yaml-----
+value.yaml--------------------
+namespace: dev-arm
+
 global:
   clusterName: k811-eks-onb-dev
   collectionInterval: 60s
   domain: coralogix.in
+
 opentelemetry-agent:
+  enabled: true
+  mode: daemonset
   config:
     processors:
       transform/remove-loglabels:
@@ -25,16 +30,14 @@ opentelemetry-agent:
       pipelines:
         logs:
           processors:
-          - k8sattributes
-          - resourcedetection/env
-          - resourcedetection/region
-          - batch
-          - transform/remove-loglabels
+            - k8sattributes
+            - resourcedetection/env
+            - resourcedetection/region
+            - batch
+            - transform/remove-loglabels
         traces:
           exporters:
-          - loadbalancing
-  enabled: true
-  mode: daemonset
+            - loadbalancing
   presets:
     loadBalancing:
       enabled: true
@@ -42,42 +45,91 @@ opentelemetry-agent:
       routingKey: traceID
     spanMetrics:
       enabled: true
+
 opentelemetry-agent-windows:
   enabled: false
+
 opentelemetry-cluster-collector:
   enabled: true
+
 opentelemetry-gateway:
+  enabled: true
+  replicaCount: 3
   config:
     processors:
       tail_sampling:
         policies:
-        - name: errors-policy
-          status_code:
-            status_codes:
-            - ERROR
-          type: status_code
-        - name: randomized-policy
-          probabilistic:
-            sampling_percentage: 10
-          type: probabilistic
-  enabled: true
-  replicaCount: 3
+          - name: errors-policy
+            status_code:
+              status_codes: [ERROR]
+            type: status_code
+          - name: randomized-policy
+            probabilistic:
+              sampling_percentage: 10
+            type: probabilistic
 
 serviceaccount:
-  name: coraloigx-dev-sa
   enabled: true
-  role: arn:aws:iam::483584640083:role/coraloigx-dev-eks-sa
-rolebinding: coraloigx-dev-rb
+  name: coralogix-dev-sa
+  role: arn:aws:iam::483584640083:role/coralogix-dev-eks-sa
+
+role:
+  name: coralogix-dev-role
+
+rolebinding:
+  name: coralogix-dev-rb
 
 appconfig:
   APPCONFIG_ENABLED: "true"
   APPCONFIG_ENVIRONMENT: "development"
   APPCONFIG_APPLICATION: "coralogix"
+  APPCONFIG_PROFILE: "coralogix-dev-secret"
 
 
 
-template/config.yaml-----
-{{- if not .Values.ssmParameter.enabled }}
+#############################
+{{/* Expand chart name */}}
+{{- define "otel-integration.name" -}}
+{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
+{{- end }}
+
+{{/* Create fully qualified app name */}}
+{{- define "otel-integration.fullname" -}}
+{{- $name := default .Chart.Name .Values.nameOverride -}}
+{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
+{{- end }}
+
+
+############################
+{{- if .Values.serviceaccount.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.serviceaccount.name }}
+  namespace: {{ .Values.namespace }}
+  annotations:
+    eks.amazonaws.com/role-arn: {{ .Values.serviceaccount.role }}
+{{- end }}
+
+
+################################
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Values.rolebinding.name }}
+  namespace: {{ .Values.namespace }}
+subjects:
+  - kind: ServiceAccount
+    name: {{ .Values.serviceaccount.name }}
+    namespace: {{ .Values.namespace }}
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ .Values.role.name }}
+
+
+
+##############################
 apiVersion: v1
 kind: ConfigMap
 metadata:
@@ -87,52 +139,3 @@ data:
   {{- range $key, $value := .Values.appconfig }}
   {{ $key }}: {{ $value | toString | quote }}
   {{- end }}
-{{- end }}
-
-
-templae/rolebanding.yaml
-apiVersion: rbac.authorization.k8s.io/v1
-kind: RoleBinding
-metadata:
-  name: {{ .Values.rolebinding }}
-  namespace: {{ .Values.namespace }}
-subjects:
-- kind: ServiceAccount
-  name: {{ .Values.serviceaccount.name }}
-  namespace: {{ .Values.namespace }}
-roleRef:
-  apiGroup: rbac.authorization.k8s.io
-  kind: Role
-  name: {{ .Values.role.name }}
-
-templte/servcieaccount.yaml----
-{{- if .Values.serviceaccount.enabled }}
-apiVersion: v1
-kind: ServiceAccount
-metadata:
-  annotations: 
-    eks.amazonaws.com/role-arn: {{ .Values.serviceaccount.role }}
-  name: {{ .Values.serviceaccount.name }}
-  namespace: {{ .Values.namespace }}
-{{- end }}
-
-templte/_hleper.tpl
-#templates/helpers.tpl
-{{/* vim: set filetype=mustache: */}}
-{{/*
-Expand the name of the chart.
-*/}}
-{{- define "name" -}}
-{{- default .Chart.Name .Values.nameOverride | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
-
-{{/*
-Create a default fully qualified app name.
-We truncate at 63 chars because some Kubernetes name fields are limited to this (by the DNS naming spec).
-*/}}
-{{- define "fullname" -}}
-{{- $name := default .Chart.Name .Values.nameOverride -}}
-{{- printf "%s-%s" .Release.Name $name | trunc 63 | trimSuffix "-" -}}
-{{- end -}}
-
-  APPCONFIG_PROFILE: "coralogix-dev-secret"
