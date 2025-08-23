@@ -1,5 +1,1 @@
-app_user@KBUTEC81L20293:~$ helm repo list  --kubeconfig ~/.kube/config-dev-arm | grep coralogix
-coralogix-charts-virtual                                        https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
-coralogix                                                       https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
-coralogix-uat                                                   https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
-app_user@KBUTEC81L20293:~$
+ helm upgrade otel-coralogix-integration coralogix-charts-virtual/otel-integration -f  override_only.yaml -n coralogix --kubeconfig ~/.kube/config-uat
