@@ -1,3 +1,5 @@
-app_user@KBUTEC81L20293:~$ helm list -A --kubeconfig ~/.kube/config-dev-arm | grep coralogix
-otel-coralogix-integration                              coralogix               1               2025-04-17 13:51:41.250375926 +0000 UTC deployed        otel-integration-0.0.168
+app_user@KBUTEC81L20293:~$ helm repo list  --kubeconfig ~/.kube/config-dev-arm | grep coralogix
+coralogix-charts-virtual                                        https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
+coralogix                                                       https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
+coralogix-uat                                                   https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
 app_user@KBUTEC81L20293:~$
