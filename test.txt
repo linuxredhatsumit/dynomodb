@@ -1,45 +1,8 @@
-dev-arm-k811-service-request-cronjob                            s3://kotak811-helmcharts/dev/k811-service-request-cronjob/
-uat-k811-service-request-cronjob                                s3://kotak811-helmcharts/dev/k811-service-request-cronjob/
-dev-arm-k811-pl-service-cronjob                                 s3://kotak811-helmcharts/dev/k811-pl-service-cronjob/
-uat-dr-k811-pl-service-cronjob                                  s3://kotak811-helmcharts-dr/dev/k811-pl-service-cronjob/
-uat-k811-pl-service-cronjob                                     s3://kotak811-helmcharts/dev/k811-pl-service-cronjob/
-dev-arm-k811-app-pin                                            s3://kotak811-helmcharts/dev/k811-app-pin/
-vmware-tanzu                                                    https://vmware-tanzu.github.io/helm-charts
-falcosecurity                                                   https://falcosecurity.github.io/charts
-uat-k811-motor-insurance                                        s3://kotak811-helmcharts/uat/k811-motor-insurance/
-uat-k811-ms-kyc-bitly-submit-new-cronjob                        s3://kotak811-helmcharts/uat/k811-ms-kyc-bitly-submit-new-cronjob/
-dev-arm-k811-service-requests-cronjob-pb-cb-bundle-applications s3://kotak811-helmcharts/dev/k811-service-requests-cronjob-pb-cb-bundle-applications/
-dev-arm-k811-service-requests-nominee-email-cronjob             s3://kotak811-helmcharts/dev/k811-service-requests-nominee-email-cronjob/
-uat-k811-service-requests-nominee-email-cronjob                 s3://kotak811-helmcharts/dev/k811-service-requests-nominee-email-cronjob/
-dev-arm-k811-app-ms-codepush-server                             s3://kotak811-helmcharts/dev/k811-app-ms-codepush/
-uat-k811-bre-dreamfyre                                          s3://kotak811-helmcharts/uat/k811-bre-dreamfyre/
-dev-arm-k811-cl-bop                                             s3://kotak811-helmcharts/dev/k811-cl-bop/
-dev-k811-app-ms-codepush-server                                 s3://kotak811-helmcharts/dev/k811-app-ms-codepush/
-uat-k811-product-catalog                                        s3://kotak811-helmcharts/uat/k811-product-catalog/
-dev-arm-k811-app-ms-accounts-transactions                       s3://kotak811-helmcharts/dev/k811-app-ms-accounts-transactions/
-dev-arm-k811-k-mobility                                         s3://kotak811-helmcharts/dev/k811-k-mobility/
-k8ssandra                                                       https://helm.k8ssandra.io/stable
-clickhouse-operator                                             https://docs.altinity.com/clickhouse-operator
-jetstack                                                        https://charts.jetstack.io
-uat-k811-bre-bolt                                               s3://kotak811-helmcharts/uat/k811-bre-bolt/
-uat-k811-devops-oncall-alerts                                   s3://kotak811-helmcharts/uat/k811-devops-oncall-alerts/
-uat-k811-k-mobility                                             s3://kotak811-helmcharts/uat/k811-k-mobility/
-dev-arm-k811-pfm-notifications                                  s3://kotak811-helmcharts/dev/k811-pfm/
-dev-arm-k811-cfl-autopay-consumer                               s3://kotak811-helmcharts/dev/k811-cfl-autopay-consumer/
-uat-k811-accounts-transactions                                  s3://kotak811-helmcharts/uat/k811-accounts-transactions/
-dev-arm-k811-data-products                                      s3://kotak811-helmcharts/dev/k811-data-products/
-dev-arm-k811-bridge-ai                                          s3://kotak811-helmcharts/dev/k811-bridge-ai/
-uat-k811-service-requests-pb-cb-bundle-cronjob                  s3://kotak811-helmcharts/dev/k811-service-requests-pb-cb-bundle-cronjob/
-uat-dr-k811-service-request-cronjob                             s3://kotak811-helmcharts-dr/dev/k811-service-request-cronjob/
-dev-arm-k811-app-ms-nudge-platform                              s3://kotak811-helmcharts/dev/k811-app-ms-nudge-platform/
-dev-arm-k811-crud-vendor-intergration                           s3://kotak811-helmcharts/dev/k811-crud-vendor-intergration/
-uat-k811-app-ms-nudge-platform                                  s3://kotak811-helmcharts/uat/k811-app-ms-nudge-platform/
-dev-arm-k811-notifications-push                                 s3://kotak811-helmcharts/dev/k811-notifications-push/
-dev-arm-k811-crud-vendor-integration                            s3://kotak811-helmcharts/dev/k811-crud-vendor-integration/
-dev-arm-k811-notifications-sms                                  s3://kotak811-helmcharts/dev/k811-notifications-sms/
-kong                                                            https://charts.konghq.com
-uat-k811-crud-vendor-integration                                s3://kotak811-helmcharts/uat/k811-crud-vendor-integration/
-loft-sh                                                         https://charts.loft.sh
-uat-k811-cfl-autopay-consumer                                   s3://kotak811-helmcharts/uat/k811-cfl-autopay-consumer/
-dev-arm-k811-config-service                                     s3://kotak811-helmcharts/dev/k811-config-service/
-uat-k811-data-products                                          s3://kotak811-helmcharts/uat/k811-data-products/
+\app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$  helm search repo dev-coralogix-s3/otel-integration
+NAME                                    CHART VERSION   APP VERSION     DESCRIPTION
+dev-coralogix-s3/otel-integration       0.0.168                         OpenTelemetry Integration
+app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$  helm search repo dev-coralogix-internal/otel-integration
+No results found
+app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$ helm repo add dev-coralogix-internal s3://kotak811-helmcharts/dev/k811-eks-onb-dev
+"dev-coralogix-internal" already exists with the same configuration, skipping
+app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$
