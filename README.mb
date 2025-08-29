@@ -1,134 +1,47 @@
-trigger: none
+KMBL350986@KBMK24-00000929 otel-integration % grep -r CORALOGIX_PRIVATE_KEY .
+./central-agent-values.yaml:      privateKey: ${env:CORALOGIX_PRIVATE_KEY}
+./tail-sampling-values.yaml:      privateKey: ${env:CORALOGIX_PRIVATE_KEY}
+./values-windows.yaml:    - name: CORALOGIX_PRIVATE_KEY
+./values-windows.yaml:      privateKey: ${env:CORALOGIX_PRIVATE_KEY}
+./charts/opentelemetry-collector/examples/coralogix-exporter-pipelines/rendered/configmap-agent.yaml:        private_key: ${env:CORALOGIX_PRIVATE_KEY}
+./charts/opentelemetry-collector/examples/coralogix-exporter-pipelines/values.yaml:    privateKey: ${env:CORALOGIX_PRIVATE_KEY}
+./charts/opentelemetry-collector/examples/host-entity/rendered/configmap-agent.yaml:        private_key: ${CORALOGIX_PRIVATE_KEY}
+./charts/opentelemetry-collector/examples/host-entity/rendered/configmap-agent.yaml:              Authorization: Bearer ${env:CORALOGIX_PRIVATE_KEY}
+./charts/opentelemetry-collector/examples/opentelemetrycollector-daemonset-crd/rendered/opentelemetrycollector.yaml:    - name: CORALOGIX_PRIVATE_KEY
+./charts/opentelemetry-collector/examples/opentelemetrycollector-daemonset-crd/opentelemetrycollector-values.yaml:  - name: CORALOGIX_PRIVATE_KEY
+./charts/opentelemetry-collector/examples/daemonset-supervisor/rendered/configmap-agent.yaml:        private_key: ${env:CORALOGIX_PRIVATE_KEY}
+./charts/opentelemetry-collector/examples/daemonset-supervisor/rendered/configmap-supervisor.yaml:        Authorization: "Bearer ${env:CORALOGIX_PRIVATE_KEY}"
+./charts/opentelemetry-collector/examples/daemonset-supervisor/values.yaml:    privateKey: ${env:CORALOGIX_PRIVATE_KEY}
+./charts/opentelemetry-collector/examples/coralogix-exporter-pipeline/rendered/configmap-agent.yaml:        private_key: ${env:CORALOGIX_PRIVATE_KEY}
+./charts/opentelemetry-collector/examples/coralogix-exporter-pipeline/values.yaml:    privateKey: ${env:CORALOGIX_PRIVATE_KEY}
+./charts/opentelemetry-collector/examples/daemonset-reduced-attributes/rendered/configmap-agent.yaml:        private_key: ${CORALOGIX_PRIVATE_KEY}
+./charts/opentelemetry-collector/examples/resource-catalog/rendered/configmap.yaml:        private_key: ${CORALOGIX_PRIVATE_KEY}
+./charts/opentelemetry-collector/examples/profiles/rendered/configmap-agent.yaml:        private_key: ${CORALOGIX_PRIVATE_KEY}
+./charts/opentelemetry-collector/templates/_config.tpl:    private_key: "${CORALOGIX_PRIVATE_KEY}"
+./charts/opentelemetry-collector/templates/_config.tpl:            Authorization: "Bearer ${env:CORALOGIX_PRIVATE_KEY}"
+./charts/opentelemetry-collector/templates/_config.tpl:    private_key: "${CORALOGIX_PRIVATE_KEY}"
+./charts/opentelemetry-collector/templates/_config.tpl:    private_key: "${CORALOGIX_PRIVATE_KEY}"
+./charts/opentelemetry-collector/templates/configmap-supervisor.yaml:        Authorization: "Bearer ${env:CORALOGIX_PRIVATE_KEY}"
+./charts/opentelemetry-collector/values.yaml:    privateKey: ${env:CORALOGIX_PRIVATE_KEY}
+./values.yaml:    - name: CORALOGIX_PRIVATE_KEY
+./values.yaml:      privateKey: ${env:CORALOGIX_PRIVATE_KEY}
+./values.yaml:      privateKey: ${env:CORALOGIX_PRIVATE_KEY}
+./values.yaml:    - name: CORALOGIX_PRIVATE_KEY
+./values.yaml:    - name: CORALOGIX_PRIVATE_KEY
+./values.yaml:      privateKey: ${env:CORALOGIX_PRIVATE_KEY}
+./values.yaml:    - name: CORALOGIX_PRIVATE_KEY
+./values.yaml:      privateKey: ${env:CORALOGIX_PRIVATE_KEY}
+./values-windows-tailsampling.yaml:    - name: CORALOGIX_PRIVATE_KEY
+./values-windows-tailsampling.yaml:        private_key: "${env:CORALOGIX_PRIVATE_KEY}"
+KMBL350986@KBMK24-00000929 otel-integration % 
 
-parameters:
-  - name: service
-    displayName: Select Cluster/Service
-    type: string
-    default: k811-eks-onb-dev
-    values:
-      - k811-eks-onb-dev
-      - k811-eks-corsshell-dev
-      - k811-eks-onb-prod
 
-variables:
-  - group: onb-service-apigw-dev
-  - group: Kotak-ECR-Credentials
 
-  - name: ENV
-    value: dev-arm
-  - name: apigw_env
-    value: dev
-
-  # pool
-  - name: POOL_NAME
-    value: "K811-DevOps"
-
-  # AWS role / region
-  - name: AWS_REGION
-    value: ap-south-1
-  - name: AWS_ACCOUNT_ID
-    value: "483584640083"
-  - name: ROLE_NAME
-    value: EKS_Setup_Role
-
-  # helm repo/chart paths
-  - name: HELM_CHARTS_PATH
-    value: coralogix/charts
-  - name: HELM_S3BUCKET_URL
-    value: s3://kotak811-helmcharts/dev/${{ parameters.service }}/
-  - name: NAMESPACE
-    value: coralogix
-
-  # cluster mapping
-  - name: K8S_CLUSTER_NAME
-    ${{ if eq(parameters.service, 'k811-eks-onb-dev') }}:
-      value: "k811-eks-onb-dev"
-    ${{ if eq(parameters.service, 'k811-eks-corsshell-dev') }}:
-      value: "k811-eks-corsshell-dev"
-    ${{ if eq(parameters.service, 'k811-eks-onb-prod') }}:
-      value: "k811-eks-onb-prod"
-
-  # kubeconfig mapping
-  - name: KUBE_CONFIG_PATH
-    ${{ if eq(parameters.service, 'k811-eks-onb-dev') }}:
-      value: "/home/app_user/.kube/config-dev-arm"
-    ${{ if eq(parameters.service, 'k811-eks-corsshell-dev') }}:
-      value: "/home/app_user/.kube/config-dev"
-    ${{ if eq(parameters.service, 'k811-eks-onb-prod') }}:
-      value: "/home/app_user/.kube/config-uat"
-
-pool:
-  name: $(POOL_NAME)
-
-stages:
-  - stage: Build
-    displayName: "Prepare Helm Chart"
-    jobs:
-      - job: UpdateChart
-        displayName: "Update Chart.yaml"
-        steps:
-          - checkout: self
-            clean: false
-
-          - script: |
-              echo "Updating Chart.yaml with service = ${{ parameters.service }} and build version = 1.$(Build.BuildNumber)"
-              sed -i -e 's/^name:.*/name: ${{ parameters.service }}/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
-              sed -i -e 's/^appVersion:.*/appVersion: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
-              sed -i -e 's/^version:.*/version: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
-
-              echo "Running helm dependency update..."
-              helm dependency update $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/
-            displayName: "Update Chart.yaml & Dependencies"
-
-  - stage: PackageAndPush
-    displayName: "Package & Push Helm Chart"
-    dependsOn: Build
-    jobs:
-      - job: HelmPush
-        steps:
-          - script: |
-              unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
-              CREDENTIALS=$(aws sts assume-role \
-                --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) \
-                --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber))
-              
-              export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r '.Credentials.SessionToken')
-              export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey')
-              export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId')
-
-              helm repo add $(ENV)-${{ parameters.service }} $(HELM_S3BUCKET_URL) || true
-              helm package $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/
-              helm s3 push --force $(System.DefaultWorkingDirectory)/${{ parameters.service }}-1.$(Build.BuildNumber).tgz $(ENV)-${{ parameters.service }}
-              helm repo update
-              helm search repo $(ENV)-${{ parameters.service }}
-            displayName: "Push Chart to S3 Repo"
-
-  - stage: Deploy
-    displayName: "Deploy to Kubernetes"
-    dependsOn: PackageAndPush
-    jobs:
-      - job: HelmDeploy
-        steps:
-          - script: |
-              unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
-              CREDENTIALS=$(aws sts assume-role \
-                --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) \
-                --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber))
-              
-              export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r '.Credentials.SessionToken')
-              export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey')
-              export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId')
-
-              helm repo update
-              helm fetch $(ENV)-${{ parameters.service }}/${{ parameters.service }}
-              tar -xvf ${{ parameters.service }}-1.$(Build.BuildNumber).tgz
-
-              echo "Deploying to cluster: $(K8S_CLUSTER_NAME), kubeconfig: $(KUBE_CONFIG_PATH), namespace: $(NAMESPACE)"
-              helm upgrade --install $(ENV)-${{ parameters.service }} \
-                ${{ parameters.service }}/ \
-                -f $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(K8S_CLUSTER_NAME).yaml \
-                --namespace $(NAMESPACE) \
-                --kubeconfig $(KUBE_CONFIG_PATH) \
-                --wait --timeout 3m
-            displayName: "Helm Deploy"
-            continueOnError: true
+app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$ kadev get cm -n coralogix
+NAME                                DATA   AGE
+coralogix-opentelemetry-agent       1      133d
+coralogix-opentelemetry-collector   1      133d
+coralogix-opentelemetry-gateway     1      133d
+istio-ca-root-cert                  1      133d
+kube-root-ca.crt                    1      133d
+app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$
