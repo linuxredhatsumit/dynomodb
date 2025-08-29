@@ -1,33 +1,10 @@
-app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$ aws s3 cp otel-integration-0.0.168.tgz s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev
-upload: ./otel-integration-0.0.168.tgz to s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev
-(reverse-i-search)`index': aws s3 cp ^Cdex.yaml  s3://kotak811-helmcharts/dev/k811-eks-onb-dev
-app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$ helm repo index . --url s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev
-app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$ helm repo add dev-coralogix-internal s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev
-Error: repository name (dev-coralogix-internal) already exists, please specify a different name
-app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$ helm repo remove dev-coralogix-internal)
--bash: syntax error near unexpected token `)'
-app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$ helm repo remove dev-coralogix-internal
-"dev-coralogix-internal" has been removed from your repositories
-app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$ helm repo add dev-coralogix-internal s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev
-The index file does not exist by the path s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev/index.yaml. If you haven't initialized the repository yet, try running `helm s3 init s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev`Error: looks like "s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev" is not a valid chart repository or cannot be reached: plugin "bin/helm-s3 download" exited with error
-app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$ helm s3 init s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev
-Initialized empty repository at s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev
-app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$ helm repo add dev-coralogix-internal s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev
-"dev-coralogix-internal" has been added to your repositories
-app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$ helm repo update
-Hang tight while we grab the latest from your chart repositories...
-...Successfully got an update from the "dev-arm-k811-payment-notify" chart repository
-...Successfully got an update from the "uat-k811-webhooks" chart repository
-...Successfully got an update from the "uat-cloudacqui-super" chart repository
-...Successfully got an update from the "uat-k811-gst" chart repository
-...Successfully got an update from the "dev-k811-token-mandate-instructions" chart repository
-...Successfully got an update from the "dev-arm-k811-webauth" chart repository
-...Successfully got an update from the "dev-arm-k811-gst" chart repository
-...Successfully got an update from the "uat-k811-cc-management" chart repository
-
-
-...Successfully got an update from the "bitnami" chart repository
-Update Complete. ⎈Happy Helming!⎈
-app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$ helm search repo dev-coralogix-internal/otel-integration
-No results found
-app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$
+app_user@KBUTEC81L20293:~$ helm search repo dev-coralogix-internal/otel-integration
+NAME                                    CHART VERSION   APP VERSION     DESCRIPTION
+dev-coralogix-internal/otel-integration 0.0.168                         OpenTelemetry Integration
+app_user@KBUTEC81L20293:~$ helm repo list | grep coralogix
+coralogix-charts-virtual                                        https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
+coralogix                                                       https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
+coralogix-uat                                                   https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
+dev-coralogix-s3                                                s3://kotak811-helmcharts/dev/coralogix-dev
+dev-coralogix-internal                                          s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev
+app_user@KBUTEC81L20293:~$
