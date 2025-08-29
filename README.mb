@@ -1,29 +1,3 @@
-error
-
-...Successfully got an update from the "dev-arm-appointment" chart repository
-The index file does not exist by the path s3://kotak811-helmcharts/dev/coralogix-dev/index.yaml. If you haven't initialized the repository yet, try running `helm s3 init s3://kotak811-helmcharts/dev/coralogix-dev`...Successfully got an update from the "dev-k811-loan-leads-service" chart repository
-
-------------
-apiVersion: v2
-name: kotak-coralogix
-description: A Helm chart for coralogix service on k8s
-version: 1.1.1
-appVersion: "0.1.1"
-dependencies:
-  - name: otel-integration
-    version: 0.0.168
-    repository: "s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev"
-
-
------
-app_user@KBUTEC81L20293:~$ helm search repo dev-coralogix-internal/otel-integration
-NAME                                    CHART VERSION   APP VERSION     DESCRIPTION
-dev-coralogix-internal/otel-integration 0.0.168                         OpenTelemetry Integration
-app_user@KBUTEC81L20293:~$ helm repo list | grep coralogixcoralogix-charts-virtual                                        https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
-coralogix                                                       https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
-coralogix-uat                                                   https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
-dev-coralogix-s3                                                s3://kotak811-helmcharts/dev/coralogix-dev
-dev-coralogix-internal                                          s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev
-app_user@KBUTEC81L20293:~$
-    
-
+app_user@KBUTEC81L20293:~$ aws s3 ls s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev
+                           PRE k811-eks-onb-dev/
+2025-08-23 13:43:10     326625 k811-eks-onb-dev
