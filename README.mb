@@ -1,1 +1,70 @@
-arn:aws:secretsmanager:ap-south-1:483584640083:secret:coralogix-dKXGxg
+
+coralogix/charts/values.yaml
+service:
+  name: {{ .Release.Name }}
+namespace: coralogix
+aws:
+  region: ap-south-1
+secrets:
+  coralogixSecretName: coralogix-dKXGxg
+serviceAccount:
+  name: coralogix-sa
+otelIntegration: {}
+
+
+coralogix/charts/templates/secrets.yaml:
+
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: {{ .Chart.Name }}-spc
+  namespace: {{ .Values.namespace }}
+spec:
+  provider: aws
+  secretObjects:
+    - secretName: coralogix-keys
+      type: Opaque
+      data:
+        - objectName: CORALOGIX_PRIVATE_KEY
+          key: PRIVATE_KEY
+  parameters:
+    objects: |
+      - objectName: "{{ .Values.appconfig.APPCONFIG_PROFILE }}"
+        objectType: secretsmanager
+        objectAlias: CORALOGIX_PRIVATE_KEY
+
+
+coralogix/charts/templates/deployment.yaml:
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.service.name }}-opentelemetry-agent
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Values.service.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.service.name }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name | default "coralogix-sa" }}
+      containers:
+        - name: {{ .Values.service.name }}
+          env:
+            - name: CORALOGIX_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: PRIVATE_KEY
+                  name: coralogix-keys
+      volumes:
+        - name: secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: {{ .Chart.Name }}-spc
+
+
