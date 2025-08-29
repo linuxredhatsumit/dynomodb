@@ -1,9 +1,1 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: {{ .Chart.Name }}-configmap
-  namespace: {{ .Values.namespace }}
-data:
-  {{- range $key, $value := .Values.appconfig }}
-  {{ $key }}: {{ $value | toString | quote }}
-  {{- end }}
+arn:aws:secretsmanager:ap-south-1:483584640083:secret:coralogix-dKXGxg
