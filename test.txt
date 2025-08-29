@@ -1,10 +1,121 @@
-app_user@KBUTEC81L20293:~$ helm search repo dev-coralogix-internal/otel-integration
-NAME                                    CHART VERSION   APP VERSION     DESCRIPTION
-dev-coralogix-internal/otel-integration 0.0.168                         OpenTelemetry Integration
-app_user@KBUTEC81L20293:~$ helm repo list | grep coralogix
-coralogix-charts-virtual                                        https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
-coralogix                                                       https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
-coralogix-uat                                                   https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
-dev-coralogix-s3                                                s3://kotak811-helmcharts/dev/coralogix-dev
-dev-coralogix-internal                                          s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev
-app_user@KBUTEC81L20293:~$
+trigger: none
+
+variables:
+  - group: onb-service-apigw-dev
+  - group: Kotak-ECR-Credentials
+  - name: ENV
+    value: dev-arm
+  # ApiGW variables
+  - name: apigw_env
+    value: dev
+  #pool details
+  - name: POOL_NAME
+    value: "K811-DevOps"
+  # Azure Git application Repository Details
+  - name: BRANCH_NAME
+    value: ${{ parameters.BRANCH_NAME }}
+  # Docker details
+  - name: AWS_REGION
+    value: ap-south-1
+  - name: AWS_ACCOUNT_ID
+    value: "483584640083"
+  # For AWS Role Access
+  - name: ROLE_NAME
+    value: EKS_Setup_Role
+  - name: HELM_CHARTS_PATH
+    value: coralogix/charts
+  - name: HELM_S3BUCKET_URL
+    value: s3://kotak811-helmcharts/dev/${{ parameters.service }}/
+  - name: KUBE_CONFIG_PATH
+    value: /home/app_user/.kube/config-dev-arm
+  - name: NAMESPACE
+    value: dev
+  - name: K8S_CLUSTER_NAME
+    ${{ if eq( parameters['service'], 'k811-eks-onb-dev') }}:
+      value: "k811-eks-onb-dev"
+    ${{ if eq( parameters['service'], 'k811-eks-onb-dev' ) }}:
+      value: "k811-eks-onb-dev"
+
+
+parameters:
+  - name: Env
+    displayName: Env
+    type: string
+    default: dev-arm
+
+
+
+pool:
+  name: $(POOL_NAME)
+
+stages:
+  - stage: Dev
+    displayName: "Build in Dev Environment"
+    jobs:
+      - job: BuildAndDeploy
+        displayName: "Application Build and deploy"
+        steps:
+          - bash: |
+              echo "##vso[task.setvariable variable=AgentName;isoutput=true]$(Agent.Name)"
+            name: passOutput
+
+  - stage: GitClone
+    dependsOn:
+      - Dev
+    jobs:
+      - job: CloneRepository
+        pool:
+          name: $(POOL_NAME)
+          demands:
+            - agent.name -equals $(Agent_Name)
+        variables:
+          Agent_Name: $[ stageDependencies.Dev.BuildAndDeploy.outputs['passOutput.AgentName'] ]
+        steps:
+          - checkout: self
+            clean: false
+
+          - script: |
+              pwd
+              rm -rf $(REPOSITORY_NAME)
+              git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
+              ls
+              echo "###################"
+              echo "$(REPOSITORY_NAME) is using $(BRANCH_NAME) branch"
+              ls ./$(REPOSITORY_NAME)/
+            displayName: Clone  $(REPOSITORY_NAME) repository
+
+          - script: |
+              pwd
+              unset AWS_SESSION_TOKEN
+              unset AWS_SECRET_ACCESS_KEY
+              unset AWS_ACCESS_KEY_ID
+              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+              helm s3 init ${{ parameters.HELM_S3BUCKET_URL }}
+              helm repo add $(ENV)-${{ parameters.service }} ${{ parameters.HELM_S3BUCKET_URL }} 
+              helm package $(System.DefaultWorkingDirectory)/${{ parameters.HELM_CHARTS_PATH }}/
+              helm s3 push --force $(System.DefaultWorkingDirectory)/${{ parameters.service }}-1.$(Build.BuildNumber).tgz $(ENV)-${{ parameters.service }}
+              aws s3 ls ${{ parameters.HELM_S3BUCKET_URL }} 
+              helm repo update 
+              helm search repo $(ENV)-${{ parameters.service }}
+            displayName: "Charts Push To S3"
+
+          - script: |
+              pwd
+              unset AWS_SESSION_TOKEN
+              unset AWS_SECRET_ACCESS_KEY
+              unset AWS_ACCESS_KEY_ID
+              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+              rm -rf $(System.DefaultWorkingDirectory)/*.tgz
+              helm repo update
+              helm fetch $(ENV)-${{ parameters.service }}/${{ parameters.service }}
+              tar -xvf ${{ parameters.service }}-1.$(Build.BuildNumber).tgz
+              echo "Starting the deployment in the namespace $(NAMESPACE)"
+              helm upgrade --install $(ENV)-${{ parameters.service }} ${{ parameters.service }}/ -f ${{ parameters.service }}/$(ENV)-values.yaml --namespace $(NAMESPACE) --kubeconfig $(KUBE_CONFIG_PATH) --wait --timeout 3m
+            displayName: "Helm Charts Deployment"
+            continueOnError: true
