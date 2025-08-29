@@ -1,16 +1,29 @@
-Updating Chart.yaml with service = k811-eks-onb-dev and build version = 1.20250829.9
-Running helm dependency update...
-Getting updates for unmanaged Helm repositories...
-Error: fetch from s3 url=s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev/index.yaml: fetch object from s3: AccessDenied: User: arn:aws:sts::483584640083:assumed-role/AWS-EC2-Role/i-06950af8d81d0affc is not authorized to perform: s3:GetObject on resource: "arn:aws:s3:::kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev/index.yaml" because no identity-based policy allows the s3:GetObject action
-	status code: 403, request id: 18CF3YS01WT35T2Z, host id: WOW10XU63kTENaxmTHvJ4VGcOa01fblxb0AmolG1Aa0VhDRGEOdWjV2+65cikENpoR0WrrSEl10K8K2jOohb5gqHTjCuVawoFIBdjOz7iqY=
-...Unable to get an update from the "s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev" chart repository:
-	plugin "bin/helm-s3 download" exited with error
-Hang tight while we grab the latest from your chart repositories...
-Error: fetch from s3 url=s3://kotak811-helmcharts-dr/uat/k811-dc-profiler/index.yaml: fetch object from s3: AccessDenied: User: arn:aws:sts::483584640083:assumed-role/AWS-EC2-Role/i-06950af8d81d0affc is not authorized to perform: s3:GetObject on resource: "arn:aws:s3:::kotak811-helmcharts-dr/uat/k811-dc-profiler/index.yaml" because no identity-based policy allows the s3:GetObject action
-	status code: 403, request id: C1CTBY16J14M42PQ, host id: 8mT248ZGhzqPV/Rz0fIUzJZSKvyBx+fs3//yjYXO9VzJtQSCR5F30t6AGjtlFf1E6sTuTkr/G4UmaCL9YUoi4sRZvm3UrmwvDcb+fkiS+fM=
-...Unable to get an update from the "uat-dr-k811-dc-profiler" chart repository (s3://kotak811-helmcharts-dr/uat/k811-dc-profiler/):
-	plugin "bin/helm-s3 download" exited with error
-Error: fetch from s3 url=s3://kotak811-helmcharts/uat/k811-cc-application-liquidation-cronjob/index.yaml: fetch object from s3: AccessDenied: User: arn:aws:sts::483584640083:assumed-role/AWS-EC2-Role/i-06950af8d81d0affc is not authorized to perform: s3:GetObject on resource: "arn:aws:s3:::kotak811-helmcharts/uat/k811-cc-application-liquidation-cronjob/index.yaml" because no identity-based policy allows the s3:GetObject action
-	status code: 403, request id: C1CR6FCYE6AEF2WB, host id: jJsIszzp30/cFdyB9EtASzndokMWJW1OgFeMq6XA9kIHanyKh5IT4dculaBUsft9FqU7bRFmDL1WDG23T1Z/wJGb5gZODxPNyYFsrXEErBk=
-...Unable to get an update from the "uat-k811-cc-application-liquidation-cronjob" chart repository (s3://kotak811-helmcharts/uat/k811-cc-application-liquidation-cronjob/):
-	plugin "bin/helm-s3 download" exited with error
+error
+
+...Successfully got an update from the "dev-arm-appointment" chart repository
+The index file does not exist by the path s3://kotak811-helmcharts/dev/coralogix-dev/index.yaml. If you haven't initialized the repository yet, try running `helm s3 init s3://kotak811-helmcharts/dev/coralogix-dev`...Successfully got an update from the "dev-k811-loan-leads-service" chart repository
+
+------------
+apiVersion: v2
+name: kotak-coralogix
+description: A Helm chart for coralogix service on k8s
+version: 1.1.1
+appVersion: "0.1.1"
+dependencies:
+  - name: otel-integration
+    version: 0.0.168
+    repository: "s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev"
+
+
+-----
+app_user@KBUTEC81L20293:~$ helm search repo dev-coralogix-internal/otel-integration
+NAME                                    CHART VERSION   APP VERSION     DESCRIPTION
+dev-coralogix-internal/otel-integration 0.0.168                         OpenTelemetry Integration
+app_user@KBUTEC81L20293:~$ helm repo list | grep coralogixcoralogix-charts-virtual                                        https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
+coralogix                                                       https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
+coralogix-uat                                                   https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
+dev-coralogix-s3                                                s3://kotak811-helmcharts/dev/coralogix-dev
+dev-coralogix-internal                                          s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev
+app_user@KBUTEC81L20293:~$
+    
+
