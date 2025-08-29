@@ -2,3 +2,6 @@ app_user@KBUTEC81L20293:~$ aws s3 ls s3://kotak811-helmcharts/dev/coralogix-dev/
 2025-08-23 13:49:39       2298 index.yaml
 2025-08-23 13:49:39     326625 otel-integration-0.0.168.tgz
 app_user@KBUTEC81L20293:~$
+
+
+dev-coralogix-internal                                          s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev
