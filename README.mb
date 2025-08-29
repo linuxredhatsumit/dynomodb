@@ -263,5 +263,19 @@ metadata:
     eks.amazonaws.com/role-arn: {{ .Values.serviceaccount.role }}
 {{- end }}
 
+below pipline error ------
+...Unable to get an update from the "uat-k811-insurance-platform-monthly-report-cronjob" chart repository (s3://kotak811-helmcharts/uat/k811-insurance-platform-monthly-report-cronjob/):
+	plugin "bin/helm-s3 download" exited with error
+...Unable to get an update from the "dev-arm-k811-pl-management" chart repository (s3://kotak811-helmcharts/dev/k811-pl-management/):
+	plugin "bin/helm-s3 download" exited with error
+...Unable to get an update from the "dev-arm-partner" chart repository (s3://cloudacqui-helmcharts/prelogin/dev-arm/partner/):
+	plugin "bin/helm-s3 download" exited with error
+...Unable to get an update from the "uat-k811-payment-hold" chart repository (s3://kotak811-helmcharts/uat/k811-payment-hold/):
+	plugin "bin/helm-s3 download" exited with error
+Update Complete. ⎈Happy Helming!⎈
+Error: no cached repository for helm-manager-61e274ce704c4b348b39a8eb6dfb99d0cc96235c1622c7830b202e1f5bd1724d found. (try 'helm repo update'): open /home/app_user/.cache/helm/repository/helm-manager-61e274ce704c4b348b39a8eb6dfb99d0cc96235c1622c7830b202e1f5bd1724d-index.yaml: no such file or directory
+
+##[error]Bash exited with code '1'.
+Finishing: Update Chart.yaml & Dependencies
 
 
