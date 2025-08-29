@@ -73,6 +73,14 @@ stages:
         steps:
           - checkout: self
             clean: false
+            - script: |
+                pwd
+                sed -i -e 's/name:.*/name: ${{ parameters.service }}/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+                sed -i -e 's/appVersion:.*/appVersion: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+                sed -i -e 's/version:.*/version: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+                sed -i -e 's/tag:.*/tag: ${{ parameters.IMAGE_NAME }}/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(ENV)-values.yaml
+              displayName: "Updating Chart Values"
+              continueOnError: true
 
           - script: |
               pwd
