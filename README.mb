@@ -1,3 +1,4 @@
+pipliene.yaml ----
 trigger: none
 
 parameters:
@@ -97,6 +98,9 @@ stages:
               export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId')
 
               helm repo add $(ENV)-${{ parameters.service }} $(HELM_S3BUCKET_URL) || true
+              helm repo update
+              echo "Running helm dependency update..."
+              helm dependency update $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)
               helm package $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/
               helm s3 push --force $(System.DefaultWorkingDirectory)/${{ parameters.service }}-1.$(Build.BuildNumber).tgz $(ENV)-${{ parameters.service }}
               helm repo update
@@ -120,8 +124,7 @@ stages:
               export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId')
 
               helm repo update
-              echo "Running helm dependency update..."
-              helm dependency update $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)
+
               helm fetch $(ENV)-${{ parameters.service }}/${{ parameters.service }}
               tar -xvf ${{ parameters.service }}-1.$(Build.BuildNumber).tgz
 
@@ -134,3 +137,131 @@ stages:
                 --wait --timeout 3m
             displayName: "Helm Deploy"
             continueOnError: true
+
+coralogix/charts
+charts.yaml ----
+apiVersion: v2
+name: kotak-coralogix
+description: A Helm chart for coralogix service on k8s
+version: 1.1.1
+appVersion: "0.1.1"
+dependencies:
+  - name: otel-integration
+    version: 0.0.168
+    repository: "s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev"
+
+coralogix/charts
+k811-eks-onb-dev.yaml -------
+namespace: coralogix
+
+global:
+  clusterName: k811-eks-onb-dev
+  collectionInterval: 60s
+  domain: coralogix.in
+
+opentelemetry-agent:
+  enabled: true
+  mode: daemonset
+  config:
+    processors:
+      transform/remove-loglabels:
+        error_mode: ignore
+        log_statements:
+        - context: resource
+          statements:
+          - delete_key(attributes, "host.image.id")
+          - delete_key(attributes, "k8s.pod.uid")
+          - delete_key(attributes, "cloud.account.id")
+          - delete_key(attributes, "cloud.platform")
+          - delete_key(attributes, "cloud.availability.zone")
+          - delete_key(attributes, "cloud.availability_zone")
+          - delete_key(attributes, "os.type")
+          - delete_key(attributes, "cloud.provider")
+          - delete_key(attributes, "cloud.region")
+          - delete_key(attributes, "host.type")
+    service:
+      pipelines:
+        logs:
+          processors:
+            - k8sattributes
+            - resourcedetection/env
+            - resourcedetection/region
+            - batch
+            - transform/remove-loglabels
+        traces:
+          exporters:
+            - loadbalancing
+  presets:
+    loadBalancing:
+      enabled: true
+      hostname: coralogix-opentelemetry-gateway
+      routingKey: traceID
+    spanMetrics:
+      enabled: true
+
+opentelemetry-agent-windows:
+  enabled: false
+
+opentelemetry-cluster-collector:
+  enabled: true
+
+opentelemetry-gateway:
+  enabled: true
+  replicaCount: 3
+  config:
+    processors:
+      tail_sampling:
+        policies:
+          - name: errors-policy
+            status_code:
+              status_codes: [ERROR]
+            type: status_code
+          - name: randomized-policy
+            probabilistic:
+              sampling_percentage: 10
+            type: probabilistic
+
+serviceaccount:
+  enabled: true
+  name: coralogix-dev-sa
+  role: arn:aws:iam::483584640083:role/coralogix-dev-eks-sa
+
+role:
+  name: coralogix-dev-role
+
+rolebinding:
+  name: coralogix-dev-rb
+
+appconfig:
+  APPCONFIG_ENABLED: "true"
+  APPCONFIG_ENVIRONMENT: "development"
+  APPCONFIG_APPLICATION: "coralogix"
+  APPCONFIG_PROFILE: "coralogix-dev-secret"
+
+coralogix/charts/templates
+configmap.yaml ------
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Chart.Name }}-configmap
+  namespace: {{ .Values.namespace }}
+data:
+  {{- range $key, $value := .Values.appconfig }}
+  {{ $key }}: {{ $value | toString | quote }}
+  {{- end }}
+
+
+coralogix/charts/templates
+serviceaccount.yaml ----------
+{{- if .Values.serviceaccount.enabled }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ .Values.serviceaccount.name }}
+  namespace: {{ .Values.namespace }}
+  annotations:
+    eks.amazonaws.com/role-arn: {{ .Values.serviceaccount.role }}
+{{- end }}
+
+
+
