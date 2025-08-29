@@ -1,7 +1,36 @@
-app_user@KBUTEC81L20293:~$ aws s3 ls s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev/
-2025-08-23 13:49:39       2298 index.yaml
-2025-08-23 13:49:39     326625 otel-integration-0.0.168.tgz
-app_user@KBUTEC81L20293:~$
+kubectl create secret generic coralogix-keys --from-literal=PRIVATE_KEY="cxtp_7wnLGg1APjZVMxTN8YqRs1rd2FYDws" -n coralogix.
 
 
-dev-coralogix-internal                                          s3://kotak811-helmcharts/dev/coralogix-dev/k811-eks-onb-dev
+app_user@KBUTEC81L20293:~$ kadev get secret coralogix-keys -n coralogix -o yamlapiVersion: v1
+data:
+  PRIVATE_KEY: Y3h0cF9Ed0VGYUpZaG5rR2tReExRUkNtZnZpWGp4N3ZiczU=
+kind: Secret
+metadata:
+  creationTimestamp: "2025-04-17T13:50:41Z"
+  name: coralogix-keys
+  namespace: coralogix
+  resourceVersion: "547361391"
+  uid: 96261e6b-32ae-419e-873a-430e490315a7
+type: Opaque
+
+
+
+ kadev get po coralogix-opentelemetry-agent-ndvwp -n coralogix -oyaml
+
+    - name: CORALOGIX_PRIVATE_KEY
+      valueFrom:
+        secretKeyRef:
+          key: PRIVATE_KEY
+          name: coralogix-keys
+
+
+values.yaml
+appconfig:
+  APPCONFIG_ENABLED: "true"
+  APPCONFIG_ENVIRONMENT: "development"
+  APPCONFIG_APPLICATION: "coralogix"
+  APPCONFIG_PROFILE: "coralogix-dev-secret"
+
+
+mapped secret manager
+{"CORALOGIX_DEV_KEY":"cxtp_Dadfasdfadfasd"}
