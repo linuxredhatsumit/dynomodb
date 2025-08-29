@@ -1,85 +1,37 @@
-namespace: dev-arm
-
-global:
-  clusterName: k811-eks-onb-dev
-  collectionInterval: 60s
-  domain: coralogix.in
-
-opentelemetry-agent:
-  enabled: true
-  mode: daemonset
-  config:
-    processors:
-      transform/remove-loglabels:
-        error_mode: ignore
-        log_statements:
-        - context: resource
-          statements:
-          - delete_key(attributes, "host.image.id")
-          - delete_key(attributes, "k8s.pod.uid")
-          - delete_key(attributes, "cloud.account.id")
-          - delete_key(attributes, "cloud.platform")
-          - delete_key(attributes, "cloud.availability.zone")
-          - delete_key(attributes, "cloud.availability_zone")
-          - delete_key(attributes, "os.type")
-          - delete_key(attributes, "cloud.provider")
-          - delete_key(attributes, "cloud.region")
-          - delete_key(attributes, "host.type")
-    service:
-      pipelines:
-        logs:
-          processors:
-            - k8sattributes
-            - resourcedetection/env
-            - resourcedetection/region
-            - batch
-            - transform/remove-loglabels
-        traces:
-          exporters:
-            - loadbalancing
-  presets:
-    loadBalancing:
-      enabled: true
-      hostname: coralogix-opentelemetry-gateway
-      routingKey: traceID
-    spanMetrics:
-      enabled: true
-
-opentelemetry-agent-windows:
-  enabled: false
-
-opentelemetry-cluster-collector:
-  enabled: true
-
-opentelemetry-gateway:
-  enabled: true
-  replicaCount: 3
-  config:
-    processors:
-      tail_sampling:
-        policies:
-          - name: errors-policy
-            status_code:
-              status_codes: [ERROR]
-            type: status_code
-          - name: randomized-policy
-            probabilistic:
-              sampling_percentage: 10
-            type: probabilistic
-
-serviceaccount:
-  enabled: true
-  name: coralogix-dev-sa
-  role: arn:aws:iam::483584640083:role/coralogix-dev-eks-sa
-
-role:
-  name: coralogix-dev-role
-
-rolebinding:
-  name: coralogix-dev-rb
-
-appconfig:
-  APPCONFIG_ENABLED: "true"
-  APPCONFIG_ENVIRONMENT: "development"
-  APPCONFIG_APPLICATION: "coralogix"
-  APPCONFIG_PROFILE: "coralogix-dev-secret"
+app_user@KBUTEC81L20293:~$ kadev get po -n coralogix
+NAME                                                READY   STATUS    RESTARTS       AGE
+coralogix-opentelemetry-agent-557lb                 1/1     Running   0              168m
+coralogix-opentelemetry-agent-56qt8                 1/1     Running   0              175m
+coralogix-opentelemetry-agent-7tnhz                 1/1     Running   0              174m
+coralogix-opentelemetry-agent-8fzfb                 1/1     Running   0              10h
+coralogix-opentelemetry-agent-9gd2l                 1/1     Running   0              156m
+coralogix-opentelemetry-agent-9h754                 1/1     Running   0              73m
+coralogix-opentelemetry-agent-dx7bq                 1/1     Running   0              142m
+coralogix-opentelemetry-agent-fw959                 1/1     Running   0              136m
+coralogix-opentelemetry-agent-gk7qm                 1/1     Running   0              64d
+coralogix-opentelemetry-agent-gq4qk                 1/1     Running   0              18d
+coralogix-opentelemetry-agent-h25rr                 1/1     Running   0              174m
+coralogix-opentelemetry-agent-h42r2                 1/1     Running   0              5h34m
+coralogix-opentelemetry-agent-jqs9m                 1/1     Running   0              5h33m
+coralogix-opentelemetry-agent-k29rn                 1/1     Running   0              5h33m
+coralogix-opentelemetry-agent-kgvfm                 1/1     Running   0              5h34m
+coralogix-opentelemetry-agent-kt24l                 1/1     Running   0              138m
+coralogix-opentelemetry-agent-l66q2                 1/1     Running   0              3h23m
+coralogix-opentelemetry-agent-n4cg4                 1/1     Running   0              5h34m
+coralogix-opentelemetry-agent-ndvwp                 1/1     Running   0              11h
+coralogix-opentelemetry-agent-qlrdn                 1/1     Running   0              5h33m
+coralogix-opentelemetry-agent-qqv5q                 1/1     Running   0              18d
+coralogix-opentelemetry-agent-smkms                 1/1     Running   0              11h
+coralogix-opentelemetry-agent-t6dtm                 1/1     Running   0              4h15m
+coralogix-opentelemetry-agent-w5whz                 1/1     Running   0              174m
+coralogix-opentelemetry-agent-wcksn                 1/1     Running   0              5h34m
+coralogix-opentelemetry-agent-wdbxp                 1/1     Running   0              11h
+coralogix-opentelemetry-agent-wwz4h                 1/1     Running   0              52m
+coralogix-opentelemetry-agent-zzg5t                 1/1     Running   10 (77m ago)   5h33m
+coralogix-opentelemetry-collector-9985c6486-dj58m   1/1     Running   0              62d
+coralogix-opentelemetry-gateway-ff7987bbd-8mkhd     1/1     Running   0              64d
+coralogix-opentelemetry-gateway-ff7987bbd-dcz2l     1/1     Running   0              18d
+coralogix-opentelemetry-gateway-ff7987bbd-k7g74     1/1     Running   0              64d
+app_user@KBUTEC81L20293:~$ kadev exec -it -n coralogix coralogix-opentelemetry-collector-9985c6486-dj58m -- printenv | grep CORALOGIX_PRIVATE_KEY
+error: Internal error occurred: Internal error occurred: error executing command in container: failed to exec in container: failed to start exec "343745a7d37ce0a284532b133580874c4662e8301495e564948c8c212bd74164": OCI runtime exec failed: exec failed: unable to start container process: exec: "printenv": executable file not found in $PATH: unknown
+app_user@KBUTEC81L20293:~$
