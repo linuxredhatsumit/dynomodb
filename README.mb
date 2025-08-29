@@ -1,47 +1,85 @@
-KMBL350986@KBMK24-00000929 otel-integration % grep -r CORALOGIX_PRIVATE_KEY .
-./central-agent-values.yaml:      privateKey: ${env:CORALOGIX_PRIVATE_KEY}
-./tail-sampling-values.yaml:      privateKey: ${env:CORALOGIX_PRIVATE_KEY}
-./values-windows.yaml:    - name: CORALOGIX_PRIVATE_KEY
-./values-windows.yaml:      privateKey: ${env:CORALOGIX_PRIVATE_KEY}
-./charts/opentelemetry-collector/examples/coralogix-exporter-pipelines/rendered/configmap-agent.yaml:        private_key: ${env:CORALOGIX_PRIVATE_KEY}
-./charts/opentelemetry-collector/examples/coralogix-exporter-pipelines/values.yaml:    privateKey: ${env:CORALOGIX_PRIVATE_KEY}
-./charts/opentelemetry-collector/examples/host-entity/rendered/configmap-agent.yaml:        private_key: ${CORALOGIX_PRIVATE_KEY}
-./charts/opentelemetry-collector/examples/host-entity/rendered/configmap-agent.yaml:              Authorization: Bearer ${env:CORALOGIX_PRIVATE_KEY}
-./charts/opentelemetry-collector/examples/opentelemetrycollector-daemonset-crd/rendered/opentelemetrycollector.yaml:    - name: CORALOGIX_PRIVATE_KEY
-./charts/opentelemetry-collector/examples/opentelemetrycollector-daemonset-crd/opentelemetrycollector-values.yaml:  - name: CORALOGIX_PRIVATE_KEY
-./charts/opentelemetry-collector/examples/daemonset-supervisor/rendered/configmap-agent.yaml:        private_key: ${env:CORALOGIX_PRIVATE_KEY}
-./charts/opentelemetry-collector/examples/daemonset-supervisor/rendered/configmap-supervisor.yaml:        Authorization: "Bearer ${env:CORALOGIX_PRIVATE_KEY}"
-./charts/opentelemetry-collector/examples/daemonset-supervisor/values.yaml:    privateKey: ${env:CORALOGIX_PRIVATE_KEY}
-./charts/opentelemetry-collector/examples/coralogix-exporter-pipeline/rendered/configmap-agent.yaml:        private_key: ${env:CORALOGIX_PRIVATE_KEY}
-./charts/opentelemetry-collector/examples/coralogix-exporter-pipeline/values.yaml:    privateKey: ${env:CORALOGIX_PRIVATE_KEY}
-./charts/opentelemetry-collector/examples/daemonset-reduced-attributes/rendered/configmap-agent.yaml:        private_key: ${CORALOGIX_PRIVATE_KEY}
-./charts/opentelemetry-collector/examples/resource-catalog/rendered/configmap.yaml:        private_key: ${CORALOGIX_PRIVATE_KEY}
-./charts/opentelemetry-collector/examples/profiles/rendered/configmap-agent.yaml:        private_key: ${CORALOGIX_PRIVATE_KEY}
-./charts/opentelemetry-collector/templates/_config.tpl:    private_key: "${CORALOGIX_PRIVATE_KEY}"
-./charts/opentelemetry-collector/templates/_config.tpl:            Authorization: "Bearer ${env:CORALOGIX_PRIVATE_KEY}"
-./charts/opentelemetry-collector/templates/_config.tpl:    private_key: "${CORALOGIX_PRIVATE_KEY}"
-./charts/opentelemetry-collector/templates/_config.tpl:    private_key: "${CORALOGIX_PRIVATE_KEY}"
-./charts/opentelemetry-collector/templates/configmap-supervisor.yaml:        Authorization: "Bearer ${env:CORALOGIX_PRIVATE_KEY}"
-./charts/opentelemetry-collector/values.yaml:    privateKey: ${env:CORALOGIX_PRIVATE_KEY}
-./values.yaml:    - name: CORALOGIX_PRIVATE_KEY
-./values.yaml:      privateKey: ${env:CORALOGIX_PRIVATE_KEY}
-./values.yaml:      privateKey: ${env:CORALOGIX_PRIVATE_KEY}
-./values.yaml:    - name: CORALOGIX_PRIVATE_KEY
-./values.yaml:    - name: CORALOGIX_PRIVATE_KEY
-./values.yaml:      privateKey: ${env:CORALOGIX_PRIVATE_KEY}
-./values.yaml:    - name: CORALOGIX_PRIVATE_KEY
-./values.yaml:      privateKey: ${env:CORALOGIX_PRIVATE_KEY}
-./values-windows-tailsampling.yaml:    - name: CORALOGIX_PRIVATE_KEY
-./values-windows-tailsampling.yaml:        private_key: "${env:CORALOGIX_PRIVATE_KEY}"
-KMBL350986@KBMK24-00000929 otel-integration % 
+namespace: dev-arm
 
+global:
+  clusterName: k811-eks-onb-dev
+  collectionInterval: 60s
+  domain: coralogix.in
 
+opentelemetry-agent:
+  enabled: true
+  mode: daemonset
+  config:
+    processors:
+      transform/remove-loglabels:
+        error_mode: ignore
+        log_statements:
+        - context: resource
+          statements:
+          - delete_key(attributes, "host.image.id")
+          - delete_key(attributes, "k8s.pod.uid")
+          - delete_key(attributes, "cloud.account.id")
+          - delete_key(attributes, "cloud.platform")
+          - delete_key(attributes, "cloud.availability.zone")
+          - delete_key(attributes, "cloud.availability_zone")
+          - delete_key(attributes, "os.type")
+          - delete_key(attributes, "cloud.provider")
+          - delete_key(attributes, "cloud.region")
+          - delete_key(attributes, "host.type")
+    service:
+      pipelines:
+        logs:
+          processors:
+            - k8sattributes
+            - resourcedetection/env
+            - resourcedetection/region
+            - batch
+            - transform/remove-loglabels
+        traces:
+          exporters:
+            - loadbalancing
+  presets:
+    loadBalancing:
+      enabled: true
+      hostname: coralogix-opentelemetry-gateway
+      routingKey: traceID
+    spanMetrics:
+      enabled: true
 
-app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$ kadev get cm -n coralogix
-NAME                                DATA   AGE
-coralogix-opentelemetry-agent       1      133d
-coralogix-opentelemetry-collector   1      133d
-coralogix-opentelemetry-gateway     1      133d
-istio-ca-root-cert                  1      133d
-kube-root-ca.crt                    1      133d
-app_user@KBUTEC81L20293:~/DevOps/dev-coralogix/21aug2025$
+opentelemetry-agent-windows:
+  enabled: false
+
+opentelemetry-cluster-collector:
+  enabled: true
+
+opentelemetry-gateway:
+  enabled: true
+  replicaCount: 3
+  config:
+    processors:
+      tail_sampling:
+        policies:
+          - name: errors-policy
+            status_code:
+              status_codes: [ERROR]
+            type: status_code
+          - name: randomized-policy
+            probabilistic:
+              sampling_percentage: 10
+            type: probabilistic
+
+serviceaccount:
+  enabled: true
+  name: coralogix-dev-sa
+  role: arn:aws:iam::483584640083:role/coralogix-dev-eks-sa
+
+role:
+  name: coralogix-dev-role
+
+rolebinding:
+  name: coralogix-dev-rb
+
+appconfig:
+  APPCONFIG_ENABLED: "true"
+  APPCONFIG_ENVIRONMENT: "development"
+  APPCONFIG_APPLICATION: "coralogix"
+  APPCONFIG_PROFILE: "coralogix-dev-secret"
