@@ -1,19 +1,9 @@
-apiVersion: secrets-store.csi.x-k8s.io/v1
-kind: SecretProviderClass
+apiVersion: v1
+kind: ConfigMap
 metadata:
-  name: {{ .Chart.Name }}-spc
+  name: {{ .Chart.Name }}-configmap
   namespace: {{ .Values.namespace }}
-spec:
-  provider: aws
-  secretObjects:
-    - secretName: {{ .Chart.Name }}-secrets
-      type: Opaque
-      data:
-        - objectName: REQUEST_CERTS
-          key: REQUEST_CERTS
-
-  parameters:
-    objects: |
-      - objectName: "/{{ .Values.ssmParameter.ssm_root }}/811-ONB/{{ .Values.ssmParameter.service_name }}/REQUEST_CERTS"
-        objectType: "ssmparameter"
-        objectAlias: REQUEST_CERTS
+data:
+  {{- range $key, $value := .Values.appconfig }}
+  {{ $key }}: {{ $value | toString | quote }}
+  {{- end }}
