@@ -1,10 +1,161 @@
-KMBL350986@KBMK24-00000929 charts % ls -ltr
-total 24
--rw-r--r--@  1 KMBL350986  staff  1166 Aug 21 17:07 values.yaml
--rw-r--r--@  1 KMBL350986  staff     0 Aug 23 14:13 uat-values.yaml
-drwxr-xr-x@ 10 KMBL350986  staff   320 Aug 23 14:51 templates
--rw-r--r--@  1 KMBL350986  staff  2141 Aug 23 15:18 k811-eks-onb-dev.yaml
--rw-r--r--@  1 KMBL350986  staff   242 Aug 29 12:13 Chart.yaml
-KMBL350986@KBMK24-00000929 charts % pwd
-/Users/KMBL350986/kotak-811/Kotak-811-DevOps-Pipelines/coralogix/charts
-KMBL350986@KBMK24-00000929 charts % 
+coralogix/charts/values.yaml
+service:
+  name: {{ .Release.Name }}
+namespace: coralogix
+aws:
+  region: ap-south-1
+appconfig:
+  APPCONFIG_PROFILE: coralogix-dev-secret
+serviceAccount:
+  name: coralogix-sa
+otelIntegration: {}
+
+
+coralogix/charts/templates/secrets.yaml
+
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: {{ .Chart.Name }}-spc
+  namespace: {{ .Values.namespace }}
+spec:
+  provider: aws
+  secretObjects:
+    - secretName: coralogix-keys
+      type: Opaque
+      data:
+        - objectName: CORALOGIX_PRIVATE_KEY
+          key: PRIVATE_KEY
+  parameters:
+    objects: |
+      - objectName: "{{ .Values.appconfig.APPCONFIG_PROFILE }}"
+        objectType: secretsmanager
+        objectAlias: CORALOGIX_PRIVATE_KEY
+
+
+coralogix/charts/templates/deployment.yaml
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ .Values.service.name }}-opentelemetry-agent
+  namespace: {{ .Values.namespace }}
+spec:
+  selector:
+    matchLabels:
+      app: {{ .Values.service.name }}
+  template:
+    metadata:
+      labels:
+        app: {{ .Values.service.name }}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount.name | default "coralogix-sa" }}
+      containers:
+        - name: {{ .Values.service.name }}
+          env:
+            - name: CORALOGIX_PRIVATE_KEY
+              valueFrom:
+                secretKeyRef:
+                  key: PRIVATE_KEY
+                  name: coralogix-keys
+      volumes:
+        - name: secrets-store
+          csi:
+            driver: secrets-store.csi.k8s.io
+            readOnly: true
+            volumeAttributes:
+              secretProviderClass: {{ .Chart.Name }}-spc
+
+
+UpdateChart
+
+- stage: Build
+  displayName: "Prepare Helm Chart"
+  jobs:
+    - job: UpdateChart
+      displayName: "Update Chart.yaml"
+      steps:
+        - checkout: self
+          clean: false
+        - script: |
+            aws --version
+            helm version
+            jq --version
+          displayName: "Verify agent tools"
+        - script: |
+            helm plugin install https://github.com/hypnoglow/helm-s3.git --version 0.10.0 || true
+            helm plugin list
+          displayName: "Install helm-s3 plugin"
+        - script: |
+            rm -rf /home/app_user/.cache/helm/repository/*
+          displayName: "Clear Helm cache"
+        - script: |
+            unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+            CREDENTIALS=$(aws sts assume-role \
+              --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) \
+              --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber))
+            export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r '.Credentials.SessionToken')
+            export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey')
+            export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId')
+            echo "Verifying assumed role..."
+            aws sts get-caller-identity
+            helm repo remove dev-coralogix-s3 || true
+            helm repo remove dev-arm-appointment || true
+            helm repo remove dev-k811-loan-leads-service || true
+            helm repo remove uat-k811-dc-profiler || true
+            helm repo remove uat-k811-cc-application-liquidation-cronjob || true
+            helm repo add $(ENV)-dependency s3://kotak811-helmcharts/dev/coralogix-dev/${{ parameters.service }}/ || true
+            helm repo update --debug
+            echo "Updating Chart.yaml with service = ${{ parameters.service }} and build version = 1.$(Build.BuildNumber)"
+            sed -i -e 's/^name:.*/name: ${{ parameters.service }}/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+            sed -i -e 's/^appVersion:.*/appVersion: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+            sed -i -e 's/^version:.*/version: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+            sed -i -e 's|repository:.*|repository: s3://kotak811-helmcharts/dev/coralogix-dev/${{ parameters.service }}|' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+            echo "Updated Chart.yaml:"
+            cat $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+            echo "Running helm dependency update..."
+            helm dependency update --debug $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/
+          displayName: "Update Chart.yaml & Dependencies"
+
+
+Deploy Stage:
+
+- stage: Deploy
+  displayName: "Deploy to Kubernetes"
+  dependsOn: PackageAndPush
+  jobs:
+    - job: HelmDeploy
+      steps:
+        - script: |
+            unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+            CREDENTIALS=$(aws sts assume-role \
+              --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) \
+              --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber))
+            export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r '.Credentials.SessionToken')
+            export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey')
+            export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId')
+            helm repo add $(ENV)-${{ parameters.service }} $(HELM_S3BUCKET_URL) || true
+            helm repo update --debug
+            helm fetch $(ENV)-${{ parameters.service }}/${{ parameters.service }}
+            tar -xvf ${{ parameters.service }}-1.$(Build.BuildNumber).tgz
+            echo "Deploying to cluster: $(K8S_CLUSTER_NAME), kubeconfig: $(KUBE_CONFIG_PATH), namespace: $(NAMESPACE)"
+            helm upgrade --install $(ENV)-${{ parameters.service }} \
+              ${{ parameters.service }}/ \
+              -f $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(K8S_CLUSTER_NAME).yaml \
+              --namespace $(NAMESPACE) \
+              --kubeconfig $(KUBE_CONFIG_PATH) \
+              --wait --timeout 3m \
+              --set appconfig.APPCONFIG_PROFILE=coralogix-dev-secret \
+              --set serviceAccount.name=coralogix-sa
+          displayName: "Helm Deploy"
+          continueOnError: true
+
+
+coralogix/charts/templates/configmap.yaml
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ .Chart.Name }}-configmap
+  namespace: {{ .Values.namespace }}
+data:
+  CORALOGIX_SECRET_NAME: {{ .Values.appconfig.APPCONFIG_PROFILE | quote }}
