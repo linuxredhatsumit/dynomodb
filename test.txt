@@ -1,61 +1,120 @@
-apiVersion: v2
-dependencies:
-- alias: opentelemetry-agent
-  condition: opentelemetry-agent.enabled
-  name: opentelemetry-collector
-  repository: https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
-  version: 0.118.23
-- alias: opentelemetry-agent-windows
-  condition: opentelemetry-agent-windows.enabled
-  name: opentelemetry-collector
-  repository: https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
-  version: 0.118.23
-- alias: opentelemetry-cluster-collector
-  condition: opentelemetry-cluster-collector.enabled
-  name: opentelemetry-collector
-  repository: https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
-  version: 0.118.23
-- alias: opentelemetry-receiver
-  condition: opentelemetry-receiver.enabled
-  name: opentelemetry-collector
-  repository: https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
-  version: 0.118.23
-- alias: opentelemetry-gateway
-  condition: opentelemetry-gateway.enabled
-  name: opentelemetry-collector
-  repository: https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
-  version: 0.118.23
-- alias: coralogix-ebpf-agent
-  condition: coralogix-ebpf-agent.enabled
-  name: coralogix-ebpf-agent
-  repository: https://cgx.jfrog.io/artifactory/coralogix-charts
-  version: 0.1.14
-- alias: coralogix-ebpf-profiler
-  condition: coralogix-ebpf-profiler.enabled
-  name: coralogix-ebpf-profiler
-  repository: https://cgx.jfrog.io/artifactory/coralogix-charts
-  version: 0.0.11
-- alias: opentelemetry-ebpf-instrumentation
-  condition: opentelemetry-ebpf-instrumentation.enabled
-  name: opentelemetry-ebpf-instrumentation
-  repository: https://cgx.jfrog.io/artifactory/coralogix-charts
-  version: 0.1.2
-- alias: coralogix-operator
-  condition: coralogix-operator.enabled
-  name: coralogix-operator
-  repository: https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
-  version: 1.0.0
-description: OpenTelemetry Integration
-keywords:
-- OpenTelemetry Collector
-- OpenTelemetry Agent
-- OpenTelemetry Integration
-- Kubernetes
-- Coralogix
-maintainers:
-- email: platform@coralogix.com
-  name: Coralogix
-name: otel-integration
-sources:
-- https://github.com/coralogix/opentelemetry-helm-charts/tree/main/charts/opentelemetry-collector
-version: 0.0.205
+namespace: coralogix
+
+global:
+  clusterName: k811-eks-onb-dev
+  collectionInterval: 60s
+  domain: coralogix.in
+
+opentelemetry-agent:
+  enabled: true
+  mode: daemonset
+  config:
+    processors:
+      transform/remove-loglabels:
+        error_mode: ignore
+        log_statements:
+        - context: resource
+          statements:
+          - delete_key(attributes, "host.image.id")
+          - delete_key(attributes, "k8s.pod.uid")
+          - delete_key(attributes, "cloud.account.id")
+          - delete_key(attributes, "cloud.platform")
+          - delete_key(attributes, "cloud.availability.zone")
+          - delete_key(attributes, "cloud.availability_zone")
+          - delete_key(attributes, "os.type")
+          - delete_key(attributes, "cloud.provider")
+          - delete_key(attributes, "cloud.region")
+          - delete_key(attributes, "host.type")
+    service:
+      pipelines:
+        logs:
+          processors:
+            - k8sattributes
+            - resourcedetection/env
+            - resourcedetection/region
+            - batch
+            - transform/remove-loglabels
+        traces:
+          exporters:
+            - loadbalancing
+  presets:
+    loadBalancing:
+      enabled: true
+      hostname: coralogix-opentelemetry-gateway
+      routingKey: traceID
+    spanMetrics:
+      enabled: true
+  extraVolumes:
+    - name: my-extra-volume
+      emptyDir: {}
+  extraVolumeMounts:
+    - name: my-extra-volume
+      mountPath: /mnt/my-extra-volume
+
+opentelemetry-agent-windows:
+  enabled: false
+
+opentelemetry-cluster-collector:
+  enabled: true
+  extraVolumes:
+    - name: my-extra-volume
+      emptyDir: {}
+  extraVolumeMounts:
+    - name: my-extra-volume
+      mountPath: /mnt/my-extra-volume
+
+opentelemetry-gateway:
+  enabled: true
+  replicaCount: 3
+  config:
+    processors:
+      tail_sampling:
+        policies:
+          - name: errors-policy
+            status_code:
+              status_codes: [ERROR]
+            type: status_code
+          - name: randomized-policy
+            probabilistic:
+              sampling_percentage: 10
+            type: probabilistic
+  extraVolumes:
+    - name: my-extra-volume
+      emptyDir: {}
+  extraVolumeMounts:
+    - name: my-extra-volume
+      mountPath: /mnt/my-extra-volume
+
+serviceaccount:
+  enabled: true
+  name: coralogix-dev-sa
+  role: arn:aws:iam::483584640083:role/coralogix-dev-eks-sa
+
+role:
+  name: coralogix-dev-role
+
+rolebinding:
+  name: coralogix-dev-rb
+
+appconfig:
+  APPCONFIG_ENABLED: "true"
+  APPCONFIG_ENVIRONMENT: "development"
+  APPCONFIG_APPLICATION: "coralogix"
+  APPCONFIG_PROFILE: "coralogix-dev-secret"
+
+# SecretProviderClass Configuration
+secretProviderClass:
+  enabled: true
+  secrets:
+    - objectName: "coralogix-dev-keys"
+      objectType: "secretsmanager"
+      region: "ap-south-1"
+      jmesPath:
+        - path: "PRIVATE_KEY"
+          objectAlias: "PRIVATE_KEY"
+  secretObjects:
+    - secretName: coralogix-keys
+      type: Opaque
+      data:
+        - objectName: PRIVATE_KEY
+          key: PRIVATE_KEY
