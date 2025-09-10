@@ -1,2 +1,156 @@
-app_user@KBUTEC81L20293:~/DevOps/dev-coralogix$ echo "eyJQUklWQVRFX0tFWSI6ImN4dHBfRHdFRmFKWWhua0drUXhMUVJDbWZ2aVhadsfad" | base64 --decode
-{"PRIVATE_KEY":"cxtp_DwEFaJYhnkGkQxLQRCasdfads"}app_user@KBUTEC81L20293:~/DevOps/dev-coralogix$
+Update Complete. ⎈Happy Helming!⎈
+namespace/coralogix created
+helm upgrade --install dev-arm-k811-coralogix-k811-eks-onb-dev   dev-arm-k811-coralogix-k811-eks-onb-dev/k811-coralogix   -f /home/app_user/workspace/Agent1/_work/488/s/k811-coralogix/charts/k811-eks-onb-dev.yaml   --namespace coralogix   --kubeconfig /home/app_user/.kube/config-dev-arm   --wait --timeout 3m
+error: error parsing /home/app_user/workspace/Agent1/_work/488/s/k811-coralogix/charts/templates/secretstore.yaml: json: offset 2: invalid character '{' looking for beginning of object key string
+externalsecret.external-secrets.io/coralogix-secret created
+Release "dev-arm-k811-coralogix-k811-eks-onb-dev" does not exist. Installing it now.
+coalesce.go:237: warning: skipped value for k811-coralogix.rolebinding: Not a table.
+coalesce.go:237: warning: skipped value for k811-coralogix.rolebinding: Not a table.
+Error: Unable to continue with install: ExternalSecret "coralogix-secret" in namespace "coralogix" exists and cannot be imported into the current release: invalid ownership metadata; label validation error: missing key "app.kubernetes.io/managed-by": must be set to "Helm"; annotation validation error: missing key "meta.helm.sh/release-name": must be set to "dev-arm-k811-coralogix-k811-eks-onb-dev"; annotation validation error: missing key "meta.helm.sh/release-namespace": must be set to "coralogix"
+
+
+pipeline
+
+trigger: none
+
+parameters:
+  - name: cluster_name
+    displayName: Select Cluster/Service
+    type: string
+    default: k811-eks-onb-dev
+    values:
+      - k811-eks-onb-dev
+      - k811-eks-corsshell-dev
+      - k811-eks-onb-prod
+
+variables:
+  - group: onb-service-apigw-dev
+  - group: Kotak-ECR-Credentials
+
+  - name: ENV
+    value: dev-arm
+  - name: apigw_env
+    value: dev
+  - name: POOL_NAME
+    value: "K811-DevOps"
+  - name: SERVICE_NAME
+    value: k811-coralogix
+  - name: AWS_REGION
+    value: ap-south-1
+  - name: AWS_ACCOUNT_ID
+    value: "483584640083"
+  - name: ROLE_NAME
+    value: EKS_Setup_Role
+
+  - name: HELM_CHARTS_PATH
+    value: k811-coralogix/charts
+  - name: HELM_S3BUCKET_URL
+    value: s3://kotak811-helmcharts/dev/$(SERVICE_NAME)/${{ parameters.cluster_name }}
+  - name: NAMESPACE
+    value: coralogix
+
+  - name: K8S_CLUSTER_NAME
+    ${{ if eq(parameters.cluster_name, 'k811-eks-onb-dev') }}:
+      value: "k811-eks-onb-dev"
+    ${{ if eq(parameters.cluster_name, 'k811-eks-corsshell-dev') }}:
+      value: "k811-eks-corsshell-dev"
+    ${{ if eq(parameters.cluster_name, 'k811-eks-onb-prod') }}:
+      value: "k811-eks-onb-prod"
+
+  - name: KUBE_CONFIG_PATH
+    ${{ if eq(parameters.cluster_name, 'k811-eks-onb-dev') }}:
+      value: "/home/app_user/.kube/config-dev-arm"
+    ${{ if eq(parameters.cluster_name, 'k811-eks-corsshell-dev') }}:
+      value: "/home/app_user/.kube/config-dev"
+    ${{ if eq(parameters.cluster_name, 'k811-eks-onb-prod') }}:
+      value: "/home/app_user/.kube/config-uat"
+
+pool:
+  name: $(POOL_NAME)
+
+stages:
+  - stage: Build
+    displayName: "Prepare Helm Chart"
+    jobs:
+      - job: UpdateChart
+        displayName: "Update Chart.yaml"
+        steps:
+          - checkout: self
+            clean: false
+
+          - script: |
+              pwd
+              echo "Updating Chart.yaml with service = $(SERVICE_NAME) and build version = 1.$(Build.BuildNumber)"
+              sed -i -e 's/version:.*/version: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+              cat $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+              cat k811-coralogix/charts/Chart.yaml
+            displayName: "Update Chart.yaml & Dependencies"
+
+  - stage: PackageAndPush
+    displayName: "Package & Push Helm Chart"
+    dependsOn: Build
+    jobs:
+      - job: HelmPush
+        steps:
+          - script: |
+              unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+              CREDENTIALS=$(aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber))
+              export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r '.Credentials.SessionToken')
+              export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey')
+              export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId')
+              helm repo add $(ENV)-$(SERVICE_NAME)-${{ parameters.cluster_name }} $(HELM_S3BUCKET_URL)
+              helm repo add otel-integration s3://kotak811-helmcharts/others/coralogix/
+              helm repo update
+              echo "Running helm dependency update..."
+              sed -i -e 's/^version:.*/version: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+              cat $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+              ls $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/
+              helm dependency update $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)
+              helm package $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/
+              helm s3 push --force $(System.DefaultWorkingDirectory)/$(SERVICE_NAME)-1.$(Build.BuildNumber).tgz $(ENV)-$(SERVICE_NAME)-${{ parameters.cluster_name }}
+              helm repo update
+              helm search repo $(ENV)-$(SERVICE_NAME)-${{ parameters.cluster_name }}
+            displayName: "Push Chart to S3 Repo"
+
+  - stage: Deploy
+    displayName: "Deploy to Kubernetes"
+    dependsOn: PackageAndPush
+    jobs:
+      - job: HelmDeploy
+        steps:
+          - script: |
+              unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+              CREDENTIALS=$(aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber))
+              export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r '.Credentials.SessionToken')
+              export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey')
+              export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId')
+              helm repo add $(ENV)-$(SERVICE_NAME)-${{ parameters.cluster_name }} $(HELM_S3BUCKET_URL)
+              helm repo add otel-integration s3://kotak811-helmcharts/others/coralogix/
+              helm fetch $(ENV)-$(SERVICE_NAME)-${{ parameters.cluster_name }}/$(SERVICE_NAME)
+              tar -xvf $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
+              echo "Deploying to cluster: $(K8S_CLUSTER_NAME), kubeconfig: $(KUBE_CONFIG_PATH), namespace: $(NAMESPACE)"
+              helm repo update
+              kubectl create ns coralogix --kubeconfig $(KUBE_CONFIG_PATH)
+              echo "helm upgrade --install $(ENV)-$(SERVICE_NAME)-${{ parameters.cluster_name }} \
+                $(ENV)-$(SERVICE_NAME)-${{ parameters.cluster_name }}/$(SERVICE_NAME) \
+                -f $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(K8S_CLUSTER_NAME).yaml \
+                --namespace $(NAMESPACE) \
+                --kubeconfig $(KUBE_CONFIG_PATH) \
+                --wait --timeout 3m"
+              kubectl apply -f $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/templates/secretstore.yaml   --namespace $(NAMESPACE)  --kubeconfig $(KUBE_CONFIG_PATH) 
+              kubectl apply -f $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/templates/externalsecret.yaml  --namespace $(NAMESPACE)  --kubeconfig $(KUBE_CONFIG_PATH) 
+              # helm upgrade --install $(ENV)-$(SERVICE_NAME)-${{ parameters.cluster_name }} \
+              #   otel-integration/otel-integration \
+              #   -f $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(K8S_CLUSTER_NAME).yaml \
+              #   --namespace $(NAMESPACE) \
+              #   --kubeconfig $(KUBE_CONFIG_PATH) \
+              #   --wait --timeout 3m
+              helm upgrade --install $(ENV)-$(SERVICE_NAME)-${{ parameters.cluster_name }} \
+                $(ENV)-$(SERVICE_NAME)-${{ parameters.cluster_name }}/$(SERVICE_NAME) \
+                -f $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(K8S_CLUSTER_NAME).yaml \
+                --namespace $(NAMESPACE) \
+                --kubeconfig $(KUBE_CONFIG_PATH) 
+
+            displayName: "Helm Deploy"
+            continueOnError: true
+
