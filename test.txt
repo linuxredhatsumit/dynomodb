@@ -1,1 +1,23 @@
 
+opentelemetry-gateway:
+  enabled: false
+  mode: deployment
+  fullnameOverride: coralogix-opentelemetry-gateway
+  service:
+    enabled: true
+    clusterIP: "None"
+    
+opentelemetry-agent:
+  enabled: true
+  mode: daemonset
+  fullnameOverride: coralogix-opentelemetry
+
+opentelemetry-cluster-collector:
+  enabled: true
+  mode: deployment
+  fullnameOverride: coralogix-opentelemetry-collector
+  clusterRole:
+    name: "coralogix-opentelemetry-collector"
+    create: true
+    clusterRoleBinding:
+      name: "coralogix-opentelemetry-collector"
