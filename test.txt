@@ -1,17 +1,56 @@
-apiVersion: external-secrets.io/v1beta1
-kind: ExternalSecret
-metadata:
-  name: coralogix-secret
-  namespace: coralogix
-spec:
-  refreshInterval: 1h
-  secretStoreRef:
-    name: aws-secretstore
-    kind: SecretStore
-  target:
-    name: coralogix-keys
-    creationPolicy: Owner
-  data:
-    - secretKey: PRIVATE_KEY
-      remoteRef:
-        key: coralogix-dev-key    # <-- AWS Secret name
+app_user@KBUTEC81L20293:~/DevOps/dev-coralogix$ kadev describe  externalsecret coralogix-secret -n coralogix
+Name:         coralogix-secret
+Namespace:    coralogix
+Labels:       <none>
+Annotations:  <none>
+API Version:  external-secrets.io/v1beta1
+Kind:         ExternalSecret
+Metadata:
+  Creation Timestamp:  2025-09-10T06:34:47Z
+  Generation:          2
+  Resource Version:    706566709
+  UID:                 d09b1ac3-591d-4c2a-afa8-ff684fda4132
+Spec:
+  Data:
+    Remote Ref:
+      Conversion Strategy:  Default
+      Decoding Strategy:    None
+      Key:                  coralogix-dev-keys
+      Metadata Policy:      None
+    Secret Key:             PRIVATE_KEY
+  Refresh Interval:         1h
+  Secret Store Ref:
+    Kind:  SecretStore
+    Name:  aws-secretstore
+  Target:
+    Creation Policy:  Owner
+    Deletion Policy:  Retain
+    Name:             coralogix-keys
+Status:
+  Binding:
+    Name:
+  Conditions:
+    Last Transition Time:  2025-09-10T06:34:47Z
+    Message:               could not get secret data from provider
+    Reason:                SecretSyncedError
+    Status:                False
+    Type:                  Ready
+  Refresh Time:            <nil>
+Events:
+  Type     Reason        Age                     From              Message
+  ----     ------        ----                    ----              -------
+  Warning  UpdateFailed  2m29s (x17 over 7m56s)  external-secrets  error processing spec.data[0] (key: coralogix-dev-key), err: could not get SecretStore "aws-secretstore", SecretStore.external-secrets.io "aws-secretstore" not found
+  Warning  UpdateFailed  13s                     external-secrets  error processing spec.data[0] (key: coralogix-dev-keys), err: could not get SecretStore "aws-secretstore", SecretStore.external-secrets.io "aws-secretstore" not found
+
+key details
+
+coralogix-dev-keys
+Secret details
+
+Actions
+Encryption key
+ebs-kms-key-dev
+Secret name
+coralogix-dev-keys
+Secret ARN
+arn:aws:secretsmanager:ap-south-1:483584640083:secret:coralogix-dev-keys-WOIsQP
