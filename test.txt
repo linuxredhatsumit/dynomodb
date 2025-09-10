@@ -1,14 +1,51 @@
-apiVersion: external-secrets.io/v1beta1
-kind: SecretStore
-metadata:
-  name: aws-secretstore
-  namespace: coralogix
-spec:
-  provider:
-    aws:
-      service: SecretsManager
-      region: ap-south-1
-      auth:
-        jwt:
-          serviceAccountRef:
-            name: coralogix-sa   # <-- must exist
+app_user@KBUTEC81L20293:~/DevOps/dev-coralogix$ kadev describe  externalsecret coralogix-secret -n coralogix
+Name:         coralogix-secret
+Namespace:    coralogix
+Labels:       <none>
+Annotations:  <none>
+API Version:  external-secrets.io/v1beta1
+Kind:         ExternalSecret
+Metadata:
+  Creation Timestamp:  2025-09-10T06:34:47Z
+  Generation:          2
+  Resource Version:    706566709
+  UID:                 d09b1ac3-591d-4c2a-afa8-ff684fda4132
+Spec:
+  Data:
+    Remote Ref:
+      Conversion Strategy:  Default
+      Decoding Strategy:    None
+      Key:                  coralogix-dev-keys
+      Metadata Policy:      None
+    Secret Key:             PRIVATE_KEY
+  Refresh Interval:         1h
+  Secret Store Ref:
+    Kind:  SecretStore
+    Name:  aws-secretstore
+  Target:
+    Creation Policy:  Owner
+    Deletion Policy:  Retain
+    Name:             coralogix-keys
+Status:
+  Binding:
+    Name:
+  Conditions:
+    Last Transition Time:  2025-09-10T06:34:47Z
+    Message:               could not get secret data from provider
+    Reason:                SecretSyncedError
+    Status:                False
+    Type:                  Ready
+  Refresh Time:            <nil>
+Events:
+  Type     Reason        Age                   From              Message
+  ----     ------        ----                  ----              -------
+  Warning  UpdateFailed  7m23s (x17 over 12m)  external-secrets  error processing spec.data[0] (key: coralogix-dev-key), err: could not get SecretStore "aws-secretstore", SecretStore.external-secrets.io "aws-secretstore" not found
+  Warning  UpdateFailed  115s (x2 over 5m7s)   external-secrets  error processing spec.data[0] (key: coralogix-dev-keys), err: could not get SecretStore "aws-secretstore", SecretStore.external-secrets.io "aws-secretstore" not found
+app_user@KBUTEC81L20293:~/DevOps/dev-coralogix$ kadev get secretstore -n coralogix
+NAME              AGE   STATUS             CAPABILITIES   READY
+aws-secretstore   48s   ValidationFailed                  False
+app_user@KBUTEC81L20293:~/DevOps/dev-coralogix$ kadev descreibe secretstore aws-secretstore -n coralogix
+Error: flags cannot be placed before plugin name: --kubeconfig
+app_user@KBUTEC81L20293:~/DevOps/dev-coralogix$ kadev descrebe secretstore aws-secretstore -n coralogix
+Error: flags cannot be placed before plugin name: --kubeconfig
+app_user@KBUTEC81L20293:~/DevOps/dev-coralogix$
