@@ -1,1 +1,3 @@
-Agent and collector “worked” because their templates were designed to read from parent/global values. Gateway “didn’t work” because it required the values to be under the dependency chart’s name.
+Agent and collector worked because their templates were designed to read global values or keys at the top level, but the gateway template specifically looks under otel-integration.opentelemetry-gateway.
+
+✅ So the dependency chart’s name must wrap the values in your values.yaml to make them effective.
