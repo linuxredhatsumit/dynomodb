@@ -1,21 +1,17 @@
-below for pod.
-
-- name: CORALOGIX_PRIVATE_KEY
-      valueFrom:
-        secretKeyRef:
+apiVersion: secrets-store.csi.x-k8s.io/v1
+kind: SecretProviderClass
+metadata:
+  name: coralogix-keys
+  namespace: coralogix
+spec:
+  provider: aws
+  parameters:
+    objects: |
+      - objectName: "CORALOGIX_PRIVATE_KEY"   # AWS Secret name
+        objectType: "secretsmanager"
+  secretObjects:
+    - secretName: coralogix-keys
+      type: Opaque
+      data:
+        - objectName: "CORALOGIX_PRIVATE_KEY"
           key: PRIVATE_KEY
-          name: coralogix-keys
-
-
-
-app_user@KBUTEC81L20293:~$ kuat get secret -n coralogix
-NAME                                                    TYPE                 DATA   AGE
-coralogix-keys                                          Opaque               1      5d13h
-
-
-
-currently we have to run below command which will craete the secret
-kubectl create secret generic coralogix-keys --from-literal=PRIVATE_KEY="adfadfads" -n coralogix
-
-
-what is the way to create secret using helm chart?
