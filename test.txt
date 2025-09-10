@@ -1,17 +1,17 @@
-apiVersion: secrets-store.csi.x-k8s.io/v1
-kind: SecretProviderClass
+apiVersion: external-secrets.io/v1beta1
+kind: ExternalSecret
 metadata:
-  name: coralogix-keys
+  name: coralogix-secret
   namespace: coralogix
 spec:
-  provider: aws
-  parameters:
-    objects: |
-      - objectName: "CORALOGIX_PRIVATE_KEY"   # AWS Secret name
-        objectType: "secretsmanager"
-  secretObjects:
-    - secretName: coralogix-keys
-      type: Opaque
-      data:
-        - objectName: "CORALOGIX_PRIVATE_KEY"
-          key: PRIVATE_KEY
+  refreshInterval: 1h
+  secretStoreRef:
+    name: aws-secretstore
+    kind: SecretStore
+  target:
+    name: coralogix-keys
+    creationPolicy: Owner
+  data:
+    - secretKey: PRIVATE_KEY
+      remoteRef:
+        key: coralogix-dev-key    # <-- AWS Secret name
