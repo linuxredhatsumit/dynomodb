@@ -1,51 +1,127 @@
-app_user@KBUTEC81L20293:~/DevOps/dev-coralogix$ kadev describe  externalsecret coralogix-secret -n coralogix
-Name:         coralogix-secret
+app_user@KBUTEC81L20293:~/DevOps/dev-coralogix$ kadev describe secretstore aws-secretstore -n coralogix
+Name:         aws-secretstore
 Namespace:    coralogix
 Labels:       <none>
 Annotations:  <none>
 API Version:  external-secrets.io/v1beta1
-Kind:         ExternalSecret
+Kind:         SecretStore
 Metadata:
-  Creation Timestamp:  2025-09-10T06:34:47Z
-  Generation:          2
-  Resource Version:    706566709
-  UID:                 d09b1ac3-591d-4c2a-afa8-ff684fda4132
+  Creation Timestamp:  2025-09-10T06:47:10Z
+  Generation:          1
+  Resource Version:    706571377
+  UID:                 e2328608-234a-4961-8fdb-ff85407dbfc4
 Spec:
-  Data:
-    Remote Ref:
-      Conversion Strategy:  Default
-      Decoding Strategy:    None
-      Key:                  coralogix-dev-keys
-      Metadata Policy:      None
-    Secret Key:             PRIVATE_KEY
-  Refresh Interval:         1h
-  Secret Store Ref:
-    Kind:  SecretStore
-    Name:  aws-secretstore
-  Target:
-    Creation Policy:  Owner
-    Deletion Policy:  Retain
-    Name:             coralogix-keys
+  Provider:
+    Aws:
+      Auth:
+        Jwt:
+          Service Account Ref:
+            Name:  coralogix-dev-sa
+      Region:      ap-south-1
+      Service:     SecretsManager
 Status:
-  Binding:
-    Name:
   Conditions:
-    Last Transition Time:  2025-09-10T06:34:47Z
-    Message:               could not get secret data from provider
-    Reason:                SecretSyncedError
-    Status:                False
-    Type:                  Ready
-  Refresh Time:            <nil>
+    Last Transition Time:  2025-09-10T06:47:10Z
+    Message:               unable to validate store: WebIdentityErr: failed to retrieve credentials
+caused by: AccessDenied: Not authorized to perform sts:AssumeRoleWithWebIdentity
+             status code: 403,
+    Reason:  ValidationFailed
+    Status:  False
+    Type:    Ready
 Events:
-  Type     Reason        Age                   From              Message
-  ----     ------        ----                  ----              -------
-  Warning  UpdateFailed  7m23s (x17 over 12m)  external-secrets  error processing spec.data[0] (key: coralogix-dev-key), err: could not get SecretStore "aws-secretstore", SecretStore.external-secrets.io "aws-secretstore" not found
-  Warning  UpdateFailed  115s (x2 over 5m7s)   external-secrets  error processing spec.data[0] (key: coralogix-dev-keys), err: could not get SecretStore "aws-secretstore", SecretStore.external-secrets.io "aws-secretstore" not found
-app_user@KBUTEC81L20293:~/DevOps/dev-coralogix$ kadev get secretstore -n coralogix
-NAME              AGE   STATUS             CAPABILITIES   READY
-aws-secretstore   48s   ValidationFailed                  False
-app_user@KBUTEC81L20293:~/DevOps/dev-coralogix$ kadev descreibe secretstore aws-secretstore -n coralogix
-Error: flags cannot be placed before plugin name: --kubeconfig
-app_user@KBUTEC81L20293:~/DevOps/dev-coralogix$ kadev descrebe secretstore aws-secretstore -n coralogix
-Error: flags cannot be placed before plugin name: --kubeconfig
-app_user@KBUTEC81L20293:~/DevOps/dev-coralogix$
+  Type     Reason            Age                   From          Message
+  ----     ------            ----                  ----          -------
+  Warning  ValidationFailed  12s (x16 over 2m56s)  secret-store  WebIdentityErr: failed to retrieve credentials
+caused by: AccessDenied: Not authorized to perform sts:AssumeRoleWithWebIdentity
+  status code: 403,
+
+
+
+iam poliyc
+
+{
+    "Statement": [
+        {
+            "Action": [
+                "kms:Decrypt",
+                "kms:Encrypt",
+                "kms:GenerateDataKey"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:kms:ap-south-1:483584640083:key/fd55a4ac-4afd-467f-b41d-ce6881f6cd61",
+                "arn:aws:kms:ap-south-1:483584640083:key/cc498c37-f3b6-4dfa-a9fb-4e98996be115"
+            ]
+        },
+        {
+            "Action": [
+                "appconfig:ListTagsForResource",
+                "appconfig:GetHostedConfigurationVersion",
+                "appconfig:GetDeployment",
+                "appconfig:ListEnvironments",
+                "appconfig:StartDeployment",
+                "appconfig:GetExtensionAssociation",
+                "appconfig:GetLatestConfiguration",
+                "appconfig:ListDeployments",
+                "appconfig:GetExtension",
+                "appconfig:GetEnvironment",
+                "appconfig:GetDeploymentStrategy",
+                "appconfig:ListConfigurationProfiles",
+                "appconfig:GetConfiguration",
+                "appconfig:GetApplication",
+                "appconfig:GetConfigurationProfile",
+                "appconfig:ListHostedConfigurationVersions",
+                "appconfig:StartConfigurationSession"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:appconfig:ap-south-1:483584640083:application/hpvzqlc",
+                "arn:aws:appconfig:ap-south-1:483584640083:application/hpvzqlc/configurationprofile/*",
+                "arn:aws:appconfig:ap-south-1:483584640083:application/hpvzqlc/environment/*"
+            ]
+        },
+        {
+            "Action": [
+                "s3:ListBucket",
+                "s3:GetObject",
+                "s3:PutObject"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:s3:::811-coralogix-dev",
+                "arn:aws:s3:::811-coralogix-dev/*"
+            ]
+        },
+        {
+            "Action": [
+                "secretsmanager:GetSecretValue"
+            ],
+            "Effect": "Allow",
+            "Resource": [
+                "arn:aws:secretsmanager:ap-south-1:483584640083:secret:coralogix-dKXGxg",
+                "arn:aws:secretsmanager:ap-south-1:483584640083:secret:coralogix-dev-keys-WOIsQP"
+            ]
+        }
+    ],
+    "Version": "2012-10-17"
+}
+
+
+
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+            "Effect": "Allow",
+            "Principal": {
+                "Federated": "arn:aws:iam::483584640083:oidc-provider/oidc.eks.ap-south-1.amazonaws.com/id/0D04991F1AA697F7FD8125ABFBEE2857"
+            },
+            "Action": "sts:AssumeRoleWithWebIdentity",
+            "Condition": {
+                "StringEquals": {
+                    "oidc.eks.ap-south-1.amazonaws.com/id/0D04991F1AA697F7FD8125ABFBEE2857:sub": "system:serviceaccount:dev:coralogix-dev-sa"
+                }
+            }
+        }
+    ]
+}
