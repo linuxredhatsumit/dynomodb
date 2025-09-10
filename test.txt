@@ -1,12 +1,5 @@
-KMBL350986@KBMK24-00000929 otel-integration % ls
-central-agent-values.yaml			gke-autopilot-values.yaml			values-crd-override.yaml
-central-tail-sampling-values.yaml		ipv6-values.yaml				values-ebpf-agent-existing-collector.yaml
-Chart.lock					README.md					values-ebpf-profiler.yaml
-Chart.yaml					static						values-windows-tailsampling.yaml
-charts						tail-sampling-values.yaml			values-windows.yaml
-ci						templates					values.yaml
-e2e-test					values-cluster-ksm.yaml
-KMBL350986@KBMK24-00000929 otel-integration % grep -ir  "opentelemetry-gateway" *
+KMBL350986@KBMK24-00000929 otel-integration % grep -R  "opentelemetry-gateway" templates/
+KMBL350986@KBMK24-00000929 otel-integration % grep -R  "opentelemetry-gateway" *         
 central-agent-values.yaml:opentelemetry-gateway:
 central-tail-sampling-values.yaml:      hostname: coralogix-opentelemetry-gateway
 central-tail-sampling-values.yaml:opentelemetry-gateway:
