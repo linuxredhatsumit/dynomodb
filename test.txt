@@ -1,27 +1,61 @@
-KMBL350986@KBMK24-00000929 otel-integration % grep -R  "opentelemetry-gateway" templates/
-KMBL350986@KBMK24-00000929 otel-integration % grep -R  "opentelemetry-gateway" *         
-central-agent-values.yaml:opentelemetry-gateway:
-central-tail-sampling-values.yaml:      hostname: coralogix-opentelemetry-gateway
-central-tail-sampling-values.yaml:opentelemetry-gateway:
-Chart.yaml:- alias: opentelemetry-gateway
-Chart.yaml:  condition: opentelemetry-gateway.enabled
-charts/opentelemetry-collector/examples/loadbalancing/rendered/configmap.yaml:            hostname: coralogix-opentelemetry-gateway
-charts/opentelemetry-collector/examples/loadbalancing/values.yaml:    hostname: "coralogix-opentelemetry-gateway"
-ci/tail-sampling-values.yaml:      hostname: coralogix-opentelemetry-gateway
-ci/tail-sampling-values.yaml:opentelemetry-gateway:
-README.md:The following configuration enables OTEL-agent pods to send span data to the coralogix-opentelemetry-gateway deployment using the [loadbalancing exporter](https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/loadbalancingexporter).
-README.md:      hostname: coralogix-opentelemetry-gateway
-README.md:opentelemetry-gateway:
-README.md:coralogix-opentelemetry-gateway-65dfbb5567-6rk4j   1/1     Running   0          7h59m
-README.md:coralogix-opentelemetry-gateway-65dfbb5567-g7m5l   1/1     Running   0          7h59m
-README.md:coralogix-opentelemetry-gateway-65dfbb5567-zbprd   1/1     Running   0          7h59m
-README.md:You should end up with as many opentelemetry-agent pods as you have nodes in your cluster, and 3 opentelemetry-gateway pods.
-README.md:- `opentelemetry-receiver`. Receives OTLP data and sends metrics and logs directly to Coralogix while performing load balancing of span data sent to the `opentelemetry-gateway` deployment. deployment.
-README.md:- `opentelemetry-gateway`. Performs tail sampling decisions on the received span data before forwarding to Coralogix
-tail-sampling-values.yaml:      hostname: coralogix-opentelemetry-gateway
-tail-sampling-values.yaml:opentelemetry-gateway:
-values-windows-tailsampling.yaml:      hostname: coralogix-opentelemetry-gateway
-values-windows-tailsampling.yaml:opentelemetry-gateway:
-values.yaml:opentelemetry-gateway:
-values.yaml:  fullnameOverride: coralogix-opentelemetry-gateway
-KMBL350986@KBMK24-00000929 otel-integration % 
+apiVersion: v2
+dependencies:
+- alias: opentelemetry-agent
+  condition: opentelemetry-agent.enabled
+  name: opentelemetry-collector
+  repository: https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
+  version: 0.118.23
+- alias: opentelemetry-agent-windows
+  condition: opentelemetry-agent-windows.enabled
+  name: opentelemetry-collector
+  repository: https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
+  version: 0.118.23
+- alias: opentelemetry-cluster-collector
+  condition: opentelemetry-cluster-collector.enabled
+  name: opentelemetry-collector
+  repository: https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
+  version: 0.118.23
+- alias: opentelemetry-receiver
+  condition: opentelemetry-receiver.enabled
+  name: opentelemetry-collector
+  repository: https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
+  version: 0.118.23
+- alias: opentelemetry-gateway
+  condition: opentelemetry-gateway.enabled
+  name: opentelemetry-collector
+  repository: https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
+  version: 0.118.23
+- alias: coralogix-ebpf-agent
+  condition: coralogix-ebpf-agent.enabled
+  name: coralogix-ebpf-agent
+  repository: https://cgx.jfrog.io/artifactory/coralogix-charts
+  version: 0.1.14
+- alias: coralogix-ebpf-profiler
+  condition: coralogix-ebpf-profiler.enabled
+  name: coralogix-ebpf-profiler
+  repository: https://cgx.jfrog.io/artifactory/coralogix-charts
+  version: 0.0.11
+- alias: opentelemetry-ebpf-instrumentation
+  condition: opentelemetry-ebpf-instrumentation.enabled
+  name: opentelemetry-ebpf-instrumentation
+  repository: https://cgx.jfrog.io/artifactory/coralogix-charts
+  version: 0.1.2
+- alias: coralogix-operator
+  condition: coralogix-operator.enabled
+  name: coralogix-operator
+  repository: https://cgx.jfrog.io/artifactory/coralogix-charts-virtual
+  version: 1.0.0
+description: OpenTelemetry Integration
+keywords:
+- OpenTelemetry Collector
+- OpenTelemetry Agent
+- OpenTelemetry Integration
+- Kubernetes
+- Coralogix
+maintainers:
+- email: platform@coralogix.com
+  name: Coralogix
+name: otel-integration
+sources:
+- https://github.com/coralogix/opentelemetry-helm-charts/tree/main/charts/opentelemetry-collector
+version: 0.0.205
