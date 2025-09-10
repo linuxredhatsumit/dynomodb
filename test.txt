@@ -1,1 +1,276 @@
-helm show values https://cgx.jfrog.io/artifactory/coralogix-charts-virtual/opentelemetry-collector-0.118.23.tgz | grep -A2 enabled
+app_user@KBUTEC81L20293:~$ helm show values https://cgx.jfrog.io/artifactory/coralogix-charts-virtual/opentelemetry-collector-0.118.23.tgz --kubeconfig ~/.kube/config-dev-arm | grep -A2 enabled
+# If enabled, the OpenTelemetryCollector CRD will be generated
+# instead of the collector manifests. It is recommended to use this
+# in conjunction with 'helm template' and 'kubectl apply', if you
+--
+# If the target allocator is enabled, the service account, cluster role
+# and cluster role binding will be generated as well, with appropriate
+# permissions, necessary for target allocator to work. If you do not
+--
+  enabled: false
+  replicas: 1
+  tolerations: []
+--
+    enabled: false
+    podMonitorSelector: {}
+    serviceMonitorSelector: {}
+--
+    enabled: false
+    extraLabels: {}
+
+--
+#         enabled: true
+#   service:
+#     pipelines:
+--
+    enabled: false
+    includeCollectorLogs: false
+    # Time since last read of data from file, after which currently buffered log should be send to pipeline. A value of 0 will disable forced flushing.
+--
+      enabled: false
+      denylist:
+        - "log.iostream"
+--
+    enabled: false
+  # Configures the collector to collect host metrics.
+  # Adds the hostmetrics receiver to the metrics pipeline
+--
+    enabled: false
+    # Enables process scraper for hostMetrics
+    # This needs privileged security context
+--
+      enabled: false
+    # collectionInterval: 30s
+  # Configures the Kubernetes Processor to add Kubernetes metadata.
+--
+    enabled: false
+    # When enabled the processor will extra all labels for an associated pod and add them as resource attributes.
+    # The label's exact name will be the key.
+    extractAllPodLabels: false
+    # When enabled the processor will extra all annotations for an associated pod and add them as resource attributes.
+    # The annotation's exact name will be the key.
+    extractAllPodAnnotations: false
+--
+      enabled: true
+    # Specifies whether to extract pod start time into k8s.pod.start_time attribute.
+    podStartTime:
+      enabled: true
+    # When enabled adds node_from_env_var filter to limit processing to the node
+    # specified by the K8S_NODE_NAME environment variable.
+    nodeFilter:
+      enabled: false
+  # Configures the collector to collect node, pod, and container metrics from the API server on a kubelet..
+  # Adds the kubeletstats receiver to the metrics pipeline
+--
+    enabled: false
+    # collectionInterval: 30s
+  # Configures the collector to collect kubernetes events.
+--
+    enabled: false
+    clusterName: ""
+  # Configures the Kubernetes Cluster Receiver to collect cluster-level metrics.
+--
+    enabled: false
+    # collectionInterval: 30s
+    customMetrics:
+      enabled: false
+
+  # Configures the collector to collect extra Kubernetes metrics, such as pod status and Kubernetes API version.
+--
+    enabled: false
+    # When false (default), collects only fs and cfs throttling metrics. When true, collect all metrics.
+    scrapeAll: false
+--
+    enabled: false
+    clusterName: ""
+    integrationName: ""
+--
+    enabled: false
+    # Configures collector to add service.version to spanMetrics dimensions
+    serviceVersion:
+      enabled: true
+    dbMetrics:
+      enabled: true
+      # Configures collector to add service.version to dbMetrics dimensions
+      serviceVersion:
+        enabled: true
+      extraDimensions: []
+    # Configures the collector to collect and export error information from spans.
+--
+      enabled: true
+    extraDimensions:
+      - name: http.method
+--
+    enabled: false
+    extraDimensions:
+      - name: http.method
+--
+    enabled: false
+    # traceID, service, resource or metric
+    # See https://github.com/open-telemetry/opentelemetry-collector-contrib/tree/main/exporter/loadbalancingexporter
+--
+    enabled: false
+    # Use pipelines (plural) for multiple pipeline selection.
+    # When pipelines is set, it takes precedence over pipeline.
+--
+    enabled: false
+    waitDuration: 30s
+
+--
+    enabled: false
+    pipelines: ["all"]
+    denylist:
+--
+    enabled: false
+  # Configures Kubernetes Object receiver to collect Kubernetes Resources.
+  kubernetesResources:
+    enabled: false
+    filterWorkflows:
+      enabled: true
+    filterStatements: []
+    transformStatements: []
+--
+      enabled: false
+    periodicCollection:
+      enabled: true
+  # Configures Host Metrics receiver to collect Entity Events.
+  hostEntityEvents:
+    enabled: false
+  # Configures the collector to communicate with the remote Coralogix fleet management service.
+  fleetManagement:
+    enabled: false
+    # IMPORTANT: The `supervisor` preset is in alpha stage and under heavy development.
+    # It's not recommended for use in production environments.
+--
+      enabled: false
+    agentType: ""
+    clusterName: ""
+--
+    enabled: false
+    agentType: ""
+
+--
+      enabled: false
+      # If you have multiple instance you'd like to collect, specify each instance in the list below.
+      # If you have only one instance, you don't need to specify the labelSelectors.
+--
+      enabled: false
+      # volumeMountName specifies the name of the volume mount. It should correspond to the volume name of the MySQL data volume.
+      volumeMountName: "data"
+--
+    enabled: false
+    # Percentage of traces to sample (0-100)
+    percentage: 10
+--
+    enabled: true
+    # Pipeline to add the collector metrics receiver and processor to. Possible values are
+    # "metrics" and "none".
+--
+    enabled: false
+
+  # Configures the collector to receive Zipkin data.
+--
+    enabled: false
+
+  # Configures the collector to receive OTLP data.
+--
+    enabled: true
+    # Default otlp grpc server message size limit is 4mib, which might be too low.
+    maxRecvMsgSizeMiB: 20
+--
+    enabled: false
+
+  # Configures the collector to expose zPages for debugging.
+--
+    enabled: false
+    endpoint: localhost:55679
+
+--
+    enabled: false
+    endpoint: localhost:1777
+
+--
+    enabled: false
+    sendBatchSize: 1024
+    sendBatchMaxSize: 2048
+--
+    enabled: false
+    # Pipeline to add the resource detection processors to. Possible values are
+    # "all", "metrics", "traces" and "none".
+--
+      enabled: true
+    # Specifies whether to mount /var/lib/dbus/machine-id from the host.
+    dbusMachineId:
+      enabled: true
+    # Allows setting the deployment environment name in OTEL_RESOURCE_ATTRIBUTES.
+    deploymentEnvironmentName: ""
+--
+    enabled: true
+    containerPort: 4317
+    servicePort: 4317
+--
+    enabled: true
+    containerPort: 4318
+    servicePort: 4318
+--
+    # in order to use the ServiceMonitor (serviceMonitor.enabled) or PodMonitor (podMonitor.enabled).
+    enabled: false
+    containerPort: 8888
+    servicePort: 8888
+--
+  # By default, it's enabled on mode != daemonset.
+  # However, to enable it on mode = daemonset, its creation must be explicitly enabled
+  # enabled: true
+
+  type: ClusterIP
+--
+  enabled: false
+  # annotations: {}
+  # ingressClassName: nginx
+--
+  # Additional ingresses - only created if ingress.enabled is true
+  # Useful for when differently annotated ingress services are required
+  # Each additional ingress needs key "name" set to something unique
+--
+  # The metrics port needs to be enabled as well.
+  enabled: false
+  metricsEndpoints:
+    - port: metrics
+--
+  # The metrics port needs to be enabled as well.
+  enabled: false
+  metricsEndpoints:
+    - port: metrics
+--
+# PodDisruptionBudget is used only if deployment enabled
+podDisruptionBudget:
+  enabled: false
+#   minAvailable: 2
+#   maxUnavailable: 1
+--
+  enabled: false
+  # hpa or custom if you are using a custom autoscaler, such as KEDA
+  mode: "hpa"
+--
+  enabled: false
+  groups: []
+  # Create default rules for monitoring the collector
+--
+    enabled: false
+
+  # additional labels for the PrometheusRule
+--
+  enabled: false
+
+  # Annotations to add to the NetworkPolicy
+--
+  # By default this will restrict traffic to ports enabled for the Collector. If
+  # you wish to further restrict traffic to other hosts or specific namespaces,
+  # see the standard NetworkPolicy 'spec.ingress.from' definition for more info:
+--
+# When enabled, the chart will set the GOMEMLIMIT env var to 80% of the configured
+# resources.limits.memory and remove the memory ballast extension.
+# If no resources.limits.memory are defined enabling does nothing.
+# In a future release this setting will be enabled by default.
+# See https://github.com/open-telemetry/opentelemetry-helm-charts/issues/891
+# for more details.
