@@ -1,70 +1,60 @@
+Hi DevOps Team,
 
-coralogix/charts/values.yaml
-service:
-  name: {{ .Release.Name }}
-namespace: coralogix
-aws:
-  region: ap-south-1
-secrets:
-  coralogixSecretName: coralogix-dKXGxg
-serviceAccount:
-  name: coralogix-sa
-otelIntegration: {}
+Service Name: Verify-plus
 
+We need to create an S3 bucket to store consent audio files for multiple languages. The bucket will be used by our backend service at /api/v1/consent/audio/refresh.
 
-coralogix/charts/templates/secrets.yaml:
+Requirements:
 
-apiVersion: secrets-store.csi.x-k8s.io/v1
-kind: SecretProviderClass
-metadata:
-  name: {{ .Chart.Name }}-spc
-  namespace: {{ .Values.namespace }}
-spec:
-  provider: aws
-  secretObjects:
-    - secretName: coralogix-keys
-      type: Opaque
-      data:
-        - objectName: CORALOGIX_PRIVATE_KEY
-          key: PRIVATE_KEY
-  parameters:
-    objects: |
-      - objectName: "{{ .Values.appconfig.APPCONFIG_PROFILE }}"
-        objectType: secretsmanager
-        objectAlias: CORALOGIX_PRIVATE_KEY
+S3 Bucket
+
+Name: cpg-aadhaar-consent-audio-uat (or follow naming conventions)
+
+Public access: Yes, read-only for public CDN
+
+Versioning: Enable versioning on the bucket so that older files are retained
+
+Cache-Control headers: no-cache, no-store, must-revalidate to ensure Cloudflare always serves the latest audio
+
+Cloudflare URL
+
+Provide a Cloudflare URL or CDN endpoint so that the uploaded audio files can be accessed publicly.
+
+Other Notes:
+
+Audio files will be uploaded via backend service automatically.
+
+Each audio file will be named: audio_<language>.mp3
+
+Every upload should replace the existing audio for that language while keeping old versions via S3 versioning.
+
+Please confirm once the bucket and Cloudflare URL are ready.
 
 
-coralogix/charts/templates/deployment.yaml:
-
-apiVersion: apps/v1
-kind: Deployment
-metadata:
-  name: {{ .Values.service.name }}-opentelemetry-agent
-  namespace: {{ .Values.namespace }}
-spec:
-  selector:
-    matchLabels:
-      app: {{ .Values.service.name }}
-  template:
-    metadata:
-      labels:
-        app: {{ .Values.service.name }}
-    spec:
-      serviceAccountName: {{ .Values.serviceAccount.name | default "coralogix-sa" }}
-      containers:
-        - name: {{ .Values.service.name }}
-          env:
-            - name: CORALOGIX_PRIVATE_KEY
-              valueFrom:
-                secretKeyRef:
-                  key: PRIVATE_KEY
-                  name: coralogix-keys
-      volumes:
-        - name: secrets-store
-          csi:
-            driver: secrets-store.csi.k8s.io
-            readOnly: true
-            volumeAttributes:
-              secretProviderClass: {{ .Chart.Name }}-spc
 
 
+one more below ticket it's related
+
+Hi DevOps Team,
+Service Name : Verify-plus
+
+We need to trigger our /api/v1/consent/audio/refresh endpoint automatically every 10 minutes.
+
+Requirements:
+
+Endpoint: POST http://uat-kotak811-nlb-ff7a63b15721e4a1.elb.ap-south-1.amazonaws.com/vplus/api/v1/consent/audio/refresh
+
+
+
+curl --location --request POST 'http://uat-kotak811-nlb-ff7a63b15721e4a1.elb.ap-south-1.amazonaws.com/vplus/api/v1/consent/audio/refresh' \
+--header 'Content-Type: application/json'
+
+
+
+Trigger Frequency: Every 30 minutes
+
+Method: Lambda function with CloudWatch Events (or equivalent scheduler)
+
+Response: Ensure logs capture success/failure of each call
+
+Please configure this and confirm once the Lambda scheduler is active.
