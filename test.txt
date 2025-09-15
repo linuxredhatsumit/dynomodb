@@ -83,7 +83,6 @@ def load_gsi_config(table_name, check_gsi):
             }))
             sys.exit(1)
 
-        valid_projection_types = {"ALL", "KEYS_ONLY", "INCLUDE"}
         for index_name, conf in gsi_config.items():
             if not isinstance(conf, dict):
                 logger.error(json.dumps({
@@ -91,27 +90,6 @@ def load_gsi_config(table_name, check_gsi):
                     "error": f"Configuration for index {index_name} must be a JSON object"
                 }))
                 sys.exit(1)
-
-            if "ProjectionType" in conf and conf["ProjectionType"] not in valid_projection_types:
-                logger.error(json.dumps({
-                    "context": "config.validate",
-                    "error": f"Invalid ProjectionType for index {index_name}: {conf['ProjectionType']}. Must be one of {valid_projection_types}"
-                }))
-                sys.exit(1)
-                
-            if conf.get("ProjectionType") == "INCLUDE":
-                if "NonKeyAttributes" not in conf:
-                    logger.error(json.dumps({
-                        "context": "config.validate",
-                        "error": f"NonKeyAttributes required for index {index_name} when ProjectionType is INCLUDE"
-                    }))
-                    sys.exit(1)
-                if not isinstance(conf["NonKeyAttributes"], list):
-                    logger.error(json.dumps({
-                        "context": "config.validate",
-                        "error": f"NonKeyAttributes for index {index_name} must be a list"
-                    }))
-                    sys.exit(1)
 
             if "ReadCapacityUnits" in conf and not isinstance(conf["ReadCapacityUnits"], int):
                 logger.error(json.dumps({
@@ -183,14 +161,12 @@ def validate_gsi_config(desc, gsi_config, check_gsi):
 
 def update_gsi_configuration(dynamodb, table_name, gsi_config):
     """
-    Update GSI configurations, including throughput and projection attributes.
-    If projection attributes differ, delete and recreate the GSI with AttributeDefinitions.
+    Update GSI configurations for throughput (ReadCapacityUnits and WriteCapacityUnits) only.
     """
     try:
         updated = False
         table_desc = dynamodb.describe_table(TableName=table_name)["Table"]
         existing_gsis = {gsi["IndexName"]: gsi for gsi in table_desc.get("GlobalSecondaryIndexes", [])}
-        table_attribute_definitions = table_desc.get("AttributeDefinitions", [])
         gsi_updates = []
 
         for index_name, conf in gsi_config.items():
@@ -202,31 +178,6 @@ def update_gsi_configuration(dynamodb, table_name, gsi_config):
                 }))
                 continue
 
-            projection_needs_update = False
-            throughput_needs_update = False
-
-            current_projection = existing.get("Projection", {})
-            desired_projection_type = conf.get("ProjectionType", current_projection.get("ProjectionType", "ALL"))
-            desired_non_key_attributes = conf.get("NonKeyAttributes", [])
-            current_non_key_attributes = current_projection.get("NonKeyAttributes", [])
-
-            logger.info(json.dumps({
-                "context": "gsi.update",
-                "message": f"Checking projection attributes for GSI {index_name}",
-                "current_projection_type": current_projection.get("ProjectionType"),
-                "desired_projection_type": desired_projection_type,
-                "current_non_key_attributes": current_non_key_attributes,
-                "desired_non_key_attributes": desired_non_key_attributes
-            }))
-
-            if (current_projection.get("ProjectionType") != desired_projection_type or
-                    sorted(current_non_key_attributes or []) != sorted(desired_non_key_attributes or [])):
-                projection_needs_update = True
-                logger.info(json.dumps({
-                    "context": "gsi.update",
-                    "message": f"Projection attributes for GSI {index_name} need updating: current={current_projection}, desired={{'ProjectionType': '{desired_projection_type}', 'NonKeyAttributes': {desired_non_key_attributes}}}"
-                }))
-
             current_throughput = existing.get("ProvisionedThroughput", {})
             desired_throughput = {
                 "ReadCapacityUnits": conf.get("ReadCapacityUnits", 5),
@@ -234,7 +185,6 @@ def update_gsi_configuration(dynamodb, table_name, gsi_config):
             }
             if (current_throughput.get("ReadCapacityUnits") != desired_throughput["ReadCapacityUnits"] or
                     current_throughput.get("WriteCapacityUnits") != desired_throughput["WriteCapacityUnits"]):
-                throughput_needs_update = True
                 logger.info(json.dumps({
                     "context": "gsi.update",
                     "message": f"Throughput for GSI {index_name} needs updating",
@@ -243,63 +193,6 @@ def update_gsi_configuration(dynamodb, table_name, gsi_config):
                     "desired_read_capacity": desired_throughput["ReadCapacityUnits"],
                     "desired_write_capacity": desired_throughput["WriteCapacityUnits"]
                 }))
-
-            if projection_needs_update:
-                logger.info(json.dumps({
-                    "context": "gsi.update",
-                    "message": f"Deleting GSI {index_name} to update projection attributes"
-                }))
-                gsi_updates.append({
-                    "Delete": {
-                        "IndexName": index_name
-                    }
-                })
-                dynamodb.update_table(
-                    TableName=table_name,
-                    GlobalSecondaryIndexUpdates=gsi_updates
-                )
-                wait_for_table_active(dynamodb, table_name)
-                gsi_updates = []
-
-                key_attributes = [ks["AttributeName"] for ks in existing["KeySchema"]]
-                required_attributes = set(key_attributes + desired_non_key_attributes)
-                attribute_definitions = []
-                attribute_types = {
-                    "id": "S",
-                    "status": "S",
-                    "mandateStatus": "S",
-                    "customerid": "N",
-                    "email": "S"
-                }
-
-                for attr in required_attributes:
-                    attr_type = attribute_types.get(attr)
-                    if not attr_type:
-                        logger.warning(json.dumps({
-                            "context": "gsi.update",
-                            "message": f"Attribute {attr} not found in table's AttributeDefinitions. Assuming type 'S'."
-                        }))
-                        attr_type = "S"
-                    attribute_definitions.append({
-                        "AttributeName": attr,
-                        "AttributeType": attr_type
-                    })
-
-                create_update = {
-                    "Create": {
-                        "IndexName": index_name,
-                        "KeySchema": existing["KeySchema"],
-                        "Projection": {
-                            "ProjectionType": desired_projection_type
-                        },
-                        "ProvisionedThroughput": desired_throughput
-                    }
-                }
-                if desired_projection_type == "INCLUDE":
-                    create_update["Create"]["Projection"]["NonKeyAttributes"] = desired_non_key_attributes
-                gsi_updates.append(create_update)
-                updated = True
-            elif throughput_needs_update:
                 gsi_updates.append({
                     "Update": {
                         "IndexName": index_name,
@@ -311,21 +204,13 @@ def update_gsi_configuration(dynamodb, table_name, gsi_config):
         if gsi_updates:
             logger.info(json.dumps({
                 "context": "gsi.update",
-                "message": f"Applying GSI updates: {gsi_updates}"
+                "message": f"Applying GSI throughput updates: {gsi_updates}"
             }))
-            update_kwargs = {
-                "TableName": table_name,
-                "GlobalSecondaryIndexUpdates": gsi_updates
-            }
-            if any("Create" in update for update in gsi_updates):
-                update_kwargs["AttributeDefinitions"] = attribute_definitions
-                logger.info(json.dumps({
-                    "context": "gsi.update",
-                    "message": f"Including AttributeDefinitions: {attribute_definitions}"
-                }))
-
-            dynamodb.update_table(**update_kwargs)
-            logger.info("GSI configuration update submitted. Waiting 10 seconds before continuing...")
+            dynamodb.update_table(
+                TableName=table_name,
+                GlobalSecondaryIndexUpdates=gsi_updates
+            )
+            logger.info("GSI throughput update submitted. Waiting 10 seconds before continuing...")
             time.sleep(10)
 
         final_desc = dynamodb.describe_table(TableName=table_name)["Table"]
@@ -333,15 +218,12 @@ def update_gsi_configuration(dynamodb, table_name, gsi_config):
             name = gsi["IndexName"]
             rcu = gsi["ProvisionedThroughput"]["ReadCapacityUnits"]
             wcu = gsi["ProvisionedThroughput"]["WriteCapacityUnits"]
-            projection = gsi.get("Projection", {})
             logger.info(json.dumps({
                 "context": "gsi.verification",
                 "message": f"Final configuration for GSI {name}",
                 "IndexName": name,
                 "ReadCapacityUnits": rcu,
-                "WriteCapacityUnits": wcu,
-                "ProjectionType": projection.get("ProjectionType"),
-                "NonKeyAttributes": projection.get("NonKeyAttributes", [])
+                "WriteCapacityUnits": wcu
             }))
 
         return updated
@@ -690,194 +572,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-below pipline
-trigger: none
-
-# pool and agent details.
-variables:
-  - group: Kotak-ECR-Credentials
-  # Agent pool details
-  - name: POOL_NAME
-    value: k811-devops
-  - name: AGENT_IN_AGENTPOOL
-    value: 'Linux-Agent1'
-  # python version to use from _tool
-  - name: PYTHON_VERSION
-    value: '3.10'
-  - name: ROLE_NAME
-    value: EKS_Setup_Role
-  - name: SOURCE_ACCOUNT_NAME
-    value: NON_PROD
-  - name: AWS_ACCOUNT_ID
-    value: "483584640083"
-  - name: REPOSITORY_NAME
-    value: k811-ddb-index
-
-pool:
-  name: $(POOL_NAME)
-  demands:
-    - agent.name -equals $(AGENT_IN_AGENTPOOL)
-
-parameters:
-  - name: tableName
-    type: string
-    displayName: DynamoDB Table Name
-  - name: region
-    type: string
-    displayName: AWS Region
-  - name: readMode
-    type: string
-    displayName: Read Capacity Mode
-    values: [ondemand, provisioned]
-  - name: writeMode
-    type: string
-    displayName: Write Capacity Mode
-    values: [ondemand, provisioned]
-  - name: minRead
-    type: number
-    displayName: Minimum Read Capacity
-    default: 5
-  - name: maxRead
-    type: number
-    displayName: Maximum Read Capacity
-    default: 100
-  - name: targetRead
-    type: number
-    displayName: Target Read Utilization (%)
-    default: 70
-  - name: minWrite
-    type: number
-    displayName: Minimum Write Capacity
-    default: 5
-  - name: maxWrite
-    type: number
-    displayName: Maximum Write Capacity
-    default: 100
-  - name: targetWrite
-    type: number
-    displayName: Target Write Utilization (%)
-    default: 70
-  - name: checkGSI
-    type: boolean
-    displayName: Check GSI Configuration
-    default: true
-  - name: BRANCH_NAME
-    displayName: GSI Config Branch
-    type: string
-    default: development
-  - name: maxReadUnits
-    type: number
-    displayName: Max Read Request Units (ondemand only)
-    default: 0
-  - name: maxWriteUnits
-    type: number
-    displayName: Max Write Request Units (ondemand only)
-    default: 0
-  - name: initialReadUnits
-    type: number
-    displayName: Initial Read Capacity Units (provisioned only)
-    default: 5
-  - name: initialWriteUnits
-    type: number
-    displayName: Initial Write Capacity Units (provisioned only)
-    default: 5
-
-stages:
-  - stage: DynamoDBOperation
-    jobs:
-      - deployment: ExecuteDynamoDBOperation
-        displayName: "Execute DynamoDB Operation"
-        environment: non-prod-Dynamodb-approval
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - checkout: self
-                  displayName: 'Checkout repository'
-
-                - script: |
-                    set -e
-                    rm -rf $(REPOSITORY_NAME)
-                    git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b ${{ parameters.BRANCH_NAME }}
-                  env:
-                    Build_SourcesDirectory: $(Build.SourcesDirectory)
-                    REPOSITORY_NAME: $(REPOSITORY_NAME)
-                    PAT: $(PAT)  # Assuming PAT is in the variable group
-                  condition: and(succeeded(), eq(${{ parameters.checkGSI }}, true))
-                  displayName: "Clone GSI Config Repo"
-
-                - script: |
-                    unset AWS_SESSION_TOKEN
-                    unset AWS_SECRET_ACCESS_KEY
-                    unset AWS_ACCESS_KEY_ID
-                    CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
-                    export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-                    export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-                    export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-                    # Change to the dynamodb-scale directory
-                    cd others/dynamodb-scale &&
-                    echo "Setting up Python Environment"
-                    python3 -m venv dynomoscaleenv
-                    source dynomoscaleenv/bin/activate
-                    pip3 install boto3 requests --upgrade
-                  displayName: 'Execute Python Script for DynamoDB Operation'
-
-                - script: |
-                    set -e
-                    unset AWS_SESSION_TOKEN
-                    unset AWS_SECRET_ACCESS_KEY
-                    unset AWS_ACCESS_KEY_ID
-                    CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
-                    export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-                    export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-                    export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-                    cd others/dynamodb-scale
-                    source dynomoscaleenv/bin/activate
-                    echo "Running DynamoDB Auto Scaling Management Script"
-                    
-                    # Validate max units parameters
-                    if [ "${{ parameters.readMode }}" = "ondemand" ] && [ "${{ parameters.writeMode }}" = "ondemand" ]; then
-                      if [ "${{ parameters.maxReadUnits }}" -gt 0 ] || [ "${{ parameters.maxWriteUnits }}" -gt 0 ]; then
-                        if [ "${{ parameters.maxReadUnits }}" -le 0 ] || [ "${{ parameters.maxWriteUnits }}" -le 0 ]; then
-                          echo "##vso[task.logissue type=error]Both maxReadUnits and maxWriteUnits must be specified and > 0 if either is specified"
-                          exit 1
-                        fi
-                        echo "Using maximum read/write request units: ${{ parameters.maxReadUnits }}/${{ parameters.maxWriteUnits }}"
-                      else
-                        echo "No maximum read/write request units specified (or values are 0). Using default on-demand settings."
-                      fi
-                    fi
-                    
-                    # Build the command with optional parameters
-                    ARGS="--tableName ${{ parameters.tableName }} \
-                          --region ${{ parameters.region }} \
-                          --readMode ${{ parameters.readMode }} \
-                          --writeMode ${{ parameters.writeMode }} \
-                          --minRead ${{ parameters.minRead }} \
-                          --maxRead ${{ parameters.maxRead }} \
-                          --targetRead ${{ parameters.targetRead }} \
-                          --minWrite ${{ parameters.minWrite }} \
-                          --maxWrite ${{ parameters.maxWrite }} \
-                          --targetWrite ${{ parameters.targetWrite }} \
-                          --checkGSI ${{ parameters.checkGSI }}"
-                    
-                    # Add maxReadUnits and maxWriteUnits only if both are > 0 and mode is ondemand
-                    if [ "${{ parameters.readMode }}" = "ondemand" ] && [ "${{ parameters.writeMode }}" = "ondemand" ] && \
-                       [ "${{ parameters.maxReadUnits }}" -gt 0 ] && [ "${{ parameters.maxWriteUnits }}" -gt 0 ]; then
-                      ARGS="$ARGS --maxReadUnits ${{ parameters.maxReadUnits }} --maxWriteUnits ${{ parameters.maxWriteUnits }}"
-                    fi
-                    
-                    # Add initialReadUnits and initialWriteUnits only if mode is provisioned
-                    if [ "${{ parameters.readMode }}" = "provisioned" ] || [ "${{ parameters.writeMode }}" = "provisioned" ]; then
-                      ARGS="$ARGS --initialReadUnits ${{ parameters.initialReadUnits }} --initialWriteUnits ${{ parameters.initialWriteUnits }}"
-                    fi
-                    
-                    # Debug the raw and expanded command
-                    echo "Command arguments: $ARGS"
-                    # Run the command with quoted ARGS
-                    python3 manage_dynamodb_autoscaling.py $ARGS
-                  env:
-                    Build_SourcesDirectory: $(Build.SourcesDirectory)
-                    REPOSITORY_NAME: $(REPOSITORY_NAME)
-                  displayName: "Configure DynamoDB Auto Scaling"
