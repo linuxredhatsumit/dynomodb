@@ -1,198 +1,31 @@
-trigger: none
+Parent pipeline used these runtime parameters
+tableName : "scaling_gsi_index_test"
+region : "ap-south-1"
+readMode : "ondemand"
+writeMode : "ondemand"
+minRead : "5"
+maxRead : "10"
+targetRead : "40"
+minWrite : "5"
+maxWrite : "10"
+targetWrite : "40"
+checkGSI : "false"
+BRANCH_NAME : "development"
+maxReadUnits : "0"
+maxWriteUnits : "0"
+initialReadUnits : "5"
+initialWriteUnits : "5"
 
-# pool and agent details.
-variables:
-  - group: Kotak-ECR-Credentials
-  # Agent pool details
-  - name: POOL_NAME
-    value: k811-devops
-  - name: AGENT_IN_AGENTPOOL
-    value: 'Linux-Agent1'
-  # python version to use from _tool
-  - name: PYTHON_VERSION
-    value: '3.10'
-  - name: ROLE_NAME
-    value: EKS_Setup_Role
-  - name: SOURCE_ACCOUNT_NAME
-    value: NON_PROD
-  - name: AWS_ACCOUNT_ID
-    value: "483584640083"
-  - name: REPOSITORY_NAME
-    value: k811-ddb-index
 
-pool:
-  name: $(POOL_NAME)
-  demands:
-    - agent.name -equals $(AGENT_IN_AGENTPOOL)
+/usr/bin/bash --noprofile --norc /home/app_user/workspace/Agent1/_work/_temp/81d8ef07-50e0-4a9d-be15-dbd730248444.sh
+Running DynamoDB Auto Scaling Management Script
+No maximum read/write request units specified (or values are 0). Using default on-demand settings.
+Command arguments: --tableName scaling_gsi_index_test       --region ap-south-1       --readMode ondemand       --writeMode ondemand       --minRead 5       --maxRead 10       --targetRead 40       --minWrite 5       --maxWrite 10       --targetWrite 40       --checkGSI False
+{"timestamp": "2025-09-15 16:55:26", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"args\", \"message\": \"Received arguments: tableName=scaling_gsi_index_test, region=ap-south-1, readMode=ondemand, writeMode=ondemand, minRead=5, maxRead=10, targetRead=40, minWrite=5, maxWrite=10, targetWrite=40, maxReadUnits=0, maxWriteUnits=0, checkGSI=False, dry-run=False, initialReadUnits=5, initialWriteUnits=5\"}"}
+{"timestamp": "2025-09-15 16:55:26", "level": "INFO", "context": "autoscaling", "message": "Found credentials in environment variables."}
+{"timestamp": "2025-09-15 16:55:26", "level": "INFO", "context": "autoscaling", "message": "Found credentials from IAM Role: vpn-access"}
+{"timestamp": "2025-09-15 16:55:26", "level": "INFO", "context": "config.load", "message": "checkGSI is false. Skipping GSI config load."}
+{"timestamp": "2025-09-15 16:55:26", "level": "INFO", "context": "config.validate", "message": "No GSI config to validate (checkGSI=false or no config found)."}
+{"timestamp": "2025-09-15 16:55:26", "level": "INFO", "context": "mode_check", "message": "Table already in PAY_PER_REQUEST mode. No maximum request units specified for update."}
 
-parameters:
-  - name: tableName
-    type: string
-    displayName: DynamoDB Table Name
-  - name: region
-    type: string
-    displayName: AWS Region
-  - name: readMode
-    type: string
-    displayName: Read Capacity Mode
-    values: [ondemand, provisioned]
-  - name: writeMode
-    type: string
-    displayName: Write Capacity Mode
-    values: [ondemand, provisioned]
-  - name: minRead
-    type: number
-    displayName: Minimum Read Capacity
-    default: 5
-  - name: maxRead
-    type: number
-    displayName: Maximum Read Capacity
-    default: 100
-  - name: targetRead
-    type: number
-    displayName: Target Read Utilization (%)
-    default: 70
-  - name: minWrite
-    type: number
-    displayName: Minimum Write Capacity
-    default: 5
-  - name: maxWrite
-    type: number
-    displayName: Maximum Write Capacity
-    default: 100
-  - name: targetWrite
-    type: number
-    displayName: Target Write Utilization (%)
-    default: 70
-  - name: checkGSI
-    type: boolean
-    displayName: Check GSI Configuration
-    default: true
-  - name: BRANCH_NAME
-    displayName: GSI Config Branch
-    type: string
-    default: development
-  - name: maxReadUnits
-    type: number
-    displayName: Max Read Request Units (ondemand only)
-    default: 0
-  - name: maxWriteUnits
-    type: number
-    displayName: Max Write Request Units (ondemand only)
-    default: 0
-  - name: initialReadUnits
-    type: number
-    displayName: Initial Read Capacity Units (provisioned only)
-    default: 5
-  - name: initialWriteUnits
-    type: number
-    displayName: Initial Write Capacity Units (provisioned only)
-    default: 5
-
-stages:
-  - stage: DynamoDBOperation
-    jobs:
-      - deployment: ExecuteDynamoDBOperation
-        displayName: "Execute DynamoDB Operation"
-        environment: non-prod-Dynamodb-approval
-        strategy:
-          runOnce:
-            deploy:
-              steps:
-                - checkout: self
-                  displayName: 'Checkout repository'
-
-                - script: |
-                    set -e
-                    rm -rf $(REPOSITORY_NAME)
-                    git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b ${{ parameters.BRANCH_NAME }}
-                  env:
-                    Build_SourcesDirectory: $(Build.SourcesDirectory)
-                    REPOSITORY_NAME: $(REPOSITORY_NAME)
-                    PAT: $(PAT)  # Assuming PAT is in the variable group
-                  condition: and(succeeded(), eq(${{ parameters.checkGSI }}, true))
-                  displayName: "Clone GSI Config Repo"
-
-                - script: |
-                    unset AWS_SESSION_TOKEN
-                    unset AWS_SECRET_ACCESS_KEY
-                    unset AWS_ACCESS_KEY_ID
-                    CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
-                    export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-                    export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-                    export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-                    # Change to the dynamodb-scale directory
-                    cd others/dynamodb-scale &&
-                    echo "Setting up Python Environment"
-                    python3 -m venv dynomoscaleenv
-                    source dynomoscaleenv/bin/activate
-                    pip3 install boto3 requests --upgrade
-                  displayName: 'Execute Python Script for DynamoDB Operation'
-
-                - script: |
-                    set -e
-                    unset AWS_SESSION_TOKEN
-                    unset AWS_SECRET_ACCESS_KEY
-                    unset AWS_ACCESS_KEY_ID
-                    CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
-                    export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-                    export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-                    export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
-                    cd others/dynamodb-scale
-                    source dynomoscaleenv/bin/activate
-                    echo "Running DynamoDB Auto Scaling Management Script"
-                    
-                    # Validate max units parameters
-                    if [ "${{ parameters.readMode }}" = "ondemand" ] && [ "${{ parameters.writeMode }}" = "ondemand" ]; then
-                      if [ "${{ parameters.maxReadUnits }}" -gt 0 ] || [ "${{ parameters.maxWriteUnits }}" -gt 0 ]; then
-                        if [ "${{ parameters.maxReadUnits }}" -le 0 ] || [ "${{ parameters.maxWriteUnits }}" -le 0 ]; then
-                          echo "##vso[task.logissue type=error]Both maxReadUnits and maxWriteUnits must be specified and > 0 if either is specified"
-                          exit 1
-                        fi
-                        echo "Using maximum read/write request units: ${{ parameters.maxReadUnits }}/${{ parameters.maxWriteUnits }}"
-                      else
-                        echo "No maximum read/write request units specified (or values are 0). Using default on-demand settings."
-                      fi
-                    fi
-                    
-                    # Validate initial units parameters for provisioned mode
-                    if [ "${{ parameters.readMode }}" = "provisioned" ] || [ "${{ parameters.writeMode }}" = "provisioned" ]; then
-                      if [ "${{ parameters.initialReadUnits }}" -le 0 ] || [ "${{ parameters.initialWriteUnits }}" -le 0 ]; then
-                        echo "##vso[task.logissue type=error]initialReadUnits and initialWriteUnits must be > 0 for provisioned mode"
-                        exit 1
-                      fi
-                      echo "Using initial read/write capacity units: ${{ parameters.initialReadUnits }}/${{ parameters.initialWriteUnits }}"
-                    fi
-                    
-                    # Build the command with optional parameters
-                    ARGS="--tableName ${{ parameters.tableName }} \
-                          --region ${{ parameters.region }} \
-                          --readMode ${{ parameters.readMode }} \
-                          --writeMode ${{ parameters.writeMode }} \
-                          --minRead ${{ parameters.minRead }} \
-                          --maxRead ${{ parameters.maxRead }} \
-                          --targetRead ${{ parameters.targetRead }} \
-                          --minWrite ${{ parameters.minWrite }} \
-                          --maxWrite ${{ parameters.maxWrite }} \
-                          --targetWrite ${{ parameters.targetWrite }} \
-                          --checkGSI ${{ parameters.checkGSI }}"
-                    
-                    # Add maxReadUnits and maxWriteUnits only if both are > 0 and mode is ondemand
-                    if [ "${{ parameters.readMode }}" = "ondemand" ] && [ "${{ parameters.writeMode }}" = "ondemand" ] && \
-                       [ "${{ parameters.maxReadUnits }}" -gt 0 ] && [ "${{ parameters.maxWriteUnits }}" -gt 0 ]; then
-                      ARGS="$ARGS --maxReadUnits ${{ parameters.maxReadUnits }} --maxWriteUnits ${{ parameters.maxWriteUnits }}"
-                    fi
-                    
-                    # Add initialReadUnits and initialWriteUnits only if mode is provisioned
-                    if [ "${{ parameters.readMode }}" = "provisioned" ] || [ "${{ parameters.writeMode }}" = "provisioned" ]; then
-                      ARGS="$ARGS --initialReadUnits ${{ parameters.initialReadUnits }} --initialWriteUnits ${{ parameters.initialWriteUnits }}"
-                    fi
-                    
-                    # Note: ProjectionType and NonKeyAttributes in scaling.json are ignored as per script update
-                    echo "Command arguments: $ARGS"
-                    # Run the command with quoted ARGS
-                    python3 manage_dynamodb_autoscaling.py $ARGS
-                  env:
-                    Build_SourcesDirectory: $(Build.SourcesDirectory)
-                    REPOSITORY_NAME: $(REPOSITORY_NAME)
-                  displayName: "Configure DynamoDB Auto Scaling"
+Finishing: Configure DynamoDB Auto Scaling
