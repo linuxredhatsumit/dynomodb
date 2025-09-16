@@ -1,122 +1,41 @@
-trigger: none
-variables:
-  - group: Kotak-ECR-Credentials
-  - group: onb-811-services
-  - name: ENV
-    value: dev-arm
-# ApiGW variables
-  - name: apigw_env
-    value: dev
-#pool details
-  - name: POOL_NAME
-    value: 'K811-DevOps'
-# Docker details
-  - name: AWS_REGION
-    value: ap-south-1
-  - name: AWS_ACCOUNT_ID
-    value: '483584640083'
-# For AWS Role Access
-  - name: ROLE_NAME
-    value: EKS_Setup_Role
-# Dockerfile Path
-  - name: DOCKERFILE_PATH
-    # value: docker/app/Dockerfile
-    value: Dockerfile
-# helm related variables
-  - name: HELM_CHARTS_PATH
-    value: helm-charts/k811-cbi/charts
-  - name: HELM_S3BUCKET_URL
-    value: s3://kotak811-helmcharts/dev/k811-cbi/
-  - name: KUBE_CONFIG_PATH
-    value: /home/app_user/.kube/config-dev-arm
-  - name: NAMESPACE
-    value: dev
-
-parameters:
-  - name: service
-    displayName: 'Service Name'
-    type: string
-    default: 'k811-cbi'
-    values:
-      - k811-cbi
-  - name: Env
-    displayName: Env
-    type: string
-    default: dev-arm
-  - name: BRANCH_NAME
-    displayName: BRANCH_NAME
-    type: string
-    default: development
-  - name: CheckMarxScan
-    displayName: CheckMarxScan
-    type: boolean
-    default: false
-  - name: RunAPIGWDeploy
-    displayName: 'APIGW Deploy'
-    type: boolean
-    default: false
-  - name: RestartPod
-    displayName: 'Restart Service'
-    type: boolean
-    default: false
-  - name: ServiceBuild
-    displayName: ServiceBuild
-    type: boolean
-    default: false
-  - name: GradleTests
-    displayName: GradleTests
-    type: boolean
-    default: false
-  - name: ENABLE_ISTIO
-    displayName: Custom Istio Image
-    type: boolean
-    default: 'false'
-
-pool:
-  name: $(POOL_NAME)
-
 stages:
-  - template: ../templates/dev/docker-build-dev.yaml
-    parameters:
-      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
-      ServiceBuild: '${{ parameters.ServiceBuild }}'
-      service: '${{ parameters.service }}'
+  - stage: GitBuild
+    displayName: "Git Build"
+    jobs:
+      - template: ../templates/git-build.yaml
+        parameters:
+          BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
 
-  - template: ../templates/dev/helm-build-dev.yaml
-    parameters:
-      Env: '${{ parameters.Env }}'
-      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
-      ServiceBuild: '${{ parameters.ServiceBuild }}'
-      service: '${{ parameters.service }}'
-      ENABLE_ISTIO: '${{ parameters.ENABLE_ISTIO }}'
-      ISTIO_IMAGE: '$(ECR_ISTIO_ENHANCED_IMAGE_TAG)'
+  - stage: DockerBuild
+    displayName: "Docker Build"
+    dependsOn: GitBuild
+    jobs:
+      - template: ../templates/docker-build-cache.yaml
+        parameters:
+          Env: '${{ parameters.Env }}'
+          BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
 
-  - template: ../templates/dev/gradle-test-dev.yaml
-    parameters:
-      GradleTests: '${{ parameters.GradleTests }}'
-      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
-      service: '${{ parameters.service }}'
-      ServiceBuild: '${{ parameters.ServiceBuild }}'
+  - stage: HelmDeploy
+    displayName: "Helm Deploy"
+    dependsOn: DockerBuild
+    jobs:
+      - template: ../templates/helm-build.yaml
+        parameters:
+          Env: '${{ parameters.Env }}'
+          BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
 
-  - template: ../templates/dev/apigateway-deploy-dev.yaml
-    parameters:
-      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
-      RunAPIGWDeploy: '${{ parameters.RunAPIGWDeploy }}'
-      service: '${{ parameters.service }}'
+  - stage: PrismaScan
+    displayName: "Prisma Scan"
+    dependsOn: HelmDeploy
+    jobs:
+      - template: ../templates/prisma-scan.yaml
+        parameters:
+          BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
 
-  - template: ../templates/dev/pod-restart.yaml
-    parameters:
-      RestartPod: '${{ parameters.RestartPod }}'
-      ServiceBuild: '${{ parameters.ServiceBuild }}'
-      service: '${{ parameters.service }}'
-
-  - template: ../templates/dev/prisma-scan-dev.yaml
-    parameters:
-      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
-      ServiceBuild: '${{ parameters.ServiceBuild }}'
-      service: '${{ parameters.service }}'
-  
-  - template: ../templates/dev/checkmarx-scan-dev.yaml
-    parameters:
-      CheckMarxScan: '${{ parameters.CheckMarxScan }}'
-      service: '${{ parameters.service }}'
+  - stage: CheckmarxScan
+    displayName: "Checkmarx Scan"
+    dependsOn: PrismaScan
+    jobs:
+      - template: ../templates/checkmarx-scan.yaml
+        parameters:
+          CheckMarxScan: '${{ parameters.CheckMarxScan }}'
