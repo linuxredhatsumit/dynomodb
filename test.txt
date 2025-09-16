@@ -1,17 +1,5 @@
 trigger: none
 
-# resources:
-#   repositories:
-#     - repository: 811_app_ms_gst
-#       type: git
-#       name: Kotak 811 Onboarding App/811_app_ms_gst
-#       ref: pipeline_test
-#       trigger:
-#         branches:
-#           include:
-#             - pipeline_test
-
-# pass varibale to build.yaml file.
 variables:
   - group: AWS-keys
   - group: AWS-reference-keys
@@ -20,18 +8,14 @@ variables:
     value: k811-gst
   - name: ENV
     value: dev-arm
-#pool details
   - name: POOL_NAME
     value: 'K811-DevOps'
-# python version to use from _tool
   - name: PYTHON_VERSION
     value: '3.10'
-# Azure Git application Repository Details
   - name: REPOSITORY_NAME
     value: 811_app_ms_gst
   - name: BRANCH_NAME
     value: development
-# Docker details
   - name: AWS_REGION
     value: ap-south-1
   - name: AWS_ACCOUNT_ID
@@ -40,13 +24,10 @@ variables:
     value: 811devonb
   - name: ECR_REPO_NAME
     value: k811_ms_gst
-# For AWS Role Access
   - name: ROLE_NAME
     value: EKS_Setup_Role
-# Dockerfile Path
   - name: DOCKERFILE_PATH
     value: docker/app/Dockerfile
-# helm related variables
   - name: HELM_CHARTS_PATH
     value: helm-charts/k811-gst/charts
   - name: HELM_S3BUCKET_URL
@@ -65,80 +46,60 @@ parameters:
     displayName: BRANCH_NAME
     type: string
     default: development
-  # - name: PythonTests
-  #   displayName: 'Python Tests'
-  #   type: boolean
-  #   default: true
   - name: CheckMarxScan
     displayName: CheckMarxScan
     type: string
     default: 'enable'
     values:
-    - enable
-    - disable
+      - enable
+      - disable
 
 pool:
   name: $(POOL_NAME)
 
-stages:  
-  - template: ../templates/git-build.yaml
-    parameters:
-      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
+stages:
+  # Stage 1: Git Build
+  - stage: GitBuild
+    displayName: "Git Build Stage"
+    jobs:
+      - template: ../templates/git-build.yaml
+        parameters:
+          BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
 
-  - template: ../templates/docker-build-cache.yaml
-    parameters:
-      Env: '${{ parameters.Env }}'
-      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
-      
-  # - template: ../templates/docker-build.yaml
-  #   parameters:
-  #     Env: '${{ parameters.Env }}'
-  #     BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
+  # Stage 2: Docker Build
+  - stage: DockerBuild
+    displayName: "Docker Build Stage"
+    dependsOn: GitBuild
+    jobs:
+      - template: ../templates/docker-build-cache.yaml
+        parameters:
+          Env: '${{ parameters.Env }}'
+          BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
 
-  - template: ../templates/helm-build.yaml
-    parameters:
-      Env: '${{ parameters.Env }}'
-      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
+  # Stage 3: Helm Deploy
+  - stage: HelmDeploy
+    displayName: "Helm Deploy Stage"
+    dependsOn: DockerBuild
+    jobs:
+      - template: ../templates/helm-build.yaml
+        parameters:
+          Env: '${{ parameters.Env }}'
+          BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
 
-  # - template: ../templates/dev/python-test-dev.yaml
-  #   parameters:
-  #     PythonTests: '${{ parameters.PythonTests }}'
-  #     BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
-  #     service: '${{ parameters.service }}'
-  #     ServiceBuild: '${{ parameters.ServiceBuild }}'
-  
-  - template: ../templates/prisma-scan.yaml
-    parameters:
-      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
+  # Stage 4: Prisma Scan
+  - stage: PrismaScan
+    displayName: "Prisma Security Scan"
+    dependsOn: HelmDeploy
+    jobs:
+      - template: ../templates/prisma-scan.yaml
+        parameters:
+          BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
 
-  - template: ../templates/checkmarx-scan.yaml
-    parameters:
-      CheckMarxScan: '${{ parameters.CheckMarxScan }}'
-
-# stages:
-#   - stage: Dev
-#     displayName: 'Build in Dev Environment'
-#     jobs:  
-#     - job: BuildAndDeploy
-#       displayName: 'Application Build and deploy'
-#       steps:
-#         - task: UsePythonVersion@0
-#           inputs:
-#             versionSpec: '$(PYTHON_VERSION)'
-
-#         - script: |
-#             pwd
-#             git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
-#             ls
-#             echo "###################"
-#             echo "$(REPOSITORY_NAME) is using $(BRANCH_NAME) branch"
-#             ls ./$(REPOSITORY_NAME)/
-#           displayName: Clone $(REPOSITORY_NAME) repository
-
-#         - template: build.yaml
-
-
-below error in piple
-
-
-The pipeline must contain at least one stage with no dependencies.
+  # Stage 5: Checkmarx Scan
+  - stage: CheckmarxScan
+    displayName: "Checkmarx Scan"
+    dependsOn: PrismaScan
+    jobs:
+      - template: ../templates/checkmarx-scan.yaml
+        parameters:
+          CheckMarxScan: '${{ parameters.CheckMarxScan }}'
