@@ -1,31 +1,144 @@
-Parent pipeline used these runtime parameters
-tableName : "scaling_gsi_index_test"
-region : "ap-south-1"
-readMode : "ondemand"
-writeMode : "ondemand"
-minRead : "5"
-maxRead : "10"
-targetRead : "40"
-minWrite : "5"
-maxWrite : "10"
-targetWrite : "40"
-checkGSI : "false"
-BRANCH_NAME : "development"
-maxReadUnits : "0"
-maxWriteUnits : "0"
-initialReadUnits : "5"
-initialWriteUnits : "5"
+trigger: none
+
+# resources:
+#   repositories:
+#     - repository: 811_app_ms_gst
+#       type: git
+#       name: Kotak 811 Onboarding App/811_app_ms_gst
+#       ref: pipeline_test
+#       trigger:
+#         branches:
+#           include:
+#             - pipeline_test
+
+# pass varibale to build.yaml file.
+variables:
+  - group: AWS-keys
+  - group: AWS-reference-keys
+  - group: Kotak-ECR-Credentials
+  - name: SERVICE_NAME
+    value: k811-gst
+  - name: ENV
+    value: dev-arm
+#pool details
+  - name: POOL_NAME
+    value: 'K811-DevOps'
+# python version to use from _tool
+  - name: PYTHON_VERSION
+    value: '3.10'
+# Azure Git application Repository Details
+  - name: REPOSITORY_NAME
+    value: 811_app_ms_gst
+  - name: BRANCH_NAME
+    value: development
+# Docker details
+  - name: AWS_REGION
+    value: ap-south-1
+  - name: AWS_ACCOUNT_ID
+    value: '483584640083'
+  - name: ECR_FOLDER_NAME
+    value: 811devonb
+  - name: ECR_REPO_NAME
+    value: k811_ms_gst
+# For AWS Role Access
+  - name: ROLE_NAME
+    value: EKS_Setup_Role
+# Dockerfile Path
+  - name: DOCKERFILE_PATH
+    value: docker/app/Dockerfile
+# helm related variables
+  - name: HELM_CHARTS_PATH
+    value: helm-charts/k811-gst/charts
+  - name: HELM_S3BUCKET_URL
+    value: s3://kotak811-helmcharts/dev/k811-gst/
+  - name: KUBE_CONFIG_PATH
+    value: /home/app_user/.kube/config-dev-arm
+  - name: NAMESPACE
+    value: dev
+
+parameters:
+  - name: Env
+    displayName: Env
+    type: string
+    default: dev-arm
+  - name: BRANCH_NAME
+    displayName: BRANCH_NAME
+    type: string
+    default: development
+  # - name: PythonTests
+  #   displayName: 'Python Tests'
+  #   type: boolean
+  #   default: true
+  - name: CheckMarxScan
+    displayName: CheckMarxScan
+    type: string
+    default: 'enable'
+    values:
+    - enable
+    - disable
+
+pool:
+  name: $(POOL_NAME)
+
+stages:  
+  - template: ../templates/git-build.yaml
+    parameters:
+      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
+
+  - template: ../templates/docker-build-cache.yaml
+    parameters:
+      Env: '${{ parameters.Env }}'
+      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
+      
+  # - template: ../templates/docker-build.yaml
+  #   parameters:
+  #     Env: '${{ parameters.Env }}'
+  #     BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
+
+  - template: ../templates/helm-build.yaml
+    parameters:
+      Env: '${{ parameters.Env }}'
+      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
+
+  # - template: ../templates/dev/python-test-dev.yaml
+  #   parameters:
+  #     PythonTests: '${{ parameters.PythonTests }}'
+  #     BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
+  #     service: '${{ parameters.service }}'
+  #     ServiceBuild: '${{ parameters.ServiceBuild }}'
+  
+  - template: ../templates/prisma-scan.yaml
+    parameters:
+      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
+
+  - template: ../templates/checkmarx-scan.yaml
+    parameters:
+      CheckMarxScan: '${{ parameters.CheckMarxScan }}'
+
+# stages:
+#   - stage: Dev
+#     displayName: 'Build in Dev Environment'
+#     jobs:  
+#     - job: BuildAndDeploy
+#       displayName: 'Application Build and deploy'
+#       steps:
+#         - task: UsePythonVersion@0
+#           inputs:
+#             versionSpec: '$(PYTHON_VERSION)'
+
+#         - script: |
+#             pwd
+#             git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
+#             ls
+#             echo "###################"
+#             echo "$(REPOSITORY_NAME) is using $(BRANCH_NAME) branch"
+#             ls ./$(REPOSITORY_NAME)/
+#           displayName: Clone $(REPOSITORY_NAME) repository
+
+#         - template: build.yaml
 
 
-/usr/bin/bash --noprofile --norc /home/app_user/workspace/Agent1/_work/_temp/81d8ef07-50e0-4a9d-be15-dbd730248444.sh
-Running DynamoDB Auto Scaling Management Script
-No maximum read/write request units specified (or values are 0). Using default on-demand settings.
-Command arguments: --tableName scaling_gsi_index_test       --region ap-south-1       --readMode ondemand       --writeMode ondemand       --minRead 5       --maxRead 10       --targetRead 40       --minWrite 5       --maxWrite 10       --targetWrite 40       --checkGSI False
-{"timestamp": "2025-09-15 16:55:26", "level": "INFO", "context": "autoscaling", "message": "{\"context\": \"args\", \"message\": \"Received arguments: tableName=scaling_gsi_index_test, region=ap-south-1, readMode=ondemand, writeMode=ondemand, minRead=5, maxRead=10, targetRead=40, minWrite=5, maxWrite=10, targetWrite=40, maxReadUnits=0, maxWriteUnits=0, checkGSI=False, dry-run=False, initialReadUnits=5, initialWriteUnits=5\"}"}
-{"timestamp": "2025-09-15 16:55:26", "level": "INFO", "context": "autoscaling", "message": "Found credentials in environment variables."}
-{"timestamp": "2025-09-15 16:55:26", "level": "INFO", "context": "autoscaling", "message": "Found credentials from IAM Role: vpn-access"}
-{"timestamp": "2025-09-15 16:55:26", "level": "INFO", "context": "config.load", "message": "checkGSI is false. Skipping GSI config load."}
-{"timestamp": "2025-09-15 16:55:26", "level": "INFO", "context": "config.validate", "message": "No GSI config to validate (checkGSI=false or no config found)."}
-{"timestamp": "2025-09-15 16:55:26", "level": "INFO", "context": "mode_check", "message": "Table already in PAY_PER_REQUEST mode. No maximum request units specified for update."}
+below error in piple
 
-Finishing: Configure DynamoDB Auto Scaling
+
+The pipeline must contain at least one stage with no dependencies.
