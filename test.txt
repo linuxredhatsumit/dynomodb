@@ -1,17 +1,24 @@
-trigger: none
+Git Clone $(k811-gst_repository_name) repository
 
-# resources:
-#   repositories:
-#     - repository: 811_app_ms_gst
-#       type: git
-#       name: Kotak 811 Onboarding App/811_app_ms_gst
-#       ref: pipeline_test
-#       trigger:
-#         branches:
-#           include:
-#             - pipeline_test
+View raw log
+Starting: Git Clone $(k811-gst_repository_name) repository
+==============================================================================
+Task         : Command line
+Description  : Run a command line script using Bash on Linux and macOS and cmd.exe on Windows
+Version      : 2.250.1
+Author       : Microsoft Corporation
+Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/command-line
+==============================================================================
+Generating script.
+========================== Starting Command Output ===========================
+/usr/bin/bash --noprofile --norc /home/app_user/workspace/Agent6/_work/_temp/0e034e07-06f1-48a9-98dd-1eb1769f3e34.sh
+/home/app_user/workspace/Agent6/_work/_temp/0e034e07-06f1-48a9-98dd-1eb1769f3e34.sh: line 2: k811-gst_repository_name: command not found
+/home/app_user/workspace/Agent6/_work/_temp/0e034e07-06f1-48a9-98dd-1eb1769f3e34.sh: line 3: k811-gst_repository_name: command not found
+Cloning into '_git'...
+fatal: repository 'https://kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/' not found
+##[error]Bash exited with code '128'.
+Finishing: Git Clone $(k811-gst_repository_name) repository
 
-# pass varibale to build.yaml file.
 variables:
   - group: AWS-keys
   - group: AWS-reference-keys
@@ -55,123 +62,5 @@ variables:
     value: /home/app_user/.kube/config-dev-arm
   - name: NAMESPACE
     value: dev
-
-parameters:
-  - name: Env
-    displayName: Env
-    type: string
-    default: dev-arm
-  # - name: PythonTests
-  #   displayName: 'Python Tests'
-  #   type: boolean
-  #   default: true
-  - name: CheckMarxScan
-    displayName: CheckMarxScan
-    type: string
-    default: 'enable'
-    values:
-    - enable
-    - disable
-  - name: service
-    displayName: 'Service Name'
-    type: string
-    default: 'k811-gst'
-    values:
-      - k811-gst
-  - name: BRANCH_NAME
-    displayName: BRANCH_NAME
-    type: string
-    default: development
-  - name: PythonTests
-    displayName: 'Python Tests'
-    type: boolean
-    default: true
-  - name: RunAPIGWDeploy
-    displayName: 'APIGW Deploy'
-    type: boolean
-    default: false
-  - name: RestartPod
-    displayName: 'Restart Service'
-    type: boolean
-    default: false
-  - name: ServiceBuild
-    displayName: ServiceBuild
-    type: boolean
-    default: false
-  - name: ENABLE_ISTIO
-    displayName: Custom Istio Image
-    type: boolean
-    default: 'false'
-
-
-pool:
-  name: $(POOL_NAME)
-stages:
-  - template: ../templates/dev/docker-build-dev.yaml
-    parameters:
-      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
-      ServiceBuild: '${{ parameters.ServiceBuild }}'
-      service: '${{ parameters.service }}'
-
-  - template: ../templates/dev/helm-build-dev.yaml
-    parameters:
-      Env: '${{ parameters.Env }}'
-      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
-      ServiceBuild: '${{ parameters.ServiceBuild }}'
-      service: '${{ parameters.service }}'
-      ENABLE_ISTIO: '${{ parameters.ENABLE_ISTIO }}'
-      ISTIO_IMAGE: '$(ECR_ISTIO_ENHANCED_IMAGE_TAG)'
-
-  - template: ../templates/dev/python-test-dev.yaml
-    parameters:
-      PythonTests: '${{ parameters.PythonTests }}'
-      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
-      service: '${{ parameters.service }}'
-      ServiceBuild: '${{ parameters.ServiceBuild }}'
-
-  - template: ../templates/dev/apigateway-deploy-dev.yaml
-    parameters:
-      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
-      RunAPIGWDeploy: '${{ parameters.RunAPIGWDeploy }}'
-      service: '${{ parameters.service }}'
-
-  - template: ../templates/dev/pod-restart.yaml
-    parameters:
-      RestartPod: '${{ parameters.RestartPod }}'
-      ServiceBuild: '${{ parameters.ServiceBuild }}'
-      service: '${{ parameters.service }}'
-
-  - template: ../templates/dev/prisma-scan-dev.yaml
-    parameters:
-      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
-      ServiceBuild: '${{ parameters.ServiceBuild }}'
-      service: '${{ parameters.service }}'
-
-  - template: ../templates/dev/checkmarx-scan-dev.yaml
-    parameters:
-      CheckMarxScan: '${{ parameters.CheckMarxScan }}'
-      service: '${{ parameters.service }}'
-
-
-
-below error
-Git Clone $(k811-gst_repository_name) repository
-
-View raw log
-Starting: Git Clone $(k811-gst_repository_name) repository
-==============================================================================
-Task         : Command line
-Description  : Run a command line script using Bash on Linux and macOS and cmd.exe on Windows
-Version      : 2.250.1
-Author       : Microsoft Corporation
-Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/command-line
-==============================================================================
-Generating script.
-========================== Starting Command Output ===========================
-/usr/bin/bash --noprofile --norc /home/app_user/workspace/Agent6/_work/_temp/80d75830-a5bd-4bea-b4ef-03e8df17872a.sh
-/home/app_user/workspace/Agent6/_work/_temp/80d75830-a5bd-4bea-b4ef-03e8df17872a.sh: line 2: k811-gst_repository_name: command not found
-/home/app_user/workspace/Agent6/_work/_temp/80d75830-a5bd-4bea-b4ef-03e8df17872a.sh: line 3: k811-gst_repository_name: command not found
-Cloning into '_git'...
-fatal: repository 'https://kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/' not found
-##[error]Bash exited with code '128'.
-Finishing: Git Clone $(k811-gst_repository_name) repository
+  - name: REPOSITORY_NAME
+    value: 811_app_ms_gst
