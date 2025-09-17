@@ -1,8 +1,1 @@
-
-Please create a DNS TXT record under the name:
-
-_acme-challenge.staging-self-order.digitory.com.
-
-with the following value:
-
-S_sQ9H2hgEcttz2htI2XjJVvvAKgk1iu8FeRTdyYPmA
+please change value to "E0NAVt90ydhxH8PjCNFkDc23B626dFNNeGyFujND7to"
