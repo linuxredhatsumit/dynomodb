@@ -1,28 +1,78 @@
-resource "aws_elasticache_replication_group" "uat_kotak811" {
-  replication_group_id          = "uat-kotak811"
-  description                   = "cache for uat"
-  engine                        = "redis"
-  engine_version                = "6.2"
-  node_type                     = "cache.t4g.small"
-  num_cache_clusters            = 3
-  parameter_group_name          = "default.redis6.x"
-  subnet_group_name             = "uat-kotak811-cache"
-  security_group_ids            = ["sg-029f84bea3b98fef0"]
-  maintenance_window            = "sat:17:30-sat:18:30"
-  snapshot_window               = "05:30-06:30"
-  at_rest_encryption_enabled    = true
-  transit_encryption_enabled    = true
-  multi_az_enabled              = true
-  automatic_failover_enabled    = true
+apply" now.
+KMBL350986@KBMK24-00000929 uat-kotak811-imported % terraform plan
+aws_elasticache_replication_group.uat_kotak811: Preparing import... [id=uat-kotak811]
+aws_elasticache_replication_group.uat_kotak811: Refreshing state... [id=uat-kotak811]
 
-  tags = {
-    Env    = "uat"
-    Module = "kotak811"
-    Name   = "uat-kotak811"
-  }
-}
+Terraform used the selected providers to generate the following execution plan. Resource actions are indicated with the following symbols:
+-/+ destroy and then create replacement
 
-import {
-  to = aws_elasticache_replication_group.uat_kotak811
-  id = "uat-kotak811"
-}
+Terraform will perform the following actions:
+
+  # aws_elasticache_replication_group.uat_kotak811 must be replaced
+  # (imported from "uat-kotak811")
+  # Warning: this will destroy the imported resource
+-/+ resource "aws_elasticache_replication_group" "uat_kotak811" {
+      + apply_immediately              = (known after apply)
+      ~ arn                            = "arn:aws:elasticache:ap-south-1:483584640083:replicationgroup:uat-kotak811" -> (known after apply)
+        at_rest_encryption_enabled     = "true"
+      ~ auto_minor_version_upgrade     = "true" -> (known after apply)
+        automatic_failover_enabled     = true
+      ~ cluster_enabled                = false -> (known after apply)
+      ~ cluster_mode                   = "disabled" -> (known after apply)
+      + configuration_endpoint_address = (known after apply)
+      ~ data_tiering_enabled           = false -> (known after apply)
+        description                    = "cache for uat"
+        engine                         = "redis"
+        engine_version                 = "6.2"
+      ~ engine_version_actual          = "6.2.6" -> (known after apply)
+      + global_replication_group_id    = (known after apply)
+      ~ id                             = "uat-kotak811" -> (known after apply)
+      ~ ip_discovery                   = "ipv4" -> (known after apply)
+      - kms_key_id                     = "arn:aws:kms:ap-south-1:483584640083:key/cc498c37-f3b6-4dfa-a9fb-4e98996be115" -> null # forces replacement
+        maintenance_window             = "sat:17:30-sat:18:30"
+      ~ member_clusters                = [
+          - "uat-kotak811-001",
+          - "uat-kotak811-002",
+          - "uat-kotak811-003",
+        ] -> (known after apply)
+        multi_az_enabled               = true
+      ~ network_type                   = "ipv4" -> (known after apply)
+        node_type                      = "cache.t4g.small"
+        num_cache_clusters             = 3
+      ~ num_node_groups                = 1 -> (known after apply)
+        parameter_group_name           = "default.redis6.x"
+      - port                           = 6379 -> null
+      ~ primary_endpoint_address       = "master.uat-kotak811.8ifsxs.aps1.cache.amazonaws.com" -> (known after apply)
+      ~ reader_endpoint_address        = "replica.uat-kotak811.8ifsxs.aps1.cache.amazonaws.com" -> (known after apply)
+        region                         = "ap-south-1"
+      ~ replicas_per_node_group        = 2 -> (known after apply)
+        replication_group_id           = "uat-kotak811"
+        security_group_ids             = [
+            "sg-029f84bea3b98fef0",
+        ]
+      ~ security_group_names           = [] -> (known after apply)
+      - snapshot_retention_limit       = 0 -> null
+        snapshot_window                = "05:30-06:30"
+        subnet_group_name              = "uat-kotak811-cache"
+        tags                           = {
+            "Env"    = "uat"
+            "Module" = "kotak811"
+            "Name"   = "uat-kotak811"
+        }
+        tags_all                       = {
+            "Env"    = "uat"
+            "Module" = "kotak811"
+            "Name"   = "uat-kotak811"
+        }
+        transit_encryption_enabled     = true
+      ~ transit_encryption_mode        = "required" -> (known after apply)
+      - user_group_ids                 = [] -> null
+    }
+
+Plan: 1 to import, 1 to add, 0 to change, 1 to destroy.
+
+────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────────
+
+Note: You didn't use the -out option to save this plan, so Terraform can't guarantee to take exactly these actions if you run "terraform
+apply" now.
+KMBL350986@KBMK24-00000929 uat-kotak811-imported % 
