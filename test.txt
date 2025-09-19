@@ -1,66 +1,123 @@
-Git Clone $(k811-gst_repository_name) repository
+ Error: Missing Resource Identity After Update: The Terraform provider unexpectedly returned no resource identity after having no errors in the resource update. This is always a problem with the provider and should be reported to the provider developer
+│ 
+│   with module.lambda_function.aws_lambda_function.this[0],
+│   on ../../../../../terraform-modules/lambda/main.tf line 24, in resource "aws_lambda_function" "this":
+│   24: resource "aws_lambda_function" "this" {
 
-View raw log
-Starting: Git Clone $(k811-gst_repository_name) repository
-==============================================================================
-Task         : Command line
-Description  : Run a command line script using Bash on Linux and macOS and cmd.exe on Windows
-Version      : 2.250.1
-Author       : Microsoft Corporation
-Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/command-line
-==============================================================================
-Generating script.
-========================== Starting Command Output ===========================
-/usr/bin/bash --noprofile --norc /home/app_user/workspace/Agent6/_work/_temp/0e034e07-06f1-48a9-98dd-1eb1769f3e34.sh
-/home/app_user/workspace/Agent6/_work/_temp/0e034e07-06f1-48a9-98dd-1eb1769f3e34.sh: line 2: k811-gst_repository_name: command not found
-/home/app_user/workspace/Agent6/_work/_temp/0e034e07-06f1-48a9-98dd-1eb1769f3e34.sh: line 3: k811-gst_repository_name: command not found
-Cloning into '_git'...
-fatal: repository 'https://kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/' not found
-##[error]Bash exited with code '128'.
-Finishing: Git Clone $(k811-gst_repository_name) repository
 
-variables:
-  - group: AWS-keys
-  - group: AWS-reference-keys
-  - group: Kotak-ECR-Credentials
-  - name: SERVICE_NAME
-    value: k811-gst
-  - name: ENV
-    value: dev-arm
-#pool details
-  - name: POOL_NAME
-    value: 'K811-DevOps'
-# python version to use from _tool
-  - name: PYTHON_VERSION
-    value: '3.10'
-# Azure Git application Repository Details
-  - name: REPOSITORY_NAME
-    value: 811_app_ms_gst
-  - name: BRANCH_NAME
-    value: development
-# Docker details
-  - name: AWS_REGION
-    value: ap-south-1
-  - name: AWS_ACCOUNT_ID
-    value: '483584640083'
-  - name: ECR_FOLDER_NAME
-    value: 811devonb
-  - name: ECR_REPO_NAME
-    value: k811_ms_gst
-# For AWS Role Access
-  - name: ROLE_NAME
-    value: EKS_Setup_Role
-# Dockerfile Path
-  - name: DOCKERFILE_PATH
-    value: docker/app/Dockerfile
-# helm related variables
-  - name: HELM_CHARTS_PATH
-    value: helm-charts/k811-gst/charts
-  - name: HELM_S3BUCKET_URL
-    value: s3://kotak811-helmcharts/dev/k811-gst/
-  - name: KUBE_CONFIG_PATH
-    value: /home/app_user/.kube/config-dev-arm
-  - name: NAMESPACE
-    value: dev
-  - name: REPOSITORY_NAME
-    value: 811_app_ms_gst
+resource "aws_lambda_function" "this" {
+  count = local.create && var.create_function && !var.create_layer ? 1 : 0
+
+  function_name                      = var.function_name
+  description                        = var.description
+  role                               = var.create_role ? aws_iam_role.lambda[0].arn : var.lambda_role
+  handler                            = var.package_type != "Zip" ? null : var.handler
+  memory_size                        = var.memory_size
+  reserved_concurrent_executions     = var.reserved_concurrent_executions
+  runtime                            = var.package_type != "Zip" ? null : var.runtime
+  layers                             = var.layers
+  timeout                            = var.lambda_at_edge ? min(var.timeout, 30) : var.timeout
+  publish                            = (var.lambda_at_edge || var.snap_start) ? true : var.publish
+  kms_key_arn                        = var.kms_key_arn
+  image_uri                          = var.image_uri
+  package_type                       = var.package_type
+  architectures                      = var.architectures
+  code_signing_config_arn            = var.code_signing_config_arn
+  # replace_security_groups_on_destroy = var.replace_security_groups_on_destroy
+  # replacement_security_group_ids     = var.replacement_security_group_ids
+
+  /* ephemeral_storage is not supported in gov-cloud region, so it should be set to `null` */
+  dynamic "ephemeral_storage" {
+    for_each = var.ephemeral_storage_size == null ? [] : [true]
+
+    content {
+      size = var.ephemeral_storage_size
+    }
+  }
+
+  filename         = local.filename
+  source_code_hash = var.ignore_source_code_hash ? null : (local.filename == null ? false : fileexists(local.filename)) && !local.was_missing ? filebase64sha256(local.filename) : null
+
+  s3_bucket         = local.s3_bucket
+  s3_key            = local.s3_key
+  s3_object_version = local.s3_object_version
+
+  dynamic "image_config" {
+    for_each = length(var.image_config_entry_point) > 0 || length(var.image_config_command) > 0 || var.image_config_working_directory != null ? [true] : []
+    content {
+      entry_point       = var.image_config_entry_point
+      command           = var.image_config_command
+      working_directory = var.image_config_working_directory
+    }
+  }
+
+  dynamic "environment" {
+    for_each = length(keys(var.environment_variables)) == 0 ? [] : [true]
+    content {
+      variables = var.environment_variables
+    }
+  }
+
+  dynamic "dead_letter_config" {
+    for_each = var.dead_letter_target_arn == null ? [] : [true]
+    content {
+      target_arn = var.dead_letter_target_arn
+    }
+  }
+
+  dynamic "tracing_config" {
+    for_each = var.tracing_mode == null ? [] : [true]
+    content {
+      mode = var.tracing_mode
+    }
+  }
+
+  dynamic "vpc_config" {
+    for_each = var.vpc_subnet_ids != null && var.vpc_security_group_ids != null ? [true] : []
+    content {
+      security_group_ids = var.vpc_security_group_ids
+      subnet_ids         = var.vpc_subnet_ids
+    }
+  }
+
+  dynamic "file_system_config" {
+    for_each = var.file_system_arn != null && var.file_system_local_mount_path != null ? [true] : []
+    content {
+      local_mount_path = var.file_system_local_mount_path
+      arn              = var.file_system_arn
+    }
+  }
+
+  dynamic "snap_start" {
+    for_each = var.snap_start ? [true] : []
+
+    content {
+      apply_on = "PublishedVersions"
+    }
+  }
+
+  tags = var.tags
+
+  depends_on = [
+    null_resource.archive,
+    aws_s3_object.lambda_package,
+
+    # Depending on the log group is necessary to allow Terraform to create the log group before AWS can.
+    # When a lambda function is invoked, AWS creates the log group automatically if it doesn't exist yet.
+    # Without the dependency, this can result in a race condition if the lambda function is invoked before
+    # Terraform can create the log group.
+    aws_cloudwatch_log_group.lambda,
+
+    # Before the lambda is created the execution role with all its policies should be ready
+    aws_iam_role_policy_attachment.additional_inline,
+    aws_iam_role_policy_attachment.additional_json,
+    aws_iam_role_policy_attachment.additional_jsons,
+    aws_iam_role_policy_attachment.additional_many,
+    aws_iam_role_policy_attachment.additional_one,
+    aws_iam_role_policy_attachment.async,
+    aws_iam_role_policy_attachment.logs,
+    aws_iam_role_policy_attachment.dead_letter,
+    aws_iam_role_policy_attachment.vpc,
+    aws_iam_role_policy_attachment.tracing,
+  ]
+}
