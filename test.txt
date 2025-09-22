@@ -1,62 +1,23 @@
-Update Complete. ⎈Happy Helming!⎈
-Error from server (AlreadyExists): namespaces "coralogix" already exists
-helm upgrade --install uat-k811-coralogix-k811-crossell-uat-eks   otel-integration/otel-integration   -f /home/app_user/workspace/Agent7/_work/804/s/helm-charts/k811-coralogix/charts/k811-crossell-uat-eks.yaml   --namespace coralogix   --kubeconfig /home/app_user/.kube/config-crosssell-uat
-helm upgrade --install uat-k811-coralogix-k811-crossell-uat-eks   uat-k811-coralogix-k811-crossell-uat-eks/k811-coralogix   -f /home/app_user/workspace/Agent7/_work/804/s/helm-charts/k811-coralogix/charts/k811-crossell-uat-eks.yaml   --namespace coralogix   --kubeconfig /home/app_user/.kube/config-crosssell-uat
-Release "uat-k811-coralogix-k811-crossell-uat-eks" does not exist. Installing it now.
-coalesce.go:237: warning: skipped value for k811-coralogix.rolebinding: Not a table.
-coalesce.go:237: warning: skipped value for k811-coralogix.rolebinding: Not a table.
-Error: unable to build kubernetes objects from release manifest: [resource mapping not found for name: "coralogix-secret" namespace: "coralogix" from "": no matches for kind "ExternalSecret" in version "external-secrets.io/v1alpha1"
-ensure CRDs are installed first, resource mapping not found for name: "coralogix-secretstore-uat-crossell" namespace: "coralogix" from "": no matches for kind "SecretStore" in version "external-secrets.io/v1beta1"
-ensure CRDs are installed first]
-
-
-{{- if .Values.externalSecret.enabled }}
-apiVersion: external-secrets.io/v1alpha1
-kind: ExternalSecret
-metadata:
-  name: {{ .Values.externalSecret.name }}
-  namespace: {{ .Values.namespace }}
-  labels:
-    app.kubernetes.io/name: {{ .Chart.Name }}
-    app.kubernetes.io/component: external-secret
-spec:
-  refreshInterval: {{ .Values.externalSecret.refreshInterval | default "1h" }}
-  secretStoreRef:
-    name:  {{ .Values.secretStore.name }}
-    kind: SecretStore
-  target:
-    name: coralogix-keys
-    creationPolicy: Owner
-  data:
-    {{- range .Values.externalSecret.data }}
-    - secretKey: {{ .secretKey }}
-      remoteRef:
-        key: {{ .remoteRef.key }}
-        property: {{ .remoteRef.property }}
-    {{- end }}
-{{- end }}
-
-{{- if .Values.secretStore.enabled }}
-apiVersion: external-secrets.io/v1beta1
-kind: SecretStore
-metadata:
-  name: {{ .Values.secretStore.name }}
-  namespace: {{ .Values.namespace }}
-  labels:
-    app.kubernetes.io/name: {{ .Chart.Name }}
-    app.kubernetes.io/component: secret-store
-spec:
-  provider:
-    aws:
-      service: SecretsManager
-      region: ap-south-1
-      auth:
-        jwt:
-          serviceAccountRef:
-            name: {{ .Values.serviceaccount.name }}
-{{- end }}
-
-
-
-
-
+app_user@KBUTEC81L20293:~$ kcuat get crd | grep external-secrets
+acraccesstokens.generators.external-secrets.io              2025-09-18T20:14:43Z
+clusterexternalsecrets.external-secrets.io                  2025-09-18T20:14:43Z
+clustergenerators.generators.external-secrets.io            2025-09-18T20:14:43Z
+clusterpushsecrets.external-secrets.io                      2025-09-18T20:14:43Z
+clustersecretstores.external-secrets.io                     2025-09-18T20:14:44Z
+ecrauthorizationtokens.generators.external-secrets.io       2025-09-18T20:14:43Z
+externalsecrets.external-secrets.io                         2025-09-18T20:14:43Z
+fakes.generators.external-secrets.io                        2025-09-18T20:14:43Z
+gcraccesstokens.generators.external-secrets.io              2025-09-18T20:14:43Z
+generatorstates.generators.external-secrets.io              2025-09-18T20:14:43Z
+githubaccesstokens.generators.external-secrets.io           2025-09-18T20:14:43Z
+grafanas.generators.external-secrets.io                     2025-09-18T20:14:43Z
+mfas.generators.external-secrets.io                         2025-09-18T20:14:43Z
+passwords.generators.external-secrets.io                    2025-09-18T20:14:43Z
+pushsecrets.external-secrets.io                             2025-09-18T20:14:43Z
+quayaccesstokens.generators.external-secrets.io             2025-09-18T20:14:43Z
+secretstores.external-secrets.io                            2025-09-18T20:14:43Z
+sshkeys.generators.external-secrets.io                      2025-09-18T20:14:43Z
+stssessiontokens.generators.external-secrets.io             2025-09-18T20:14:43Z
+uuids.generators.external-secrets.io                        2025-09-18T20:14:43Z
+vaultdynamicsecrets.generators.external-secrets.io          2025-09-18T20:14:43Z
+webhooks.generators.external-secrets.io                     2025-09-18T20:14:43Z
