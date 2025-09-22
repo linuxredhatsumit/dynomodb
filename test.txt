@@ -1,2 +1,6 @@
+app_user@KBUTEC81L20293:~$ kubectl explain externalsecret --kubeconfig /home/app_user/.kube/config-crosssell-uat | head -n 5
+GROUP:      external-secrets.io
+KIND:       ExternalSecret
+VERSION:    v1
 
-kubectl explain externalsecret --kubeconfig /home/app_user/.kube/config-crosssell-uat | head -n 5
+DESCRIPTION:
