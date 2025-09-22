@@ -96,6 +96,9 @@ resource "aws_s3_bucket_policy" "ssl_policy" {
   ]
 }
 EOF
+  depends_on = [ module.s3_bucket,
+                 module.cloudfront]
+
 
 }
 
@@ -109,7 +112,7 @@ module "cloudfront" {
   price_class         = "PriceClass_200"
   retain_on_delete    = false
   wait_for_deployment = false
-  aliases             = ["verifyplus.dev.kotak811.com"]
+  aliases             = ["verify-plus.dev.kotak811.com"]
   create_monitoring_subscription = true
 
   # create_origin_access_identity = true
@@ -149,7 +152,7 @@ module "cloudfront" {
   }
 
   viewer_certificate = {
-    acm_certificate_arn = "arn:aws:acm:us-east-1:483584640083:certificate/73b7697c-2e58-4115-bb3b-b9aafc0587ee"
+    acm_certificate_arn = "arn:aws:acm:us-east-1:483584640083:certificate/6280af49-2b23-46ad-a3f6-6a28226c3dba"
     ssl_support_method  = "sni-only"
     minimum_protocol_version = "TLSv1.2_2021"
   }
@@ -205,19 +208,3 @@ terraform {
     encrypt           = true
     }
 }
-
-
-below errror
-
-module.cloudfront.aws_cloudfront_distribution.this[0]: Still creating... [1m10s elapsed]
-╷
-│ Error: creating CloudFront Distribution: operation error CloudFront: CreateDistributionWithTags, https response error StatusCode: 400, RequestID: 58348261-97b7-4689-b8db-b4ff30dcf059, InvalidViewerCertificate: The specified SSL certificate doesn't exist, isn't in us-east-1 region, isn't valid, or doesn't include a valid certificate chain.
-│ 
-│   with module.cloudfront.aws_cloudfront_distribution.this[0],
-│   on ../../../../../terraform-modules/cloudfront/main.tf line 27, in resource "aws_cloudfront_distribution" "this":
-│   27: resource "aws_cloudfront_distribution" "this" {
-│ 
-╵
-
-##[error]Bash exited with code '1'.
-Finishing: Terraform Apply
