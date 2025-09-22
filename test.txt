@@ -1,23 +1,2 @@
-app_user@KBUTEC81L20293:~$ kcuat get crd | grep external-secrets
-acraccesstokens.generators.external-secrets.io              2025-09-18T20:14:43Z
-clusterexternalsecrets.external-secrets.io                  2025-09-18T20:14:43Z
-clustergenerators.generators.external-secrets.io            2025-09-18T20:14:43Z
-clusterpushsecrets.external-secrets.io                      2025-09-18T20:14:43Z
-clustersecretstores.external-secrets.io                     2025-09-18T20:14:44Z
-ecrauthorizationtokens.generators.external-secrets.io       2025-09-18T20:14:43Z
-externalsecrets.external-secrets.io                         2025-09-18T20:14:43Z
-fakes.generators.external-secrets.io                        2025-09-18T20:14:43Z
-gcraccesstokens.generators.external-secrets.io              2025-09-18T20:14:43Z
-generatorstates.generators.external-secrets.io              2025-09-18T20:14:43Z
-githubaccesstokens.generators.external-secrets.io           2025-09-18T20:14:43Z
-grafanas.generators.external-secrets.io                     2025-09-18T20:14:43Z
-mfas.generators.external-secrets.io                         2025-09-18T20:14:43Z
-passwords.generators.external-secrets.io                    2025-09-18T20:14:43Z
-pushsecrets.external-secrets.io                             2025-09-18T20:14:43Z
-quayaccesstokens.generators.external-secrets.io             2025-09-18T20:14:43Z
-secretstores.external-secrets.io                            2025-09-18T20:14:43Z
-sshkeys.generators.external-secrets.io                      2025-09-18T20:14:43Z
-stssessiontokens.generators.external-secrets.io             2025-09-18T20:14:43Z
-uuids.generators.external-secrets.io                        2025-09-18T20:14:43Z
-vaultdynamicsecrets.generators.external-secrets.io          2025-09-18T20:14:43Z
-webhooks.generators.external-secrets.io                     2025-09-18T20:14:43Z
+
+kubectl explain externalsecret --kubeconfig /home/app_user/.kube/config-crosssell-uat | head -n 5
