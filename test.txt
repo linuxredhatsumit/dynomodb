@@ -1,5 +1,14 @@
 CIS Benchmark – Secure Mount Options
 
 Below are the mount points and their corresponding recommended options:
-what they also reqpired
-Sumit as we had earlier discussion with Ram , He told us that Devops team will come up with a solution that every time when we refreshes the audio in s3 bucket, The CDN should serve the new refreshed audio link.
+
+Mount Point	Recommended Mount Options	Why
+/tmp	nodev,nosuid,noexec	Prevents device files, privilege escalation, and binary execution
+/var/tmp	nodev,nosuid,noexec	Same as /tmp — often symlinked or bind-mounted
+/home	nodev	Users don’t need to create device files
+/dev/shm	nodev,nosuid,noexec	Shared memory segment — should be tightly restricted
+/var	nodev (optional)	Optional, but good for limiting device files in /var
+/boot	nodev,nosuid	No device files, and no SUID binaries; noexec sometimes used
+/ (root)	defaults	Base system mount — default options usually suffice
+Removable Media (/media, /mnt)	nodev,nosuid,noexec	If automounted, apply hardening or disable automounting
+/proc	hidepid=2 (extra security)	Hides other users’ processes from ps, top, etc.
