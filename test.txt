@@ -1,14 +1,25 @@
-CIS Benchmark – Secure Mount Options
+Drawbacks of LVM for /tmp
 
-Below are the mount points and their corresponding recommended options:
+Unnecessary overhead
 
-Mount Point	Recommended Mount Options	Why
-/tmp	nodev,nosuid,noexec	Prevents device files, privilege escalation, and binary execution
-/var/tmp	nodev,nosuid,noexec	Same as /tmp — often symlinked or bind-mounted
-/home	nodev	Users don’t need to create device files
-/dev/shm	nodev,nosuid,noexec	Shared memory segment — should be tightly restricted
-/var	nodev (optional)	Optional, but good for limiting device files in /var
-/boot	nodev,nosuid	No device files, and no SUID binaries; noexec sometimes used
-/ (root)	defaults	Base system mount — default options usually suffice
-Removable Media (/media, /mnt)	nodev,nosuid,noexec	If automounted, apply hardening or disable automounting
-/proc	hidepid=2 (extra security)	Hides other users’ processes from ps, top, etc.
+LVM introduces extra layers (Physical Volume → Volume Group → Logical Volume).
+
+More steps to configure, monitor, and maintain.
+
+Potential for fragmentation / wasted space
+
+If you dedicate a small LVM logical volume to /tmp and usage spikes, you might hit space issues.
+
+If you oversize it, you waste space.
+
+Recovery complexity
+
+Troubleshooting /tmp in single-user or rescue mode is simpler with a plain partition.
+
+With LVM, you may need to activate the volume group first (vgchange -ay), which complicates recovery.
+
+Cloud/VM environments don’t need it
+
+In AWS, Azure, GCP, or VMs, you can just attach a small EBS/disk and mount /tmp.
+
+LVM’s dynamic resizing benefits aren’t usually needed for /tmp.
