@@ -1,57 +1,5 @@
-What are Secure Mount Options (nodev, nosuid, noexec)?
+CIS Benchmark – Secure Mount Options
 
-These are filesystem-level security options that control what users and processes can do with files in certain mounted directories. They're recommended by CIS Benchmarks for hardening your Linux system.
-
-✅ Here's what each one does:
-Option	Description
-nodev	Prevents use of device files (like /dev/sda) on the mounted filesystem
-nosuid	Blocks execution of files with SUID/SGID bits, which can escalate privileges
-noexec	Prevents execution of binaries from this mount (scripts may still run)
-📌 Typical Mount Points to Harden
-
-These options are commonly applied to non-essential filesystems:
-
-Mount Point	Recommended Options
-/tmp	nodev,nosuid,noexec
-/var/tmp	nodev,nosuid,noexec
-/home	nodev
-/dev/shm	nodev,nosuid,noexec
-
-These directories are often writable by users and should be restricted from executing or creating device files.
-Each audio file will be named: audio_<language>.mp3
-
-Every upload should replace the existing audio for that language while keeping old versions via S3 versioning.
-
-Please confirm once the bucket and Cloudflare URL are ready.
-
-
-
-
-
-and one more ticket
-Hi DevOps Team,
-Service Name : Verify-plus
-
-We need to trigger our /api/v1/consent/audio/refresh endpoint automatically every 10 minutes.
-
-Requirements:
-
-Endpoint: POST http://uat-kotak811-nlb-ff7a63b15721e4a1.elb.ap-south-1.amazonaws.com/vplus/api/v1/consent/audio/refresh
-
-
-
-curl --location --request POST 'http://uat-kotak811-nlb-ff7a63b15721e4a1.elb.ap-south-1.amazonaws.com/vplus/api/v1/consent/audio/refresh' \
---header 'Content-Type: application/json'
-
-
-
-Trigger Frequency: Every 30 minutes
-
-Method: Lambda function with CloudWatch Events (or equivalent scheduler)
-
-Response: Ensure logs capture success/failure of each call
-
-Please configure this and confirm once the Lambda scheduler is active.
-
+Below are the mount points and their corresponding recommended options:
 what they also reqpired
 Sumit as we had earlier discussion with Ram , He told us that Devops team will come up with a solution that every time when we refreshes the audio in s3 bucket, The CDN should serve the new refreshed audio link.
