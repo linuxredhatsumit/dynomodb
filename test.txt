@@ -1,29 +1,23 @@
-Hi DevOps Team,
+What are Secure Mount Options (nodev, nosuid, noexec)?
 
-Service Name: Verify-plus
+These are filesystem-level security options that control what users and processes can do with files in certain mounted directories. They're recommended by CIS Benchmarks for hardening your Linux system.
 
-We need to create an S3 bucket to store consent audio files for multiple languages. The bucket will be used by our backend service at /api/v1/consent/audio/refresh.
+✅ Here's what each one does:
+Option	Description
+nodev	Prevents use of device files (like /dev/sda) on the mounted filesystem
+nosuid	Blocks execution of files with SUID/SGID bits, which can escalate privileges
+noexec	Prevents execution of binaries from this mount (scripts may still run)
+📌 Typical Mount Points to Harden
 
-Requirements:
+These options are commonly applied to non-essential filesystems:
 
-S3 Bucket
+Mount Point	Recommended Options
+/tmp	nodev,nosuid,noexec
+/var/tmp	nodev,nosuid,noexec
+/home	nodev
+/dev/shm	nodev,nosuid,noexec
 
-Name: cpg-aadhaar-consent-audio-uat (or follow naming conventions)
-
-Public access: Yes, read-only for public CDN
-
-Versioning: Enable versioning on the bucket so that older files are retained
-
-Cache-Control headers: no-cache, no-store, must-revalidate to ensure Cloudflare always serves the latest audio
-
-Cloudflare URL
-
-Provide a Cloudflare URL or CDN endpoint so that the uploaded audio files can be accessed publicly.
-
-Other Notes:
-
-Audio files will be uploaded via backend service automatically.
-
+These directories are often writable by users and should be restricted from executing or creating device files.
 Each audio file will be named: audio_<language>.mp3
 
 Every upload should replace the existing audio for that language while keeping old versions via S3 versioning.
