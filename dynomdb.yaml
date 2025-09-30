@@ -1,98 +1,180 @@
 trigger: none
 
-pool:
-  name: aws
+# pass varibale to build.yaml file.
+variables:
+  - group: Kotak-ECR-Credentials
+  - name: SERVICE_NAME
+    value: k811-verify-plus
+  - name: ENV
+    value: prod
+  # For AWS Role Access
+  - name: PROD_ROLE_NAME
+    value: EKS-Setup-Role-Kotak811
+  - name: UAT_ROLE_NAME
+    value: EKS_Setup_Role
+  # details for prod repo to update pro-values.yaml
+  - name: BRANCH_NAME
+    value: master
+  - name: REPOSITORY_NAME
+    value: kotak-811-devops-prod
 
+  # Agent pool details
+  - name: DEVOPS_POOL_NAME
+    value: "K811-DevOps"
+  - name: PROD_POOL_NAME
+    value: k811-prod
+  - name: PROD_AGENT_IN_AGENTPOOL
+    value: Linux-Agent3
+  # docker details to push to prod ECR
+  - name: PROD_PREFIX
+    value: stable
+  - name: PROD_AWS_REGION
+    value: ap-south-1
+  - name: PROD_AWS_ACCOUNT_ID
+    value: "718378052708"
+  - name: PROD_ECR_FOLDER_NAME
+    value: 811prodonb
+  - name: PROD_ECR_REPO_NAME
+    value: k811_ms_verify_plus
+  - name: ECR_ISTIO_REPO_NAME
+    value: k811_ms_istio_proxy
+
+  # source Enviornmnet details
+  - name: SOURCE_SERVICE_NAME
+    value: k811-verify-plus
+  - name: SOURCE_AWS_REGION
+    value: ap-south-1
+  - name: SOURCE_AWS_ACCOUNT_ID
+    value: "483584640083"
+  - name: SOURCE_ECR_FOLDER_NAME
+    value: 811uatonb
+  - name: SOURCE_ECR_REPO_NAME
+    value: k811_ms_verify_plus
+  - name: SOURCE_KUBE_CONFIG_PATH
+    value: /home/app_user/.kube/config-uat
+  - name: SOURCE_NAMESPACE
+    value: 811-uat
+  - name: DR-ENV
+    value: prod-dr
+  - name: PROD_AGENT_IN_AGENTPOOL
+    value: Linux-Agent3
+  # helm related variables
+  - name: HELM_CHARTS_PATH
+    value: helm-charts/k811-verify-plus/charts
+  - name: HELM_S3BUCKET_URL
+    value: s3://k811-onb-helmcharts/prod/k811-verify-plus/
+  - name: KUBE_CONFIG_PATH
+    value: /home/app_user/.kube/config-prod
+  - name: NAMESPACE
+    value: prod
+  - name: DR_HELM_S3BUCKET_URL
+    value: s3://k811-onb-helmcharts-dr/prod/k811-verify-plus/
+  - name: DR_KUBE_CONFIG_PATH
+    value: /home/app_user/.kube/config-onb-dr
+  - name: ISTIO_IMAGE_TEMP
+    value: stable-custom-encoder-proxyv2.1.24.6-enhanced
+
+# Parameter to input Jira Ticket
 parameters:
-  - name: action
-    displayName: 'Action'
+  - name: Jira_URL
     type: string
-    default: fetch
-    values:
-      - fetch
-      - update
-
-  - name: TableName
-    displayName: 'Table Name'
-    type: string
-    default: ''
-
-  - name: PartitionKey
-    displayName: 'Partition Key'
-    type: string
-    default: ''
-
-  - name: PartitionKeyValue
-    displayName: 'Partition Key Value'
-    type: string
-    default: ''
-
-  - name: UpdateAttribute
-    displayName: 'Update Attribute (key=value)'
-    type: string
-    default: null
+    default: ""
+    displayName: "Jira URL"
 
 stages:
-  - stage: DynamoDBOperation
+  - stage: ECR_CLONE
+    pool:
+      name: $(DEVOPS_POOL_NAME)
     jobs:
-      - job: ExecuteDynamoDBOperation
-        displayName: "Execute DynamoDB Operation"
+      - deployment: PRODDeployment
+        displayName: PRODDeployment
+        environment: prod-pipeline-approvals
+        strategy:
+          runOnce:
+            deploy:
+              steps:
+                - script: |
+                    echo "approved to deploy UAT Image to PROD"
+                  displayName: Approve UAT image to depoly in PROD
+      - job: ECR_IMAGE_PUSH_FROM_UAT_TO_PROD
         steps:
-          - checkout: self
-            displayName: 'Checkout repository'
-
-          - task: UsePythonVersion@0
-            inputs:
-              versionSpec: '3.8'
-            displayName: 'Set up Python 3.8'
+          - script: |
+              pwd
+              unset AWS_SESSION_TOKEN
+              unset AWS_SECRET_ACCESS_KEY
+              unset AWS_ACCESS_KEY_ID
+              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(SOURCE_AWS_ACCOUNT_ID):role/$(UAT_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+              version=$(kubectl get deployment $(SOURCE_SERVICE_NAME) -o jsonpath=''{$.spec.template.spec.containers[:1].image}'' -n $(SOURCE_NAMESPACE) --kubeconfig $(SOURCE_KUBE_CONFIG_PATH) | cut -d ':' -f 2)
+              echo "##vso[task.setvariable variable=version]$version"
+              istio_image=$(kubectl get deployment $(SOURCE_SERVICE_NAME) -o jsonpath='{.spec.template.metadata.annotations.sidecar\.istio\.io/proxyImage}' -n $(SOURCE_NAMESPACE) --kubeconfig $(SOURCE_KUBE_CONFIG_PATH) | awk -F':' '{print $2}')
+              echo "##vso[task.setvariable variable=istio_image]$istio_image"
+            displayName: "$(SOURCE_SERVICE_NAME) Tag value in UAT environment ."
 
           - script: |
-              pip install boto3
-            displayName: 'Install boto3'
+              echo $(istio_image)
+              echo $(version)
+            displayName: UAT Environment Docker image of $(SOURCE_SERVICE_NAME)
 
           - script: |
-              echo "Current directory: $(pwd)"
-              echo "Listing files in current directory:"
-              ls -la
-              echo "Listing files in dynomodb directory:"
-              ls -la dynomodb
-            displayName: 'Debug: List files in working directory'
+              pwd
+              unset AWS_SESSION_TOKEN
+              unset AWS_SECRET_ACCESS_KEY
+              unset AWS_ACCESS_KEY_ID
+              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(SOURCE_AWS_ACCOUNT_ID):role/$(UAT_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+              aws ecr get-login-password --region $(SOURCE_AWS_REGION) | docker login --username AWS --password-stdin $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com
+              docker pull $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version)
+              docker tag $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version) $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-$(version)
+              aws ecr get-login-password --region $(PROD_AWS_REGION) | docker login --username AWS --password-stdin $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com
+              docker push $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-$(version)
+              docker pull $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(ECR_ISTIO_REPO_NAME):$(istio_image)
+              docker tag $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(ECR_ISTIO_REPO_NAME):$(istio_image) $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(ECR_ISTIO_REPO_NAME):$(PROD_PREFIX)-$(istio_image)        
+              docker push $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(ECR_ISTIO_REPO_NAME):$(PROD_PREFIX)-$(istio_image)
+            displayName: "Login, Docker and Push"
 
           - script: |
-              echo "Action: ${{ parameters.action }}"
-              echo "Table Name: ${{ parameters.TableName }}"
-              echo "Partition Key: ${{ parameters.PartitionKey }}"
-              echo "Partition Key Value: ${{ parameters.PartitionKeyValue }}"
-              echo "Update Attribute: ${{ parameters.UpdateAttribute }}"
+              git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
+            displayName: "clone repository"
 
-              # Validate input parameters
-              if [ -z "${{ parameters.TableName }}" ] || [ -z "${{ parameters.PartitionKey }}" ] || [ -z "${{ parameters.PartitionKeyValue }}" ]; then
-                echo "Error: TableName, PartitionKey, and PartitionKeyValue are mandatory."
-                exit 1
-              fi
+          - script: |
+              pwd
+              git pull 
+              sed -i -e 's/tag:.*/tag: $(PROD_PREFIX)-$(version)/'  $(HELM_CHARTS_PATH)/$(ENV)-values.yaml
+              sed -i -e 's/istio_tag:.*/istio_tag: $(PROD_PREFIX)-$(istio_image)/' $(HELM_CHARTS_PATH)/$(ENV)-values.yaml
+              sed -i -e 's/istio_tag:.*/istio_tag: $(ISTIO_IMAGE_TEMP)/' $(HELM_CHARTS_PATH)/$(ENV)-values.yaml
+              sed -i -e 's/istio_tag:.*/istio_tag: $(ISTIO_IMAGE_TEMP)/' $(HELM_CHARTS_PATH)/$(DR-ENV)-values.yaml
+            displayName: "replace helm charts"
+            workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
 
-              # Change to the dynomodb directory
-              cd dynomodb
+          - script: |
+              git config --global user.email "pipeline@kotak.com"
+              git config --global user.name "Pipeline"
+              git add -A
+              git status
+              git commit -m "azure pipeline commited to updated prod-values.yaml in helm charts"
+              echo "Pushing now!!!"
+              git pull
+              git push -u origin $(BRANCH_NAME)
+            displayName: "Updating Chart Values"
+            workingDirectory: $(System.DefaultWorkingDirectory)/$(REPOSITORY_NAME)/
 
-              # Run the appropriate Python script based on action
-              if [ "${{ parameters.action }}" == "fetch" ]; then
-                python fetch_attributes.py \
-                  --table "${{ parameters.TableName }}" \
-                  --partition-key "${{ parameters.PartitionKey }}" \
-                  --partition-value "${{ parameters.PartitionKeyValue }}"
-              elif [ "${{ parameters.action }}" == "update" ]; then
-                if [ -z "${{ parameters.UpdateAttribute }}" ]; then
-                  echo "Error: UpdateAttribute is required for update action."
-                  exit 1
-                fi
-                python update_dynamodb.py \
-                  --action "${{ parameters.action }}" \
-                  --table "${{ parameters.TableName }}" \
-                  --partition-key "${{ parameters.PartitionKey }}" \
-                  --partition-value "${{ parameters.PartitionKeyValue }}" \
-                  --update "${{ parameters.UpdateAttribute }}"
-              else
-                echo "Error: Invalid action. Use 'fetch' or 'update'."
-                exit 1
-              fi
-            displayName: 'Execute Python Script for DynamoDB Operation'
+  - stage: PROD
+    pool:
+      name: $(PROD_POOL_NAME)
+      # demands:
+      #   - agent.name -equals $(PROD_AGENT_IN_AGENTPOOL)
+    displayName: "Build in PROD Environment"
+    jobs:
+      - job: Service_deployment_in_PROD
+        displayName: "Service deployment in PROD"
+        steps:
+          - script: |
+              git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(REPOSITORY_NAME) -b $(BRANCH_NAME)
+            displayName: "clone repository"
+          - template: build.yaml
+          - template: dr-build.yaml
