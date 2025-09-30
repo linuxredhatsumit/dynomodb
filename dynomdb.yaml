@@ -1,26 +1,15 @@
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Principal": {
-                "Service": "ec2.amazonaws.com",
-                "AWS": "arn:aws:iam::718378052708:role/EC2_SSM_+_Admin_Access"
-            },
-            "Action": "sts:AssumeRole"
-        },
-        {
-            "Effect": "Allow",
-            "Principal": {
-                "Federated": "arn:aws:iam::718378052708:oidc-provider/oidc.eks.ap-south-1.amazonaws.com/id/34C20A5F8AE5DF74F66D7F344DD1BF2F"
-            },
-            "Action": "sts:AssumeRoleWithWebIdentity",
-            "Condition": {
-                "StringEquals": {
-                    "oidc.eks.ap-south-1.amazonaws.com/id/34C20A5F8AE5DF74F66D7F344DD1BF2F:sub": "system:serviceaccount:default:azd-agent",
-                    "oidc.eks.ap-south-1.amazonaws.com/id/34C20A5F8AE5DF74F66D7F344DD1BF2F:aud": "sts.amazonaws.com"
-                }
-            }
-        }
-    ]
-}
+ - script: |
+              pwd
+              unset AWS_SESSION_TOKEN
+              unset AWS_SECRET_ACCESS_KEY
+              unset AWS_ACCESS_KEY_ID
+              CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(SOURCE_AWS_ACCOUNT_ID):role/$(UAT_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+              export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+              export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+              export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+              aws ecr get-login-password --region $(SOURCE_AWS_REGION) | docker login --username AWS --password-stdin $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com
+              docker pull $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version)
+              docker tag $(SOURCE_AWS_ACCOUNT_ID).dkr.ecr.$(SOURCE_AWS_REGION).amazonaws.com/$(SOURCE_ECR_FOLDER_NAME)/$(SOURCE_ECR_REPO_NAME):$(version) $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-$(version)
+              aws ecr get-login-password --region $(PROD_AWS_REGION) | docker login --username AWS --password-stdin $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com
+              docker push $(PROD_AWS_ACCOUNT_ID).dkr.ecr.$(PROD_AWS_REGION).amazonaws.com/$(PROD_ECR_FOLDER_NAME)/$(PROD_ECR_REPO_NAME):$(PROD_PREFIX)-$(version)
+            displayName: "Login, Docker and Push"
