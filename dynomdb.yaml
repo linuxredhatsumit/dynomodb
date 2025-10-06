@@ -1,5 +1,21 @@
-k811/k811-coralogix          1.20250925.5    0.1.1           A Helm chart for coralogix service on k8s
-app_user@KBUTEC81L20293:~$ helm search repo uat-k811-coralogix-uat-kotak811/k811-coralogix
-NAME                                            CHART VERSION   APP VERSION     DESCRIPTION
-uat-k811-coralogix-uat-kotak811/k811-coralogix  1.20250925.5    0.1.1           A Helm chart for coralogix service on k8s
-app_user@KBUTEC81L20293:~$
+ 1979  cd dev-coralogix/
+ 1980  ls
+ 1981  cd 21aug2025/
+ 1982  helm pull coralogix/otel-integration --version 0.0.168
+ 1983  ls
+ 1984  du -sh otel-integration-0.0.168.tgz
+ 1985  helm repo index . --rul https://kotak811-helmcharts.s3.ap-south-1.amazonaws.com/dev/coralogix-dev
+ 1986  helm repo index . --url https://kotak811-helmcharts.s3.ap-south-1.amazonaws.com/dev/coralogix-dev
+ 1987  ls
+ 1988  aws s3 cp otel-integration-0.0.168.tgz s3://kotak811-helmcharts/dev/coralogix-dev/
+ 1989  aws s3 cp index.yaml  s3://kotak811-helmcharts/dev/coralogix-dev/
+ 1990  history | grep helm
+ 1991  history | grep upgrade
+ 1992  helm repo add dev-coralogix-s3 https://kotak811-helmcharts.s3.ap-south-1.amazonaws.com/dev/coralogix-dev
+ 1993  aws s3 ls https://kotak811-helmcharts.s3.ap-south-1.amazonaws.com/dev/coralogix-dev
+ 1994  aws s3 ls s3://kotak811-helmcharts/dev/coralogix-dev/
+ 1995  helm repo list
+ 1996  helm plugin list
+ 1997  helm repo add dev-coralogix-s3 s3://kotak811-helmcharts/dev/coralogix-dev
+ 1998  helm repo update
+ 1999  helm search repo dev-coralogix-s3/otel-integration
