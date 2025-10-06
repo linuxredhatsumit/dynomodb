@@ -1,4 +1,5 @@
-app_user@KBUTEC81L20293:~$ helm list -n coralogix
-NAME                            NAMESPACE       REVISION        UPDATED                                 STATUS          CHART                           APP VERSION
-uat-k811-coralogix-uat-kotak811 coralogix       14              2025-09-25 13:30:12.81917304 +0000 UTC  deployed        k811-coralogix-1.20250925.5     0.1.1
+k811/k811-coralogix          1.20250925.5    0.1.1           A Helm chart for coralogix service on k8s
+app_user@KBUTEC81L20293:~$ helm search repo uat-k811-coralogix-uat-kotak811/k811-coralogix
+NAME                                            CHART VERSION   APP VERSION     DESCRIPTION
+uat-k811-coralogix-uat-kotak811/k811-coralogix  1.20250925.5    0.1.1           A Helm chart for coralogix service on k8s
 app_user@KBUTEC81L20293:~$
