@@ -1,198 +1,121 @@
-Starting: API Gateway Deploy : True
-==============================================================================
-Task         : Command line
-Description  : Run a command line script using Bash on Linux and macOS and cmd.exe on Windows
-Version      : 2.250.1
-Author       : Microsoft Corporation
-Help         : https://docs.microsoft.com/azure/devops/pipelines/tasks/utility/command-line
-==============================================================================
-Generating script.
-========================== Starting Command Output ===========================
-/usr/bin/bash --noprofile --norc /home/app_user/workspace/Agent6/_work/_temp/22a6a61e-a966-45d0-832c-c00a2ce7fa98.sh
-Cloning into '811_ms_config_service'...
-fatal: repository 'https://kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/' not found
-##[error]Bash exited with code '128'.
-Finishing: API Gateway Deploy : True
+2025-10-06T09:57:02.660Z  INFO 1 --- [           main] o.s.b.f.s.DefaultListableBeanFactory     : Overriding bean definition for bean 'commonErrorHandler' with a different definition: replacing [Root bean: class=null; scope=; abstract=false; lazyInit=null; autowireMode=3; dependencyCheck=0; autowireCandidate=true; primary=false; fallback=false; factoryBeanName=videoKYCConsumerConfiguration; factoryMethodName=commonErrorHandler; initMethodNames=null; destroyMethodNames=[(inferred)]; defined in class path resource [com/kotak811/partner/kafka/config/VideoKYCConsumerConfiguration.class]] with [Root bean: class=null; scope=; abstract=false; lazyInit=null; autowireMode=3; dependencyCheck=0; autowireCandidate=true; primary=false; fallback=false; factoryBeanName=webHookConsumerConfiguration; factoryMethodName=commonErrorHandler; initMethodNames=null; destroyMethodNames=[(inferred)]; defined in class path resource [com/kotak811/partner/kafka/config/WebHookConsumerConfiguration.class]]
+2025-10-06T09:57:03.398Z  INFO 1 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Bootstrapping Spring Data JPA repositories in DEFAULT mode.
+2025-10-06T09:57:03.780Z  INFO 1 --- [           main] .s.d.r.c.RepositoryConfigurationDelegate : Finished Spring Data repository scanning in 363 ms. Found 15 JPA repository interfaces.
+2025-10-06T09:57:04.305Z  INFO 1 --- [           main] o.s.c.c.s.GenericScope                   : BeanFactory id=c01719db-dd3f-3fc7-9717-93f43291f139
+2025-10-06T09:57:05.485Z  INFO 1 --- [           main] o.a.c.h.Http11NioProtocol                : Initializing ProtocolHandler ["http-nio-8080"]
+2025-10-06T09:57:05.493Z  INFO 1 --- [           main] o.a.c.c.StandardService                  : Starting service [Tomcat]
+2025-10-06T09:57:05.493Z  INFO 1 --- [           main] o.a.c.c.StandardEngine                   : Starting Servlet engine: [Apache Tomcat/10.1.40]
+2025-10-06T09:57:05.548Z  INFO 1 --- [           main] o.a.c.c.C.[.[.[/leads]                   : Initializing Spring embedded WebApplicationContext
+Standard Commons Logging discovery in action with spring-jcl: please remove commons-logging.jar from classpath in order to avoid potential conflicts
+2025-10-06T09:57:06.166Z  INFO 1 --- [           main] AwsAppConfigLogger                       : init app config
+2025-10-06T09:57:07.471Z  INFO 1 --- [           main] AwsAppConfigLogger                       : app config polled
+2025-10-06T09:57:07.472Z  INFO 1 --- [           main] AwsAppConfigLogger                       : fetching configuration from aws appconfig Agent: http://100.64.170.87:2772/applications/onb-leads/environments/null/configurations/leads-dev
+2025-10-06T09:57:07.583Z  WARN 1 --- [           main] o.s.w.HttpLogging                        : Failed to evaluate Jackson deserialization for type [[simple type, class com.kotak811.partner.config.AwsAppConfigModel]]: com.fasterxml.jackson.databind.exc.InvalidDefinitionException: Conflicting getter definitions for property "KAFKA_CONSUMER_GRP_LEAD_EXPIRY_NAME": com.kotak811.partner.config.AwsAppConfigModel#getKafkaConsumerGrpLeadExpiryName() vs com.kotak811.partner.config.AwsAppConfigModel#getKafkaConsumerGrpLeadCreatedName()
+2025-10-06T09:57:07.592Z  WARN 1 --- [           main] o.s.w.HttpLogging                        : Failed to evaluate Jackson deserialization for type [[simple type, class com.kotak811.partner.config.AwsAppConfigModel]]: com.fasterxml.jackson.databind.exc.InvalidDefinitionException: Conflicting getter definitions for property "KAFKA_CONSUMER_GRP_LEAD_EXPIRY_NAME": com.kotak811.partner.config.AwsAppConfigModel#getKafkaConsumerGrpLeadExpiryName() vs com.kotak811.partner.config.AwsAppConfigModel#getKafkaConsumerGrpLeadCreatedName()
+2025-10-06T09:57:07.623Z ERROR 1 --- [           main] AwsAppConfigLogger                       : error communicating with appconfig agent
 
+org.springframework.web.client.HttpClientErrorException$NotFound: 404 Not Found on GET request for "http://100.64.170.87:2772/applications/onb-leads/environments/null/configurations/leads-dev": "{"Message":"Environment not found","ReferencedBy":{"EnvironmentIdentifier":"null"},"ResourceType":"Environment"}"
+        at org.springframework.web.client.HttpClientErrorException.create(HttpClientErrorException.java:112) ~[spring-web-6.2.6.jar!/:6.2.6]
+        at org.springframework.web.client.DefaultResponseErrorHandler.handleError(DefaultResponseErrorHandler.java:186) ~[spring-web-6.2.6.jar!/:6.2.6]
+        at org.springframework.web.client.DefaultResponseErrorHandler.handleError(DefaultResponseErrorHandler.java:147) ~[spring-web-6.2.6.jar!/:6.2.6]
+        at org.springframework.web.client.RestTemplate.handleResponse(RestTemplate.java:953) ~[spring-web-6.2.6.jar!/:6.2.6]
+        at org.springframework.web.client.RestTemplate.doExecute(RestTemplate.java:902) ~[spring-web-6.2.6.jar!/:6.2.6]
+        at org.springframework.web.client.RestTemplate.execute(RestTemplate.java:801) ~[spring-web-6.2.6.jar!/:6.2.6]
+        at org.springframework.web.client.RestTemplate.getForEntity(RestTemplate.java:442) ~[spring-web-6.2.6.jar!/:6.2.6]
+        at com.kotak811.partner.config.AwsAppConfig.fetchFromAwsAppConfigAgent(AwsAppConfig.java:191) ~[!/:0.0.1-SNAPSHOT]
+        at com.kotak811.partner.config.AwsAppConfig.pollAppConfiguration(AwsAppConfig.java:108) ~[!/:0.0.1-SNAPSHOT]
+        at com.kotak811.partner.config.AwsAppConfig.<init>(AwsAppConfig.java:77) ~[!/:0.0.1-SNAPSHOT]
+        at com.kotak811.partner.config.AwsAppConfig$$SpringCGLIB$$0.<init>(<generated>) ~[!/:0.0.1-SNAPSHOT]
+        at java.base/jdk.internal.reflect.DirectConstructorHandleAccessor.newInstance(DirectConstructorHandleAccessor.java:62) ~[?:?]
+        at java.base/java.lang.reflect.Constructor.newInstanceWithCaller(Constructor.java:502) ~[?:?]
+        at java.base/java.lang.reflect.Constructor.newInstance(Constructor.java:486) ~[?:?]
+        at org.springframework.beans.BeanUtils.instantiateClass(BeanUtils.java:209) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.SimpleInstantiationStrategy.instantiate(SimpleInstantiationStrategy.java:145) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.ConstructorResolver.instantiate(ConstructorResolver.java:318) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:309) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1387) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1224) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:569) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:529) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:339) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:371) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:337) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:202) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1681) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1627) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.ConstructorResolver.resolveAutowiredArgument(ConstructorResolver.java:913) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:791) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:240) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1387) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1224) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:569) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:529) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:339) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:371) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:337) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:202) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.DefaultListableBeanFactory.doResolveDependency(DefaultListableBeanFactory.java:1681) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.DefaultListableBeanFactory.resolveDependency(DefaultListableBeanFactory.java:1627) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.ConstructorResolver.resolveAutowiredArgument(ConstructorResolver.java:913) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.ConstructorResolver.createArgumentArray(ConstructorResolver.java:791) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.ConstructorResolver.autowireConstructor(ConstructorResolver.java:240) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.autowireConstructor(AbstractAutowireCapableBeanFactory.java:1387) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBeanInstance(AbstractAutowireCapableBeanFactory.java:1224) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.doCreateBean(AbstractAutowireCapableBeanFactory.java:569) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.AbstractAutowireCapableBeanFactory.createBean(AbstractAutowireCapableBeanFactory.java:529) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.AbstractBeanFactory.lambda$doGetBean$0(AbstractBeanFactory.java:339) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.DefaultSingletonBeanRegistry.getSingleton(DefaultSingletonBeanRegistry.java:371) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.AbstractBeanFactory.doGetBean(AbstractBeanFactory.java:337) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.beans.factory.support.AbstractBeanFactory.getBean(AbstractBeanFactory.java:207) ~[spring-beans-6.2.6.jar!/:6.2.6]
+        at org.springframework.boot.web.servlet.ServletContextInitializerBeans.getOrderedBeansOfType(ServletContextInitializerBeans.java:211) ~[spring-boot-3.4.5.jar!/:3.4.5]
+        at org.springframework.boot.web.servlet.ServletContextInitializerBeans.addAsRegistrationBean(ServletContextInitializerBeans.java:174) ~[spring-boot-3.4.5.jar!/:3.4.5]
+        at org.springframework.boot.web.servlet.ServletContextInitializerBeans.addAsRegistrationBean(ServletContextInitializerBeans.java:169) ~[spring-boot-3.4.5.jar!/:3.4.5]
+        at org.springframework.boot.web.servlet.ServletContextInitializerBeans.addAdaptableBeans(ServletContextInitializerBeans.java:154) ~[spring-boot-3.4.5.jar!/:3.4.5]
+        at org.springframework.boot.web.servlet.ServletContextInitializerBeans.<init>(ServletContextInitializerBeans.java:87) ~[spring-boot-3.4.5.jar!/:3.4.5]
+        at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.getServletContextInitializerBeans(ServletWebServerApplicationContext.java:271) ~[spring-boot-3.4.5.jar!/:3.4.5]
+        at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.selfInitialize(ServletWebServerApplicationContext.java:245) ~[spring-boot-3.4.5.jar!/:3.4.5]
+        at org.springframework.boot.web.embedded.tomcat.TomcatStarter.onStartup(TomcatStarter.java:52) [spring-boot-3.4.5.jar!/:3.4.5]
+        at org.apache.catalina.core.StandardContext.startInternal(StandardContext.java:4464) [tomcat-embed-core-10.1.40.jar!/:?]
+        at org.apache.catalina.util.LifecycleBase.start(LifecycleBase.java:164) [tomcat-embed-core-10.1.40.jar!/:?]
+        at org.apache.catalina.core.ContainerBase$StartChild.call(ContainerBase.java:1203) [tomcat-embed-core-10.1.40.jar!/:?]
+        at org.apache.catalina.core.ContainerBase$StartChild.call(ContainerBase.java:1193) [tomcat-embed-core-10.1.40.jar!/:?]
+        at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317) [?:?]
+        at org.apache.tomcat.util.threads.InlineExecutorService.execute(InlineExecutorService.java:75) [tomcat-embed-core-10.1.40.jar!/:?]
+        at java.base/java.util.concurrent.AbstractExecutorService.submit(AbstractExecutorService.java:145) [?:?]
+        at org.apache.catalina.core.ContainerBase.startInternal(ContainerBase.java:749) [tomcat-embed-core-10.1.40.jar!/:?]
+        at org.apache.catalina.core.StandardHost.startInternal(StandardHost.java:772) [tomcat-embed-core-10.1.40.jar!/:?]
+        at org.apache.catalina.util.LifecycleBase.start(LifecycleBase.java:164) [tomcat-embed-core-10.1.40.jar!/:?]
+        at org.apache.catalina.core.ContainerBase$StartChild.call(ContainerBase.java:1203) [tomcat-embed-core-10.1.40.jar!/:?]
+        at org.apache.catalina.core.ContainerBase$StartChild.call(ContainerBase.java:1193) [tomcat-embed-core-10.1.40.jar!/:?]
+        at java.base/java.util.concurrent.FutureTask.run(FutureTask.java:317) [?:?]
+        at org.apache.tomcat.util.threads.InlineExecutorService.execute(InlineExecutorService.java:75) [tomcat-embed-core-10.1.40.jar!/:?]
+        at java.base/java.util.concurrent.AbstractExecutorService.submit(AbstractExecutorService.java:145) [?:?]
+        at org.apache.catalina.core.ContainerBase.startInternal(ContainerBase.java:749) [tomcat-embed-core-10.1.40.jar!/:?]
+        at org.apache.catalina.core.StandardEngine.startInternal(StandardEngine.java:203) [tomcat-embed-core-10.1.40.jar!/:?]
+        at org.apache.catalina.util.LifecycleBase.start(LifecycleBase.java:164) [tomcat-embed-core-10.1.40.jar!/:?]
+        at org.apache.catalina.core.StandardService.startInternal(StandardService.java:412) [tomcat-embed-core-10.1.40.jar!/:?]
+        at org.apache.catalina.util.LifecycleBase.start(LifecycleBase.java:164) [tomcat-embed-core-10.1.40.jar!/:?]
+        at org.apache.catalina.core.StandardServer.startInternal(StandardServer.java:870) [tomcat-embed-core-10.1.40.jar!/:?]
+        at org.apache.catalina.util.LifecycleBase.start(LifecycleBase.java:164) [tomcat-embed-core-10.1.40.jar!/:?]
+        at org.apache.catalina.startup.Tomcat.start(Tomcat.java:438) [tomcat-embed-core-10.1.40.jar!/:?]
+        at org.springframework.boot.web.embedded.tomcat.TomcatWebServer.initialize(TomcatWebServer.java:128) [spring-boot-3.4.5.jar!/:3.4.5]
+        at org.springframework.boot.web.embedded.tomcat.TomcatWebServer.<init>(TomcatWebServer.java:107) [spring-boot-3.4.5.jar!/:3.4.5]
+        at org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory.getTomcatWebServer(TomcatServletWebServerFactory.java:517) [spring-boot-3.4.5.jar!/:3.4.5]
+        at org.springframework.boot.web.embedded.tomcat.TomcatServletWebServerFactory.getWebServer(TomcatServletWebServerFactory.java:219) [spring-boot-3.4.5.jar!/:3.4.5]
+        at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.createWebServer(ServletWebServerApplicationContext.java:193) [spring-boot-3.4.5.jar!/:3.4.5]
+        at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.onRefresh(ServletWebServerApplicationContext.java:167) [spring-boot-3.4.5.jar!/:3.4.5]
+        at org.springframework.context.support.AbstractApplicationContext.refresh(AbstractApplicationContext.java:621) [spring-context-6.2.6.jar!/:6.2.6]
+        at org.springframework.boot.web.servlet.context.ServletWebServerApplicationContext.refresh(ServletWebServerApplicationContext.java:146) [spring-boot-3.4.5.jar!/:3.4.5]
+        at org.springframework.boot.SpringApplication.refresh(SpringApplication.java:753) [spring-boot-3.4.5.jar!/:3.4.5]
+        at org.springframework.boot.SpringApplication.refreshContext(SpringApplication.java:439) [spring-boot-3.4.5.jar!/:3.4.5]
+        at org.springframework.boot.SpringApplication.run(SpringApplication.java:318) [spring-boot-3.4.5.jar!/:3.4.5]
+        at org.springframework.boot.SpringApplication.run(SpringApplication.java:1362) [spring-boot-3.4.5.jar!/:3.4.5]
+        at org.springframework.boot.SpringApplication.run(SpringApplication.java:1351) [spring-boot-3.4.5.jar!/:3.4.5]
+        at com.kotak811.partner.PartnerApplication.main(PartnerApplication.java:14) [!/:0.0.1-SNAPSHOT]
+        at java.base/jdk.internal.reflect.DirectMethodHandleAccessor.invoke(DirectMethodHandleAccessor.java:103) ~[?:?]
+        at java.base/java.lang.reflect.Method.invoke(Method.java:580) ~[?:?]
+        at org.springframework.boot.loader.launch.Launcher.launch(Launcher.java:102) [partner-0.0.1-SNAPSHOT.jar:0.0.1-SNAPSHOT]
+        at org.springframework.boot.loader.launch.Launcher.launch(Launcher.java:64) [partner-0.0.1-SNAPSHOT.jar:0.0.1-SNAPSHOT]
+        at org.springframework.boot.loader.launch.JarLauncher.main(JarLauncher.java:40) [partner-0.0.1-SNAPSHOT.jar:0.0.1-SNAPSHOT]
 
-
-
-below pipline
-trigger:
-  none
-
-variables:
-  - name: SERVICE_NAME
-    value: k811-config-service
-  - group: onb-811-services
-  - group: UAT-Static-Variables 
-  - name: ENV
-    value: uat
-  - name: apigw_env
-    value: uat
-  - name: apigw_env_dr
-    value: uat_dr    
-  # source Enviornmnet details
-  - name: SOURCE_ECR_FOLDER_NAME
-    value: 811devonb
-  - name: SOURCE_ECR_REPO_NAME
-    value: k811_ms_config_service
-  - name: SOURCE_SERVICE_NAME
-    value: k811-config-service
-  - name: SOURCE_KUBE_CONFIG_PATH
-    value: /home/app_user/.kube/config-dev-arm
-  - name: SOURCE_NAMESPACE
-    value: dev
-  # Docker Details to push to uat ECR
-  - name: AWS_REGION
-    value: ap-south-1
-  - name: AWS_ACCOUNT_ID
-    value: "483584640083"
-  - name: ROLE_NAME
-    value: EKS_Setup_Role
-  - name: ECR_FOLDER_NAME
-    value: 811uatonb
-  - name: ECR_REPO_NAME
-    value: k811_ms_config-service
-  #pool details
-  - name: POOL_NAME
-    value: "K811-DevOps"
-  # helm related variables for uat environment
-  - name: HELM_CHARTS_PATH
-    value: helm-charts/k811-config-service/charts
-  - name: HELM_S3BUCKET_URL
-    value: s3://kotak811-helmcharts/uat/k811-config-service/
-  - name: KUBE_CONFIG_PATH
-    value: /home/app_user/.kube/config-uat
-  - name: NAMESPACE
-    value: 811-uat
-  - name: DR_HELM_S3BUCKET_URL
-    value: s3://kotak811-helmcharts-dr/uat/k811-config-service/
-
-parameters:
-  - name: service
-    displayName: service
-    type: string
-    default: 'k811-config-service'
-    values:
-      - k811-config-service
-  - name: RunAPIGWDeploy
-    displayName: 'APIGW Deploy'
-    type: boolean
-    default: false
-  - name: ServiceBuild
-    displayName: ServiceBuild
-    type: boolean
-    default: false
-  - name: RestartPod
-    displayName: 'Restart Service'
-    type: boolean
-    default: false
-  - name: PodLogs
-    displayName: 'Running pod logs'
-    type: boolean
-    default: false        
-  - name: ENABLE_ISTIO
-    displayName: Custom Istio Image
-    type: boolean
-    default: 'false'
-
-pool:
-  name: $(POOL_NAME)
-
-stages:
-  - template: ../templates/uat/uat-deploy.yaml
-    parameters:
-      ServiceBuild: '${{ parameters.ServiceBuild }}'
-      service: '${{ parameters.service }}'
-      ENABLE_ISTIO: '${{ parameters.ENABLE_ISTIO }}'
-
-  # - template: ../templates/uat/helm-build-dr.yaml
-  #   parameters:
-  #     ServiceBuild: '${{ parameters.ServiceBuild }}'
-  #     service: '${{ parameters.service }}'
-
-  - template: ../templates/uat/apigw-deploy.yaml
-    parameters:
-      RunAPIGWDeploy: '${{ parameters.RunAPIGWDeploy }}'
-      service: '${{ parameters.service }}'
-      apigw_env: $(apigw_env)
-
-  # - template: ../templates/uat/apigw-deploy-dr.yaml
-  #   parameters:
-  #     RunAPIGWDeploy: '${{ parameters.RunAPIGWDeploy }}'
-  #     service: '${{ parameters.service }}'
-  #     apigw_env: $(apigw_env_dr)
-
-  - template: ../templates/uat/pod-restart.yaml
-    parameters:
-      RestartPod: '${{ parameters.RestartPod }}'
-      ServiceBuild: '${{ parameters.ServiceBuild }}'
-      service: '${{ parameters.service }}'
-      KUBE_CONFIG_PATH: $(KUBE_CONFIG_PATH)
-      NAMESPACE: $(NAMESPACE)
-
-  # - template: ../templates/uat/pod-restart-dr.yaml
-  #   parameters:
-  #     RestartPod: '${{ parameters.RestartPod }}'
-  #     ServiceBuild: '${{ parameters.ServiceBuild }}'
-  #     service: '${{ parameters.service }}'
-  #     KUBE_CONFIG_PATH: $(DR_KUBE_CONFIG_PATH)      
-  #     NAMESPACE: $(DR_NAMESPACE)            
-
-  - template: ../templates/uat/pod-logs.yaml
-    parameters:
-      service: '${{ parameters.service }}'
-      PodLogs: '${{ parameters.PodLogs }}'
-      KUBE_CONFIG_PATH: $(KUBE_CONFIG_PATH)
-      NAMESPACE: $(NAMESPACE)
-
-  # - template: ../templates/uat/pod-logs-dr.yaml
-  #   parameters:
-  #     service: '${{ parameters.service }}'
-  #     PodLogs: '${{ parameters.PodLogs }}'
-  #     KUBE_CONFIG_PATH: $(DR_KUBE_CONFIG_PATH)      
-  #     NAMESPACE: $(DR_NAMESPACE)  
-
-
-  below
-  - template: ../templates/uat/apigw-deploy.yaml
-
-
-  stages:
-  - ${{ if eq( parameters['RunAPIGWDeploy'], true) }}:
-      - stage: APIGW_Update_and_Deployment_uat
-        displayName: "API Gateway Update and Deployment uat"
-        condition: not(or(failed(), canceled()))
-        jobs:
-          - job: APIGW_Update_and_Deployment_uat
-            pool:
-              name: $(POOL_NAME)
-            steps:
-              - checkout: self
-                clean: false
-              - script: |
-                  rm -rf $(${{ parameters.service }}_repository_name);
-                  git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(${{ parameters.service }}_repository_name) -b development;
-                displayName: 'API Gateway Deploy : ${{ parameters.RunAPIGWDeploy }}'
-
-              - script: |
-                  set -e
-                  unset AWS_SESSION_TOKEN
-                  unset AWS_SECRET_ACCESS_KEY
-                  unset AWS_ACCESS_KEY_ID
-                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)`
-                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
-                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
-                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`          
-                  cd $(${{ parameters.service }}_repository_name)
-                  echo "########## Service ${{ parameters.service }} Repository $(${{ parameters.service }}_repository_name) Current Branch #########"
-                  git branch --show-current 
-                  echo "########## Service ${{ parameters.service }} Repository $(${{ parameters.service }}_repository_name) last commit message #########"
-                  DESCRIPTION=$(git show -s --format=%B HEAD)
-                  echo $DESCRIPTION
-                  echo "########## Updating API Gateway ${{ parameters.service }} in ${{ parameters.apigw_env }} Environment #########"            
-                  aws apigateway put-rest-api --rest-api-id $(${{ parameters.service }}_apigw_id_uat) --parameters endpointConfigurationTypes=PRIVATE --mode overwrite --body 'fileb://apigw/${{ parameters.apigw_env }}/openapi.json'          
-                  echo "########## Deploying API Gateway ${{ parameters.service }} in ${{ parameters.apigw_env }} Environment #########"  
-                  aws apigateway create-deployment --rest-api-id $(${{ parameters.service }}_apigw_id_uat) --stage-name $(${{ parameters.service }}_apigw_stage_name_uat) --description "$DESCRIPTION"
-                displayName: 'API Gateway Updating and Deploying for Service ${{ parameters.service }}'
+2025-10-06T09:57:07.630Z ERROR 1 --- [           main] AwsAppConfigLogger                       : failed to fetch configuration from aws appconfig agent, falling back to direct aws sdk
