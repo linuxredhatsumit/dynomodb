@@ -1,3 +1,5 @@
-Encountered error(s) while parsing pipeline YAML:
-/others/coralogix-prod-non-prod-otel-version-update/otel-version-update.yaml: (Line: 49, Col: 80, Idx: 1163) - (Line: 49, Col: 80, Idx: 1163): Mapping values are not allowed in this context.
-Object reference not set to an instance of an object.
+app_user@KBUTEC81L20293:~$ helm search repo otel-integration/otel-integration --versions
+NAME                                    CHART VERSION   APP VERSION     DESCRIPTION
+otel-integration/otel-integration       0.0.218                         OpenTelemetry Integration
+otel-integration/otel-integration       0.0.168                         OpenTelemetry Integration
+app_user@KBUTEC81L20293:~$
