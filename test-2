@@ -1,355 +1,70 @@
-import boto3
-from datetime import datetime
-import pytz
-import whois, ssl, socket, OpenSSL
-from datetime import datetime, timezone
-from urllib.request import ssl, socket
-from datetime import datetime, timezone
-import os, warnings, boto3, ast
-import OpenSSL
-from OpenSSL import crypto
-import json
-import argparse
-import smtplib
-import base64
-from email.mime.multipart import MIMEMultipart
-from email.mime.text import MIMEText
-from email.mime.application import MIMEApplication
+trigger: none
 
-def get_expiring_certs(region):
-    try:
-        print(f"get_expiring_certs.regionlist: {region}")
-        try:
-            acm = boto3.client('acm', region_name=region)
-            response = acm.list_certificates()
-        except Exception as e:
-            print(f"Failed to create client: {str(e)}")
-        certificates = response['CertificateSummaryList']
-        today = datetime.now()
-        expiring_certs = []
-        try:
-            no_of_days_to_expire = args.no_of_days_to_expire
-        except KeyError:
-            print("no_of_days_to_expire environment variable is not set")
-        print(f"Expiry days as condition on certificate : {no_of_days_to_expire}")
-        try:
-            for cert in certificates:
-                cert_arn = cert['CertificateArn']
-                cert_detail = acm.describe_certificate(CertificateArn=cert_arn)
-                expiry_date = cert_detail['Certificate']['NotAfter'].replace(tzinfo=None)
+schedules:
+  - cron: "0 * * * *"  # Every hour
+    displayName: Hourly Run
+    branches:
+      include:
+        - master
+    always: true
+variables:
+  # - group: Kotak-ECR-Credentials
+  - name: NONPROD_POOL_NAME
+    value: "K811-DevOps"
+  - name: PROD_POOL_NAME
+    value: "k811-prod"
+  - name: PROD_AWS_ACCOUNT_ID
+    value: "718378052708"
+  - name: NONPROD_AWS_ACCOUNT_ID
+    value: "483584640083"
+  - name: PROD_ROLE_NAME
+    value: "EKS-Setup-Role-Kotak811"
+  - name: UAT_ROLE_NAME
+    value: "EKS_Setup_Role"
+  - name: AGENT_IN_AGENTPOOL
+    value: Linux-Agent1
 
-                if (expiry_date - today).days == no_of_days_to_expire:
-                    expiring_certs.append({
-                        'CertificateArn': cert_arn,
-                        'DomainName': cert_detail['Certificate']['DomainName'],
-                        'ExpirationDate': cert_detail['Certificate']['NotAfter'],
-                        'DaysToExpiration': (expiry_date - today).days
-                    })
-            print(f"Expiring Certificate list: {expiring_certs}")
-        except Exception as e:
-            print(f"Error in checking certificate expire: {str(e)}")
-        return expiring_certs
-    except Exception as e:
-        print(f"Failed to list aws acm certificates: {str(e)}")
-    return expiring_certs
+stages:
+  - stage: RunOnNonProd
+    displayName: "Run Script on NonProd Environment"
+    jobs:
+      - job: NonProdJob
+        pool:
+          name: $(NONPROD_POOL_NAME)
+          demands:
+            - agent.name -equals $(AGENT_IN_AGENTPOOL)
+        steps:
+          - checkout: self
 
+          - script: |
+              unset AWS_SESSION_TOKEN
+              unset AWS_SECRET_ACCESS_KEY
+              unset AWS_ACCESS_KEY_ID
+              CREDENTIALS=$(aws sts assume-role --role-arn arn:aws:iam::$(NONPROD_AWS_ACCOUNT_ID):role/$(UAT_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber))
+              export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r '.Credentials.SessionToken')
+              export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey')
+              export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId')
+              cd others/api-dsiable-logs
+              python3 api-disable-logs.py
+            displayName: "Run Python Script on Dev"
 
-def generate_csr(domain_name):
-    try:
-        # Generate private key and CSR
-        key = crypto.PKey()
-        key.generate_key(crypto.TYPE_RSA, 2048)
+  - stage: RunOnProd
+    displayName: "Run Script on Prod Environment"
+    jobs:
+      - job: ProdJob
+        pool:
+          name: $(PROD_POOL_NAME)
+        steps:
+          - checkout: self
 
-        req = crypto.X509Req()
-        req.get_subject().CN = domain_name
-        req.get_subject().O = 'Kotak Mahindra Bank'
-        req.get_subject().OU = 'Kotak811'
-        req.get_subject().C = 'IN'
-        req.get_subject().ST = 'Maharashtra'
-        req.get_subject().L = 'Mumbai'
-        req.get_subject().emailAddress = 'devops.kotak811@kotak.com'
-
-        req.set_pubkey(key)
-        req.sign(key, 'sha256')
-
-        private_key = crypto.dump_privatekey(crypto.FILETYPE_PEM, key).decode('utf-8')
-        csr = crypto.dump_certificate_request(crypto.FILETYPE_PEM, req).decode('utf-8')
-
-        return private_key, csr
-    except Exception as e:
-        print(f"Failed to create CSR certificate: {str(e)}")
-    return None
-
-
-def upload_to_s3(s3_bucket_name, filename, csr, domain_name, current_datetime):
-    try:
-        destination_object_key=f"{domain_name}_{current_datetime}/{filename}"
-        try:
-            s3 = boto3.client('s3')
-        except Exception as e:
-            print(f"Failed to create client: {str(e)}")
-
-        s3.put_object(Body=csr, Bucket=s3_bucket_name, Key=destination_object_key)
-        print(f"File {filename} copied to {destination_object_key}")
-    except Exception as e:
-        print(f"Failed to upload key to s3 bucket: {str(e)}")
-    return None
-
-
-def upload_key_to_secrets_manager(secret_name, key_file_path, secret_region_name):
-    # Create a Secrets Manager client
-    secret_manager = boto3.client('secretsmanager', region_name=secret_region_name)
-    # Read the PEM file
-    with open(key_file_path, 'r') as f:
-        pem_file_content = f.read()
-
-    # Push the PEM file to Secrets Manager
-    try:
-        response = secret_manager.create_secret(
-            Name=secret_name,
-            SecretString=pem_file_content
-        )
-        print(f"Secret created: {response['ARN']}")
-    except Exception as e:
-        print(f"Failed to upload key to Secret manager: {str(e)}")
-    return None
-
-
-def send_email_smtp(subject, filepath, filename, domain_name, sender_email, recipient_email):
-    try:
-        try:
-            smtp_server = args.smtp_server
-        except KeyError:
-            print("smtp_server environment variable is not set")
-        try:
-            smtp_username = args.smtp_username
-        except KeyError:
-            print("smtp_username environment variable is not set")
-        try:
-            smtp_password = args.smtp_password
-        except KeyError:
-            print("smtp_password environment variable is not set")
-        try:
-            smtp_port = args.smtp_port
-        except KeyError:
-            print("smtp_port environment variable is not set")
-        # Create a multipart message and set headers
-        message = MIMEMultipart()
-        message['From'] = sender_email
-        message['To'] = ', '.join(recipient_email)
-        message['Subject'] = subject
-
-        report_file_path     = filepath
-        attachment_file_name = filename
-
-        BODY = f"Please provide the certificate for the attached CSR - {domain_name}."
-
-        plain_text_body = MIMEText(BODY, 'plain')
-        message.attach(plain_text_body)
-
-        with open(report_file_path, 'rb') as file:
-            # Attach the file with filename to the email
-            message.attach(MIMEApplication(file.read(), Name=attachment_file_name))
-
-        # Start SMTP session
-        server = smtplib.SMTP(smtp_server, smtp_port)
-        server.starttls()
-        # Login to SMTP server
-        server.login(smtp_username, smtp_password)
-
-        # Send email
-        server.sendmail(sender_email, recipient_email, message.as_string())
-
-        # Quit SMTP session
-        server.quit()
-
-        print("Email sent successfully")
-    except Exception as e:
-        print(f"Failed to send CSR certificate via email: {str(e)}")
-    return None
-
-def get_domain_expiry(domain: str):
-    """
-    Get number of days and exact date in UTC before a domain gets expired
-    """
-    try:
-        domain_details = whois.whois(domain)
-        expiry_date = domain_details.expiration_date
-        if isinstance(expiry_date, list):
-            expiry_date = expiry_date[0]
-        return expiry_date.strftime("%d-%m-%Y %H:%M:%S"), (datetime.strptime(str(expiry_date)+"+00:00", '%Y-%m-%d %H:%M:%S%z') - datetime.now(timezone.utc)).days
-    except Exception as e:
-        print(str(e))
-
-def get_ssl_expiry(domain: str, port: str = '443'):
-    """
-    Get number of days and exact date in UTC before an TLS/SSL of domain gets expired
-    """
-    try:
-        context = ssl.SSLContext()
-        with socket.create_connection((domain, port)) as sock:
-            with context.wrap_socket(sock, server_hostname = domain) as ssock:
-                certificate = ssock.getpeercert(True)
-                cert = ssl.DER_cert_to_PEM_cert(certificate)
-                x509 = OpenSSL.crypto.load_certificate(OpenSSL.crypto.FILETYPE_PEM, cert)
-                cert_expires = datetime.strptime(x509.get_notAfter().decode('utf-8'), '%Y%m%d%H%M%S%z')
-                return cert_expires.strftime("%d-%m-%Y %H:%M:%S"), (cert_expires - datetime.now(timezone.utc)).days
-    except Exception as e:
-        print(str(e))
-
-######Python script######
-# def main():
-parser = argparse.ArgumentParser()
-parser.add_argument("--regions", type=json.loads, help="List of regions")
-parser.add_argument("--s3_bucket_name", help="Your name")
-parser.add_argument("--recipient_email", type=json.loads, help="List of recipient_email")
-parser.add_argument("--sender_email", help="sender_email")
-parser.add_argument("--smtp_server", help="smtp_server")
-parser.add_argument("--smtp_username", help="smtp_username")
-parser.add_argument("--smtp_password", help="smtp_password")
-parser.add_argument("--smtp_port", type=int, help="smtp_port")
-parser.add_argument("--no_of_days_to_expire", type=int, help="no_of_days_to_expire")
-args = parser.parse_args()
-# print(f"Regions environment variable: regions")
-try:
-    regions = args.regions
-except KeyError:
-    print("regions environment variable is not set")
-try:
-    s3_bucket_name = args.s3_bucket_name
-except KeyError:
-    print("s3_bucket_name environment variable is not set")
-try:
-    sender_email =  args.sender_email
-except KeyError:
-    print("sender_email environment variable is not set")
-try:
-    recipient_email =  args.recipient_email
-except KeyError:
-    print("recipient_email environment variable is not set")
-env = 'non-prod'
-
-expiring_certs = []
-
-for region in regions:
-    expiring_certs.extend(get_expiring_certs(region))
-    # try:
-    #     acm = boto3.client('acm', region_name=region)
-    #     expiring_certs.extend(get_expiring_certs(acm))
-    # except Exception as e:
-    #     print(f"Failed to create client for region {region}: {str(e)}")
-unique_expiring_certs = list({cert['DomainName']: cert for cert in expiring_certs}.values())
-
-if unique_expiring_certs:
-    for cert in unique_expiring_certs:
-        try:
-            domain_name = cert['DomainName']
-        except json.JSONDecodeError as e:
-            print(f"Error parsing domain_name: {e}")
-        # private_key, csr = generate_csr(domain_name)
-        # print("Private Key:")
-        # print(private_key)
-        # print("\nCertificate Signing Request:")
-        # print(csr)
-        current_datetime = datetime.now(pytz.timezone('Asia/Kolkata')).strftime("%Y-%m-%d-%H-%M-%S")
-        filename_csr=f"{domain_name}.csr"
-        filename = filename_csr.lstrip('*.')
-        filepath=filename
-        key_file_path = f"{domain_name}_private_key.pem"
-        secret_region_name = "ap-south-1"
-        secret_name = f"{env}/certificate_key/{current_datetime}/{domain_name}"
-
-        ######## Upload CSR to s3 bucket
-        # print("Executing upload_to_s3 function")
-        # upload_to_s3(s3_bucket_name, filename, csr, domain_name, current_datetime)
-
-        ######## Upload key to secret manager
-        # try:
-        #     with open(f"{key_file_path}", 'w') as file:
-        #         file.write(private_key)
-        # except Exception as e:
-        #     print(f"Key file is not created: {str(e)}")
-        # print("Executing upload_key_to_secrets_manager function")
-        # upload_key_to_secrets_manager(secret_name, key_file_path, secret_region_name)
-
-        ####### Send CSR via email
-        # subject = f"CSR for {domain_name}"
-        # try:
-        #     with open(f"{domain_name}.csr", 'w') as file:
-        #         file.write(csr)
-        # except Exception as e:
-        #     print(f"CSR file is not created: {str(e)}")
-        # print("Executing send_email_smtp function")
-        # send_email_smtp(subject, filepath, filename, domain_name, sender_email, recipient_email)
-        print(f"Domain Name: {cert['DomainName']} will expire in {cert['DaysToExpiration']} days")
-else:
-    print('No certificates expiring within 30 days.')
-
-# ssl_expiry = {'Domain': ['Kotak811.com', '811apppurezento.kotak811.com', '811appumami.uat.kotak811.com', '811appdaichi.kotak.com'], 'Alert': [120, 179, 328, 177]}
-ssl_expiry = {'Domain': ['811appdaichi.kotak.com'], 'Alert': [177]}
-try:
-    for index, domain_name in enumerate(ssl_expiry['Domain']):
-        ssl_expiry_date, ssl_expiry_days = get_ssl_expiry(domain_name)
-        if ssl_expiry_days == ssl_expiry['Alert'][index]:
-            print(f"need to create certificate for this domain : {domain_name}")
-            # private_key, csr = generate_csr(domain_name)
-            # print("Private Key:")
-            # print(private_key)
-            # print("\nCertificate Signing Request:")
-            # print(csr)
-            # current_datetime = datetime.now(pytz.timezone('Asia/Kolkata')).strftime("%Y-%m-%d-%H-%M-%S")
-            # filename_csr=f"{domain_name}.csr"
-            # filename = filename_csr.lstrip('*.')
-            # filepath=filename
-            # key_file_path = f"{domain_name}_private_key.pem"
-            # secret_region_name = "ap-south-1"
-            # secret_name = f"{env}/certificate_key/{current_datetime}/{domain_name}"
-
-            # # ######## Upload CSR to s3 bucket
-            # print("Executing upload_to_s3 function")
-            # upload_to_s3(s3_bucket_name, filename, csr, domain_name, current_datetime)
-
-            # # ######## Upload key to secret manager
-            # try:
-            #     with open(f"{key_file_path}", 'w') as file:
-            #         file.write(private_key)
-            # except Exception as e:
-            #     print(f"Key file is not created: {str(e)}")
-            # print("Executing upload_key_to_secrets_manager function")
-            # upload_key_to_secrets_manager(secret_name, key_file_path, secret_region_name)
-
-            # ####### Send CSR via email
-            # subject = f"CSR for {domain_name}"
-            # try:
-            #     with open(f"{domain_name}.csr", 'w') as file:
-            #         file.write(csr)
-            # except Exception as e:
-            #     print(f"CSR file is not created: {str(e)}")
-            # print("Executing send_email_smtp function")
-            # send_email_smtp(subject, filepath, filename, domain_name, sender_email, recipient_email)
-            # #######811apppurezento.kotak811.com SSL cert is valid till 11-03-2026 01:29:40 and total 179 days are remaining.
-            # print(f'{domain_name} SSL cert is valid till {ssl_expiry_date} and total {ssl_expiry_days} days are remaining.')
-except Exception as e:
-    print(str(e))
-
-domains_expiry = {'Domain': ['811appdaichi.kotak.com'], 'Alert': [415]}
-# region_name = "ap-south-1"
-# sns_arn = "arn:aws:sns:ap-south-1:483584640083:DOMAIN_ALERT_SNS_uat"
-try:
-    # sns_client = boto3.client('sns', region_name = region_name)
-    for index, domain_name in enumerate(domains_expiry['Domain']):
-        domain_expiry_date, domain_expiry_days = get_domain_expiry(domain_name)
-        ####if domain_expiry_days is less the alert it will trigger
-        if domain_expiry_days == domains_expiry['Alert'][index]:
-        # if domain_expiry_days <= domains_expiry['Alert'][index]:
-            message = f'DNS: {domain_name}\nDomain Expiry Date: {domain_expiry_date} ({domain_expiry_days} days) \n {domain_name} domain is valid till {domain_expiry_date} and total {domain_expiry_days} days are remaining.'
-            print(message)
-        ######811apppurezento.kotak811.com domain is valid till 01-02-2027 10:02:50 and total 506 days are remaining.
-            # response = sns_client.publish(TopicArn = sns_arn, Message = message, Subject=f'{domain_name} will expire in {domain_expiry_date} days')
-            # print(response)
-except Exception as e:
-    print(str(e))
-
-# if __name__ == "__main__":
-#     main()
-
+          - script: |
+              unset AWS_SESSION_TOKEN
+              unset AWS_SECRET_ACCESS_KEY
+              unset AWS_ACCESS_KEY_ID
+              CREDENTIALS=$(aws sts assume-role --role-arn arn:aws:iam::$(PROD_AWS_ACCOUNT_ID):role/$(PROD_ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber))
+              export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r '.Credentials.SessionToken')
+              export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey')
+              export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId')
+              cd others/api-dsiable-logs
+              python3 api-disable-logs.py
+            displayName: "Run Python Script on Prod"
