@@ -1,6 +1,6 @@
 i have added the otel chart in s3 bucket and using as local repo. i am not sure but i have executed kind of below command to add manully. what i want that i can just give the version and it go and pull and upload in prod bucket repository: "s3://k811-onb-helmcharts/others/coralogix/
 i just want make it for prod. i remmber i had multiple otel version i have store in bucket but i remember i guess i add single time the helm repo index .
-plz give me azure pipleine where we can select the non-prod and prod. also input to put version if we selecting non-prod it shold go s3://kotak811-helmcharts/others/coralogix/" and if prod than "s3://k811-onb-helmcharts/others/coralogix/
+plz give me azure pipleine where we can select the non-prod and prod. also input to put version if we selecting non-prod it shold go s3://kotak811-helmcharts/others/coralogix/" and if prod than "s3://k811-onb-helmcharts/others/coralogix/ and account number will change 
 
  1979  cd dev-coralogix/
  1980  ls
