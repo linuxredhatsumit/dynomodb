@@ -1,3 +1,7 @@
+i have added the otel chart in s3 bucket and using as local repo. i am not sure but i have executed kind of below command to add manully. what i want that i can just give the version and it go and pull and upload in prod bucket repository: "s3://k811-onb-helmcharts/others/coralogix/
+i just want make it for prod. i remmber i had multiple otel version i have store in bucket but i remember i guess i add single time the helm repo index .
+plz give me azure pipleine where we can select the non-prod and prod. also input to put version if we selecting non-prod it shold go s3://kotak811-helmcharts/others/coralogix/" and if prod than "s3://k811-onb-helmcharts/others/coralogix/
+
  1979  cd dev-coralogix/
  1980  ls
  1981  cd 21aug2025/
@@ -19,3 +23,421 @@
  1997  helm repo add dev-coralogix-s3 s3://kotak811-helmcharts/dev/coralogix-dev
  1998  helm repo update
  1999  helm search repo dev-coralogix-s3/otel-integration
+
+
+below is UAT and dev pipeline
+trigger: none
+
+parameters:
+  - name: cluster_name
+    displayName: Select Cluster/Service
+    type: string
+    default: k811-crossell-uat-eks
+    values:
+      - k811-crossell-uat-eks
+      - uat-kotak811
+      - uat-kotak811-bg
+      - uat-cluster-cloudacqui
+
+variables:
+  - group: Kotak-ECR-Credentials
+
+  - name: ENV
+    value: uat
+  - name: POOL_NAME
+    value: "K811-DevOps"
+  - name: SERVICE_NAME
+    value: k811-coralogix
+  - name: AWS_REGION
+    value: ap-south-1
+  - name: AWS_ACCOUNT_ID
+    value: "483584640083"
+  - name: ROLE_NAME
+    value: EKS_Setup_Role
+
+  - name: HELM_CHARTS_PATH
+    value: helm-charts/k811-coralogix/charts
+  - name: HELM_S3BUCKET_URL
+    value: s3://kotak811-helmcharts/$(ENV)/$(SERVICE_NAME)/${{ parameters.cluster_name }}
+  - name: NAMESPACE
+    value: coralogix
+
+  - name: K8S_CLUSTER_NAME
+    ${{ if eq(parameters.cluster_name, 'k811-crossell-uat-eks') }}:
+      value: "k811-crossell-uat-eks"
+    ${{ if eq(parameters.cluster_name, 'uat-kotak811') }}:
+      value: "uat-kotak811"
+    ${{ if eq(parameters.cluster_name, 'uat-kotak811-bg') }}:
+      value: "uat-kotak811-bg"
+    ${{ if eq(parameters.cluster_name, 'uat-cluster-cloudacqui') }}:
+      value: "uat-cluster-cloudacqui"
+      
+
+  - name: KUBE_CONFIG_PATH
+    ${{ if eq(parameters.cluster_name, 'k811-crossell-uat-eks') }}:
+      value: "/home/app_user/.kube/config-crosssell-uat"
+    ${{ if eq(parameters.cluster_name, 'uat-kotak811') }}:
+      value: "/home/app_user/.kube/config-uat"
+    ${{ if eq(parameters.cluster_name, 'uat-kotak811-bg') }}:
+      value: "/home/app_user/.kube/config-uat-bg"
+    ${{ if eq(parameters.cluster_name, 'uat-cluster-cloudacqui') }}:
+      value: "/home/app_user/.kube/config-ca-uat"
+    
+
+pool:
+  name: $(POOL_NAME)
+
+stages:
+  - stage: Build
+    displayName: "Prepare Helm Chart"
+    jobs:
+      - job: UpdateChart
+        displayName: "Update Chart.yaml"
+        steps:
+          - checkout: self
+            clean: false
+
+          - script: |
+              pwd
+              echo "Updating Chart.yaml with service = $(SERVICE_NAME) and build version = 1.$(Build.BuildNumber)"
+              sed -i -e 's/^version:.*/version: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+              cat $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+              cat helm-charts/k811-coralogix/charts/Chart.yaml
+            displayName: "Update Chart.yaml & Dependencies"
+
+  - stage: PackageAndPush
+    displayName: "Package & Push Helm Chart"
+    dependsOn: Build
+    jobs:
+      - job: HelmPush
+        steps:
+          - script: |
+              unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+              CREDENTIALS=$(aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber))
+              export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r '.Credentials.SessionToken')
+              export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey')
+              export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId')
+              helm repo add $(ENV)-$(SERVICE_NAME)-${{ parameters.cluster_name }} $(HELM_S3BUCKET_URL)
+              helm repo add otel-integration s3://kotak811-helmcharts/others/coralogix/
+              helm repo update
+              echo "Running helm dependency update..."
+              sed -i -e 's/^version:.*/version: 1.$(Build.BuildNumber)/' $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+              cat $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/Chart.yaml
+              ls $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/
+              helm dependency update $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)
+              helm package $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/
+              helm s3 push --force $(System.DefaultWorkingDirectory)/$(SERVICE_NAME)-1.$(Build.BuildNumber).tgz $(ENV)-$(SERVICE_NAME)-${{ parameters.cluster_name }}
+              helm repo update
+              helm search repo $(ENV)-$(SERVICE_NAME)-${{ parameters.cluster_name }}
+            displayName: "Push Chart to S3 Repo"
+
+  - stage: Deploy
+    displayName: "Deploy to Kubernetes"
+    dependsOn: PackageAndPush
+    jobs:
+      - job: HelmDeploy
+        steps:
+          - script: |
+              unset AWS_SESSION_TOKEN AWS_SECRET_ACCESS_KEY AWS_ACCESS_KEY_ID
+              CREDENTIALS=$(aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber))
+              export AWS_SESSION_TOKEN=$(echo $CREDENTIALS | jq -r '.Credentials.SessionToken')
+              export AWS_SECRET_ACCESS_KEY=$(echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey')
+              export AWS_ACCESS_KEY_ID=$(echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId')
+              helm repo add $(ENV)-$(SERVICE_NAME)-${{ parameters.cluster_name }} $(HELM_S3BUCKET_URL)
+              helm repo add otel-integration s3://kotak811-helmcharts/others/coralogix/
+              helm fetch $(ENV)-$(SERVICE_NAME)-${{ parameters.cluster_name }}/$(SERVICE_NAME)
+              tar -xvf $(SERVICE_NAME)-1.$(Build.BuildNumber).tgz
+              echo "Deploying to cluster: $(K8S_CLUSTER_NAME), kubeconfig: $(KUBE_CONFIG_PATH), namespace: $(NAMESPACE)"
+              helm repo update
+              kubectl create ns coralogix --kubeconfig $(KUBE_CONFIG_PATH)
+              echo "helm upgrade --install $(ENV)-$(SERVICE_NAME)-${{ parameters.cluster_name }} \
+                otel-integration/otel-integration \
+                -f $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(K8S_CLUSTER_NAME).yaml \
+                --namespace $(NAMESPACE) \
+                --kubeconfig $(KUBE_CONFIG_PATH)"
+              echo "helm upgrade --install $(ENV)-$(SERVICE_NAME)-${{ parameters.cluster_name }} \
+                $(ENV)-$(SERVICE_NAME)-${{ parameters.cluster_name }}/$(SERVICE_NAME) \
+                -f $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(K8S_CLUSTER_NAME).yaml \
+                --namespace $(NAMESPACE) \
+                --kubeconfig $(KUBE_CONFIG_PATH)"
+
+              helm upgrade --install $(ENV)-$(SERVICE_NAME)-${{ parameters.cluster_name }} \
+                $(ENV)-$(SERVICE_NAME)-${{ parameters.cluster_name }}/$(SERVICE_NAME) \
+                -f $(System.DefaultWorkingDirectory)/$(HELM_CHARTS_PATH)/$(K8S_CLUSTER_NAME).yaml \
+                --namespace $(NAMESPACE) \
+                --kubeconfig $(KUBE_CONFIG_PATH)
+
+            displayName: "Helm Deploy"
+            continueOnError: true
+
+
+chart.yaml
+apiVersion: v2
+name: k811-coralogix
+description: A Helm chart for coralogix service on k8s
+version: 1.1.1
+appVersion: "0.1.1"
+dependencies:
+  - name: otel-integration
+    version: 0.0.218
+    repository: "s3://kotak811-helmcharts/others/coralogix/"
+    
+
+vaule.yaml
+namespace: coralogix
+global:
+  clusterName: uat-kotak811
+  collectionInterval: 60s
+  domain: coralogix.in
+otel-integration:
+  opentelemetry-agent:
+    config:
+      connectors:
+        spanmetrics:
+          histogram:
+            explicit:
+              buckets:
+              - 1ms
+              - 4ms
+              - 10ms
+              - 20ms
+              - 50ms
+              - 100ms
+              - 200ms
+              - 500ms
+              - 1s
+              - 2s
+              - 5s
+              - 10s
+              - 20s
+              - 50s
+      processors:
+        filter/drop-istio-proxy:
+          logs:
+            exclude:
+              match_type: regexp
+              resource_attributes:
+              - key: k8s.container.name
+                value: .*istio-proxy.*
+        transform/remove-loglabels:
+          error_mode: ignore
+          log_statements:
+          - delete_key(resource.attributes, "k8s.pod.uid")
+          - delete_key(resource.attributes, "cloud.account.id")
+          - delete_key(resource.attributes, "cloud.platform")
+          - delete_key(resource.attributes, "cloud.availability_zone")
+          - delete_key(resource.attributes, "os.type")
+          - delete_key(resource.attributes, "cloud.provider")
+          - delete_key(resource.attributes, "cloud.region")
+          - delete_key(resource.attributes, "host.type")
+          - delete_key(log.attributes, "host.image.id")
+          - delete_key(log.attributes, "log.file.path")
+          - delete_key(log.attributes, "log.iostream")
+          - delete_key(log.attributes, "time")
+        transform/service_name:
+          error_mode: silent
+          trace_statements:
+          - context: span
+            statements:
+            - set(resource.attributes["service.name"], resource.attributes["k8s.deployment.name"])
+              where resource.attributes["k8s.deployment.name"] != nil
+      service:
+        pipelines:
+          logs:
+            exporters:
+            - coralogix
+            processors:
+            - k8sattributes
+            - resourcedetection/env
+            - resourcedetection/region
+            - transform/remove-loglabels
+            - filter/drop-istio-proxy
+            - batch
+          metrics:
+            exporters:
+            - coralogix
+            receivers:
+            - prometheus
+          traces:
+            exporters:
+            - loadbalancing
+            processors:
+            - resource/metadata
+            - resourcedetection/region
+            - resourcedetection/env
+            - k8sattributes
+            - transform/k8s_attributes
+            - transform/service_name
+            - transform/semconv
+            - batch
+    enabled: true
+    mode: daemonset
+    presets:
+      coralogixExporter:
+        enabled: true
+        pipelines:
+        - none
+        privateKey: ${env:CORALOGIX_PRIVATE_KEY}
+      loadBalancing:
+        enabled: true
+        hostname: coralogix-opentelemetry-gateway
+        routingKey: traceID
+      spanMetrics:
+        enabled: true
+  opentelemetry-agent-windows:
+    enabled: false
+  opentelemetry-cluster-collector:
+    config:
+      processors:
+        filter/drop_histogram_metrics:
+          metrics:
+            metric:
+            - IsMatch(name, "istio_response_bytes|istio_request_bytes") and type == 3
+        transform/drop_istio_labels:
+          metric_statements:
+          - context: datapoint
+            statements:
+            # Resource attributes
+            - delete_key(resource.attributes, "cloud.provider") where IsMatch(metric.name, "^istio_")
+            - delete_key(resource.attributes, "cloud.account.id") where IsMatch(metric.name, "^istio_")
+            - delete_key(resource.attributes, "host.image.id") where IsMatch(metric.name, "^istio_")
+            - delete_key(resource.attributes, "cloud.availability_zone") where IsMatch(metric.name, "^istio_")
+            - delete_key(resource.attributes, "cloud.region") where IsMatch(metric.name, "^istio_")
+            - delete_key(resource.attributes, "cloud.platform") where IsMatch(metric.name, "^istio_")
+            - delete_key(resource.attributes, "host.id") where IsMatch(metric.name, "^istio_")
+            - delete_key(resource.attributes, "host.name") where IsMatch(metric.name, "^istio_")
+            - delete_key(resource.attributes, "host.type") where IsMatch(metric.name, "^istio_")
+            - delete_key(resource.attributes, "os.type") where IsMatch(metric.name, "^istio_")
+            - delete_key(resource.attributes, "server.address") where IsMatch(metric.name, "^istio_")
+            - delete_key(resource.attributes, "server.port") where IsMatch(metric.name, "^istio_")      
+            - delete_key(resource.attributes, "url.scheme") where IsMatch(metric.name, "^istio_")
+            - delete_key(resource.attributes, "k8s.pod.uid") where IsMatch(metric.name, "^istio_")
+
+            # Metric attributes
+            - delete_key(attributes, "source_principal") where IsMatch(metric.name, "^istio_")
+            - delete_key(attributes, "destination_principal") where IsMatch(metric.name, "^istio_")
+            - delete_key(attributes, "destination_service_name") where IsMatch(metric.name, "^istio_")
+            - delete_key(attributes, "destination_service_namespace") where IsMatch(metric.name, "^istio_")
+            - delete_key(attributes, "destination_canonical_service") where IsMatch(metric.name, "^istio_")
+            - delete_key(attributes, "source_canonical_service") where IsMatch(metric.name, "^istio_")            
+            - delete_key(attributes, "destination_canonical_revision") where IsMatch(metric.name, "^istio_")
+            - delete_key(attributes, "source_workload_namespace") where IsMatch(metric.name, "^istio_")
+            - delete_key(attributes, "connection_security_policy") where IsMatch(metric.name, "^istio_")
+            - delete_key(attributes, "source_workload") where IsMatch(metric.name, "^istio_")
+            - delete_key(attributes, "source_canonical_revision") where IsMatch(metric.name, "^istio_")
+            - delete_key(attributes, "destination_app") where IsMatch(metric.name, "^istio_")
+            - delete_key(attributes, "destination_cluster") where IsMatch(metric.name, "^istio_")
+            - delete_key(attributes, "response_flags") where IsMatch(metric.name, "^istio_")
+            - delete_key(attributes, "source_version") where IsMatch(metric.name, "^istio_")
+            - delete_key(attributes, "destination_version") where IsMatch(metric.name, "^istio_")
+            - delete_key(attributes, "source_cluster") where IsMatch(metric.name, "^istio_")
+            - delete_key(attributes, "source_app") where IsMatch(metric.name, "^istio_")
+            
+        transform/remove-loglabels:
+          error_mode: ignore
+          log_statements:
+          - delete_key(resource.attributes, "cloud.availability_zone")
+          - delete_key(resource.attributes, "host.type")
+      receivers:
+        prometheus:
+          config:
+            scrape_configs:
+            - job_name: opentelemetry-collector
+              scrape_interval: 60s
+              static_configs:
+              - targets:
+                - ${env:MY_POD_IP}:8888
+            - job_name: istio-sidecars
+              kubernetes_sd_configs:
+              - role: pod
+              relabel_configs:
+              - action: keep
+                regex: istio-proxy
+                source_labels:
+                - __meta_kubernetes_pod_container_name
+              - action: replace
+                regex: istio-proxy
+                replacement: /stats/prometheus
+                source_labels:
+                - __meta_kubernetes_pod_container_name
+                target_label: __metrics_path__
+              - regex: ([^:]+)(?::\d+)?;istio-proxy
+                replacement: $$1:15020
+                source_labels:
+                - __address__
+                - __meta_kubernetes_pod_container_name
+                target_label: __address__
+              scrape_interval: 30s
+      service:
+        pipelines:
+          logs:
+            exporters: []
+            processors:
+            - memory_limiter
+            - transform/remove-loglabels
+          metrics:
+            exporters: []
+            processors:
+            - memory_limiter
+            - filter/drop_histogram_metrics
+            - transform/drop_istio_labels
+    enabled: true
+  opentelemetry-gateway:
+    config:
+      processors:
+        tail_sampling:
+          decision_wait: 15s
+          num_traces: 100000
+          policies:
+          - name: errors-policy
+            status_code:
+              status_codes:
+              - ERROR
+            type: status_code
+          - and:
+              and_sub_policy:
+              - name: service-name-policy
+                string_attribute:
+                  key: service.name
+                  values:
+                  - k811-notifications
+                  - k811-upi-processor
+                  - k811-upi-payments
+                type: string_attribute
+              - name: randomized-policy
+                probabilistic:
+                  sampling_percentage: 1
+                type: probabilistic
+            name: custom-policy
+            type: and
+          - name: randomized-policy
+            probabilistic:
+              sampling_percentage: 5
+            type: probabilistic
+    enabled: true
+    replicaCount: 3
+
+serviceaccount:
+  enabled: true
+  name: coralogix-uat-sa
+  role: arn:aws:iam::483584640083:role/coralogix-uat-eks-sa
+
+role:
+  name: coralogix-uat-role
+
+rolebinding:
+  name: coralogix-uat-rb
+
+secretStore:
+  enabled: true
+  name: coralogix-secretstore-uat
+
+externalSecret:
+  enabled: true
+  name: coralogix-secret
+  refreshInterval: 1h
+  data:
+    - secretKey: PRIVATE_KEY
+      remoteRef:
+        key: coralogix-uat-keys
+        property: PRIVATE_KEY
