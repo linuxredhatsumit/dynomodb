@@ -2,4 +2,14 @@ app_user@KBUTEC81L20293:~$ helm search repo otel-integration/otel-integration --
 NAME                                    CHART VERSION   APP VERSION     DESCRIPTION
 otel-integration/otel-integration       0.0.218                         OpenTelemetry Integration
 otel-integration/otel-integration       0.0.168                         OpenTelemetry Integration
+app_user@KBUTEC81L20293:~$ helm repo update
+Hang tight while we grab the latest from your chart repositories...
+...Successfully got an update from the "dev-arm-issue-debit-car
+
+
+after run the helm update its just showing the latest one
+
+app_user@KBUTEC81L20293:~$ helm search repo otel-integration/otel-integration --versions
+NAME                                    CHART VERSION   APP VERSION     DESCRIPTION
+otel-integration/otel-integration       0.0.219                         OpenTelemetry Integration
 app_user@KBUTEC81L20293:~$
