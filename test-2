@@ -1,1890 +1,270 @@
 {
-  "openapi" : "3.0.1",
-  "info" : {
-    "title" : "811-verify-plus-dev-onb-api-gw",
-    "description" : "811-verify-plus-dev-onb-api-gw",
-    "version" : "2023-04-10T06:55:35Z"
+  "openapi": "3.0.1",
+  "info": {
+    "title": "811-accounts-transactions-dev-onb-api-gw",
+    "description": "811-accounts-transactions-dev-onb-api-gw",
+    "version": "1.0.2"
   },
-  "servers" : [ {
-    "url" : "https://811appdaichi.kotak.com",
-    "x-amazon-apigateway-endpoint-configuration" : {
-      "disableExecuteApiEndpoint" : true,
-      "vpcEndpointIds" : [ "vpce-071e3896aa88715ba" ]
+  "servers": [
+    {
+      "url": "https://811appdaichi.kotak.com",
+      "x-amazon-apigateway-endpoint-configuration": {
+        "disableExecuteApiEndpoint": true,
+        "vpcEndpointIds": [
+          "vpce-071e3896aa88715ba"
+        ]
+      }
     }
-  } ],
+  ],
   "paths": {
-    "/docs": {
-      "get" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
+    "/v1/branch-update/get-data": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "200 response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Empty"
                 }
               }
             }
           }
         },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "GET",
-          "uri": "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/swagger-ui/index.html",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
+        "security": [
+          {
+            "811-onb-dev-custom-authorizer": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "connectionId": "gowz63",
+          "httpMethod": "POST",
+          "uri": "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/accounts-transactions/v1/branch-update/get-data",
+          "responses": {
+            "default": {
+              "statusCode": "200"
             }
           },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
+          "requestParameters": {
+            "integration.request.header.x-apiuniq-id": "context.extendedRequestId"
+          },
+          "passthroughBehavior": "when_no_match",
+          "connectionType": "VPC_LINK"
         }
       }
     },
-    "/{proxy+}" : {
-      "x-amazon-apigateway-any-method" : {
-        "parameters" : [ {
-          "name" : "proxy",
-          "in" : "path",
-          "required" : true,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "responses" : {
-          "200" : {
-            "description" : "200 response, used for amplify-plus frontend proxy",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
+    "/v1/branch-update/details": {
+      "post": {
+        "responses": {
+          "200": {
+            "description": "200 response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Empty"
                 }
               }
             }
           }
         },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "ANY",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/amplify-vplus/{proxy}",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
+        "security": [
+          {
+            "811-onb-dev-custom-authorizer": []
+          },
+          {
+            "api_key": []
+          }
+        ],
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "connectionId": "gowz63",
+          "httpMethod": "POST",
+          "uri": "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/accounts-transactions/v1/branch-update/details",
+          "responses": {
+            "default": {
+              "statusCode": "200"
             }
           },
-          "requestParameters" : {
-            "integration.request.path.proxy" : "method.request.path.proxy"
+          "requestParameters": {
+            "integration.request.header.x-apiuniq-id": "context.extendedRequestId"
           },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
+          "passthroughBehavior": "when_no_match",
+          "connectionType": "VPC_LINK"
+        }
+      }
+    },
+    "/docs": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "200 response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Empty"
+                }
+              }
+            }
+          }
+        },
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "connectionId": "gowz63",
+          "httpMethod": "GET",
+          "uri": "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/accounts-transactions/swagger-ui/index.html",
+          "responses": {
+            "default": {
+              "statusCode": "200"
+            }
+          },
+          "passthroughBehavior": "when_no_match",
+          "connectionType": "VPC_LINK"
         }
       }
     },
     "/swagger-ui/{proxy+}": {
-      "x-amazon-apigateway-any-method" : {
-        "parameters" : [ {
-          "name" : "proxy",
-          "in" : "path",
-          "required" : false,
-          "schema" : {
-            "type" : "string"
-          }
-        } ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "ANY",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/swagger-ui/{proxy}",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "requestParameters" : {
-            "integration.request.path.proxy" : "method.request.path.proxy"
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK",
-          "cacheNamespace" : "qypahi",
-          "cacheKeyParameters" : [ "method.request.path.proxy" ]
-        }
-      }
-    },
-
-    "/acqui/v1/initiate" : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [
-          {"guest-oauth-authorizer" : ["k811/wkc"]}
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/acqui/v1/initiate",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/acqui/v1/initiate",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-
-    "/acqui/v1/verify-aadhaar" : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [
-          {"guest-oauth-authorizer" : ["k811/wkc"]}
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/acqui/v1/verify-aadhaar",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/acqui/v1/verify-aadhaar",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-
-    "/acqui/v1/verify-aadhaar-otp" : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [
-          {"guest-oauth-authorizer" : ["k811/wkc"]}
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/acqui/v1/verify-aadhaar-otp",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/acqui/v1/verify-aadhaar-otp",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-
-    "/acqui/v1/get-details" : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [
-          {"guest-oauth-authorizer" : ["k811/wkc"]}
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/acqui/v1/get-details",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/acqui/v1/get-details",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-
-    "/tenant/v1/create" : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "api_key" : [ ]
-        }
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/tenant/v1/create",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-    "/tenant/v1/details" : {
-      "get" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "api_key" : [ ]
-        }
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "GET",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/tenant/v1/details",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-
-    "/kyc/v1/initiate" : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "api_key" : [ ]
-        }
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/kyc/v1/initiate",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/kyc/v1/initiate",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-    "/kyc/v1/details" : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "api_key" : [ ]
-        }
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/kyc/v1/details",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/kyc/v1/details",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-
-    "/vkyc/v1/initiate" : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "api_key" : [ ]
-        }
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/vkyc/v1/initiate",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/vkyc/v1/initiate",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-    "/vkyc/v2/initiate" : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "api_key" : [ ]
-        }
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/vkyc/v2/initiate",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/vkyc/v2/initiate",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-    "/vkyc/v1/status" : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "api_key" : [ ]
-        }
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/vkyc/v1/status",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/vkyc/v1/status",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-    "/vkyc/v1/wait" : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "api_key" : [ ]
-        }
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/vkyc/v1/wait",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/vkyc/v1/wait",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-
-    "/face-liveliness/v1/init" : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "api_key" : [ ]
-        }
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/face-liveliness/v1/init",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/face-liveliness/v1/init",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-    "/face-liveliness/v2/init" : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "api_key" : [ ]
-        }
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/face-liveliness/v2/init",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/face-liveliness/v2/init",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-    "/face-liveliness/v1/set-data" : {
-      "get" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "GET",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/face-liveliness/v1/set-data",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-    "/face-liveliness/v1/create-session" : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "headers": {
-              "Access-Control-Allow-Origin": {
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "Access-Control-Allow-Methods": {
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "Access-Control-Allow-Headers": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [
+      "x-amazon-apigateway-any-method": {
+        "parameters": [
           {
-            "guest-oauth-authorizer" : ["k811/wkc"]
+            "name": "proxy",
+            "in": "path",
+            "required": false,
+            "schema": {
+              "type": "string"
+            }
           }
         ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/face-liveliness/v1/create-session",
-          "responses" : {
-            "default": {
-              "statusCode": "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/face-liveliness/v1/create-session",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-    "/face-liveliness/v1/details" : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "headers": {
-              "Access-Control-Allow-Origin": {
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "Access-Control-Allow-Methods": {
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "Access-Control-Allow-Headers": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [
-          {
-            "guest-oauth-authorizer" : ["k811/wkc"]
-          }
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/face-liveliness/v1/details",
-          "responses" : {
-            "default": {
-              "statusCode": "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/face-liveliness/v1/details",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-    "/face-liveliness/v1/result" : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "headers": {
-              "Access-Control-Allow-Origin": {
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "Access-Control-Allow-Methods": {
-                "schema": {
-                  "type": "string"
-                }
-              },
-              "Access-Control-Allow-Headers": {
-                "schema": {
-                  "type": "string"
-                }
-              }
-            },
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [
-          {
-            "api_key" : [ ]
-          }
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/face-liveliness/v1/result",
-          "responses" : {
-            "default": {
-              "statusCode": "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-    "/face-liveliness/v1/face-match" : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "api_key" : [ ]
-        }
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/face-liveliness/v1/face-match",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/face-liveliness/v1/face-match",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-    "/face-liveliness/v1/get-session-data" : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [ {
-          "api_key" : [ ]
-        }
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/face-liveliness/v1/get-session-data",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/face-liveliness/v1/face-match",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-
-    "/ekyc/v1/initiate"  : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [
-          {
-            "811-onb-dev-custom-authorizer": []
-          },
-          {
-            "api_key": []
-          }
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/ekyc/v1/initiate",
-          "responses" : {
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "connectionId": "gowz63",
+          "httpMethod": "ANY",
+          "uri": "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/accounts-transactions/swagger-ui/{proxy}",
+          "responses": {
             "default": {
               "statusCode": "200"
             }
           },
           "requestParameters": {
-            "integration.request.header.x-user-crn": "context.authorizer.crn"
+            "integration.request.path.proxy": "method.request.path.proxy"
           },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/ekyc/v1/initiate",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
+          "passthroughBehavior": "when_no_match",
+          "connectionType": "VPC_LINK",
+          "cacheNamespace": "qypahi",
+          "cacheKeyParameters": [
+            "method.request.path.proxy"
+          ]
         }
       }
     },
-    "/ekyc/v1/start-ekyc"  : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
+    "/{proxy+}": {
+      "x-amazon-apigateway-any-method": {
+        "parameters": [
+          {
+            "name": "proxy",
+            "in": "path",
+            "required": false,
+            "schema": {
+              "type": "string"
             }
           }
-        },
-        "security" : [
-          {
-            "811-onb-dev-custom-authorizer": []
-          },
-          {
-            "api_key": []
-          }
         ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/ekyc/v1/start-ekyc",
-          "responses" : {
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "connectionId": "gowz63",
+          "httpMethod": "ANY",
+          "uri": "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/accounts-transactions/swagger-ui/{proxy}",
+          "responses": {
             "default": {
               "statusCode": "200"
             }
           },
           "requestParameters": {
-            "integration.request.header.x-user-crn": "context.authorizer.crn"
+            "integration.request.path.proxy": "method.request.path.proxy"
           },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/ekyc/v1/start-ekyc",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
+          "passthroughBehavior": "when_no_match",
+          "connectionType": "VPC_LINK",
+          "cacheNamespace": "qypahi",
+          "cacheKeyParameters": [
+            "method.request.path.proxy"
+          ]
         }
       }
     },
-    "/ekyc/v1/ekyc-status"  : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
+    "/v3/api-docs/swagger-config": {
+      "get": {
+        "responses": {
+          "200": {
+            "description": "200 response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Empty"
                 }
               }
             }
           }
         },
-        "security" : [
-          {
-            "811-onb-dev-custom-authorizer": []
-          },
-          {
-            "api_key": []
-          }
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/ekyc/v1/ekyc-status",
-          "responses" : {
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "connectionId": "gowz63",
+          "httpMethod": "GET",
+          "uri": "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/accounts-transactions/v3/api-docs/swagger-config",
+          "responses": {
             "default": {
               "statusCode": "200"
             }
           },
-          "requestParameters": {
-            "integration.request.header.x-user-crn": "context.authorizer.crn"
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/ekyc/v1/ekyc-status",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-    "/ekyc/v1/get-aotp-page-details"  : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [
-          {
-            "811-onb-dev-custom-authorizer": []
-          },
-          {
-            "api_key": []
-          }
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/ekyc/v1/get-aotp-page-details",
-          "responses" : {
-            "default": {
-              "statusCode": "200"
-            }
-          },
-          "requestParameters": {
-            "integration.request.header.x-user-crn": "context.authorizer.crn"
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/ekyc/v1/get-aotp-page-details",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-    "/ekyc/v1/get-aotp-languages"  : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [
-          {
-            "811-onb-dev-custom-authorizer": []
-          },
-          {
-            "api_key": []
-          }
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/ekyc/v1/get-aotp-languages",
-          "responses" : {
-            "default": {
-              "statusCode": "200"
-            }
-          },
-          "requestParameters": {
-            "integration.request.header.x-user-crn": "context.authorizer.crn"
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/ekyc/v1/get-aotp-languages",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-    "/ekyc/v1/get-aotp-consent"  : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [
-          {
-            "811-onb-dev-custom-authorizer": []
-          },
-          {
-            "api_key": []
-          }
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/ekyc/v1/get-aotp-consent",
-          "responses" : {
-            "default": {
-              "statusCode": "200"
-            }
-          },
-          "requestParameters": {
-            "integration.request.header.x-user-crn": "context.authorizer.crn"
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/ekyc/v1/get-aotp-consent",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-    "/ekyc/v1/generate-aotp"  : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [
-          {
-            "811-onb-dev-custom-authorizer": []
-          },
-          {
-            "api_key": []
-          }
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/ekyc/v1/generate-aotp",
-          "responses" : {
-            "default": {
-              "statusCode": "200"
-            }
-          },
-          "requestParameters": {
-            "integration.request.header.x-user-crn": "context.authorizer.crn"
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/ekyc/v1/generate-aotp",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-    "/ekyc/v1/validate-aotp"  : {
-      "post" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "security" : [
-          {
-            "811-onb-dev-custom-authorizer": []
-          },
-          {
-            "api_key": []
-          }
-        ],
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "POST",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/ekyc/v1/validate-aotp",
-          "responses" : {
-            "default": {
-              "statusCode": "200"
-            }
-          },
-          "requestParameters": {
-            "integration.request.header.x-user-crn": "context.authorizer.crn"
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      },
-      "options" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "OPTIONS",
-          "uri" : "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/ekyc/v1/validate-aotp",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
-        }
-      }
-    },
-    "/api-docs/swagger-config": {
-      "get" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
-                }
-              }
-            }
-          }
-        },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "GET",
-          "uri": "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/v3/api-docs/swagger-config",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
-            }
-          },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
+          "passthroughBehavior": "when_no_match",
+          "connectionType": "VPC_LINK"
         }
       }
     },
     "/v3/api-docs": {
-      "get" : {
-        "responses" : {
-          "200" : {
-            "description" : "200 response",
-            "content" : {
-              "application/json" : {
-                "schema" : {
-                  "$ref" : "#/components/schemas/Empty"
+      "get": {
+        "responses": {
+          "200": {
+            "description": "200 response",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Empty"
                 }
               }
             }
           }
         },
-        "x-amazon-apigateway-integration" : {
-          "type" : "http_proxy",
-          "connectionId" : "gowz63",
-          "httpMethod" : "GET",
-          "uri": "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/vplus/v3/api-docs",
-          "responses" : {
-            "default" : {
-              "statusCode" : "200"
+        "x-amazon-apigateway-integration": {
+          "type": "http_proxy",
+          "connectionId": "gowz63",
+          "httpMethod": "GET",
+          "uri": "http://811-verify-number-api-nlb-92b3671fa326fb41.elb.ap-south-1.amazonaws.com/accounts-transactions/v3/api-docs",
+          "responses": {
+            "default": {
+              "statusCode": "200"
             }
           },
-          "passthroughBehavior" : "when_no_match",
-          "connectionType" : "VPC_LINK"
+          "passthroughBehavior": "when_no_match",
+          "connectionType": "VPC_LINK"
         }
       }
     }
   },
-  "components" : {
-
-    "schemas" : {
-      "Empty" : {
-        "title" : "Empty Schema",
-        "type" : "object"
-      },
-      "SwitchNotification" : {
-        "title" : "Generated schema for Root",
-        "required" : [ "type" ],
-        "type" : "object",
-        "properties" : {
-          "type" : {
-            "type" : "string"
-          }
-        }
-      },
-      "FRMAlert" : {
-        "title" : "Schema for FRM Case Management Webhook Alert",
-        "type": "object",
-        "properties": {
-          "input_data": { "type": "object" }
-        },
-        "required": ["input_data"]
+  "components": {
+    "schemas": {
+      "Empty": {
+        "title": "Empty Schema",
+        "type": "object"
       }
     },
-    "securitySchemes" : {
-      "api_key" : {
-        "type" : "apiKey",
-        "name" : "x-api-key",
-        "in" : "header"
+    "securitySchemes": {
+      "api_key": {
+        "type": "apiKey",
+        "name": "x-api-key",
+        "in": "header"
       },
       "811-onb-dev-custom-authorizer": {
         "type": "apiKey",
@@ -1898,60 +278,40 @@
           "identitySource": "method.request.header.Authorization",
           "identityValidationExpression": "^(Bearer )[a-zA-Z0-9\\-_]+?\\.[a-zA-Z0-9\\-_]+?\\.([a-zA-Z0-9\\-_]+)$"
         }
-      },
-      "guest-oauth-authorizer" : {
-        "type" : "apiKey",
-        "name" : "Authorization",
-        "in" : "header",
-        "x-amazon-apigateway-authtype" : "cognito_user_pools",
-        "x-amazon-apigateway-authorizer" : {
-          "type" : "cognito_user_pools",
-          "providerARNs" : [ "arn:aws:cognito-idp:ap-south-1:483584640083:userpool/ap-south-1_GrG6NGFyW" ]
-        }
       }
     }
   },
-  "x-amazon-apigateway-request-validators" : {
-    "validate_switch_collect_request" : {
-      "validateRequestParameters" : false,
-      "validateRequestBody" : true
-    },
-    "validate_frm_alert_request" : {
-      "validateRequestParameters" : false,
-      "validateRequestBody" : true
-    }
-  },
-  "x-amazon-apigateway-gateway-responses" : {
+  "x-amazon-apigateway-gateway-responses": {
     "DEFAULT_4XX": {
       "responseTemplates": {
         "application/json": "{\"message\":\"4xx error\"}"
       }
     },
-    "INVALID_API_KEY" : {
-      "statusCode" : 403,
-      "responseTemplates" : {
-        "application/json" : "{\"detail\":$context.error.messageString, \"http_status_code\": 403, \"k811_error_code\": \"K81139996\"}"
+    "INVALID_API_KEY": {
+      "statusCode": 403,
+      "responseTemplates": {
+        "application/json": "{\"detail\":$context.error.messageString, \"http_status_code\": 403, \"k811_error_code\": \"K81139996\"}"
       }
     },
-    "UNAUTHORIZED" : {
-      "statusCode" : 401,
+    "UNAUTHORIZED": {
+      "statusCode": 401,
       "responseParameters": {
         "gatewayresponse.header.Access-Control-Allow-Origin": "'*'"
       },
-      "responseTemplates" : {
-        "application/json" : "{\"detail\":$context.error.messageString, \"http_status_code\": 401}"
+      "responseTemplates": {
+        "application/json": "{\"detail\":$context.error.messageString, \"http_status_code\": 401}"
       }
     }
   },
-  "x-amazon-apigateway-policy" : {
-    "Version" : "2012-10-17",
-    "Statement" : [ {
-      "Effect" : "Allow",
-      "Principal" : "*",
-      "Action" : "execute-api:Invoke",
-      "Resource" : "arn:aws:execute-api:ap-south-1:483584640083:xkayupzdk5/*"
-    } ]
-  },
-  "x-amazon-apigateway-binary-media-types" : [ "multipart/form-data" ]
-
+  "x-amazon-apigateway-policy": {
+    "Version": "2012-10-17",
+    "Statement": [
+      {
+        "Effect": "Allow",
+        "Principal": "*",
+        "Action": "execute-api:Invoke",
+        "Resource": "arn:aws:execute-api:ap-south-1:483584640083:nwzx47dly0/*"
+      }
+    ]
+  }
 }
