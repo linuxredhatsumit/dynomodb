@@ -1,25 +1,73 @@
-Drawbacks of LVM for /tmp
-
-Unnecessary overhead
-
-LVM introduces extra layers (Physical Volume → Volume Group → Logical Volume).
-
-More steps to configure, monitor, and maintain.
-
-Potential for fragmentation / wasted space
-
-If you dedicate a small LVM logical volume to /tmp and usage spikes, you might hit space issues.
-
-If you oversize it, you waste space.
-
-Recovery complexity
-
-Troubleshooting /tmp in single-user or rescue mode is simpler with a plain partition.
-
-With LVM, you may need to activate the volume group first (vgchange -ay), which complicates recovery.
-
-Cloud/VM environments don’t need it
-
-In AWS, Azure, GCP, or VMs, you can just attach a small EBS/disk and mount /tmp.
-
-LVM’s dynamic resizing benefits aren’t usually needed for /tmp.
+AccountName	Poc	Last use	UserName	Arn	AccessKeyCount	AccessKeyDetails	Access Key Age 1	Access Key Age 2	REVIEW COMMENTS	ACTION STATUS							
+KMBL-811-PROD	dishant	None, 13 days ago	zeebe-s3-backup-user - 	arn:aws:iam::718378052708:user/zeebe-s3-backup-user	2	AKIA2OQVLFRSHVDEHLWR (Active, 169 days old), AKIA2OQVLFRSBV42H3OI (Active, 169 days old)	169	169	TWO ACCESS KEY - ROTATE ONE KEY & DEACTIVATE SECOND KEY	ACCESS KEY NOT YET ROTATED & NOT YET DEACTIAVTED							
+KMBL-811-PROD	Ranjan Sharma	7 minutes ago	tata-smartflo-811-occ-desk	arn:aws:iam::718378052708:user/tata-smartflo-811-occ-desk	1	AKIA2OQVLFRSKVOLU764 (Active, 234 days old)	234		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Pranjal Gupta	49 minutes ago	super-user-clevertap-notifications-s3-access-user	arn:aws:iam::718378052708:user/super-user-clevertap-notifications-s3-access-user	1	AKIA2OQVLFRSHMXGWSWX (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	dishant	1 hour ago	811-devops-user	arn:aws:iam::483584640083:user/811-devops-user	1	AKIAXBF7EARJRPBQLMF6 (Active, 291 days old)	291		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	cloudxsupport.com	9 minutes ago	Splunk-KMBL-811-PROD-CLI	arn:aws:iam::718378052708:user/Splunk-KMBL-811-PROD-CLI	1	AKIA2OQVLFRSIFHUNV5W (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	varun 	5 minutes ago	ses-smtp-user-mwaa	arn:aws:iam::718378052708:user/ses-smtp-user-mwaa	1	AKIA2OQVLFRSH5SXECUC (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Ashutosh	1 hour ago	k811-onb-prod-switch-over-user	arn:aws:iam::718378052708:user/k811-onb-prod-switch-over-user	1	AKIA2OQVLFRSFF7MFXMF (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Manish	6 minutes ago	sentry-smtp-ses-prod-user	arn:aws:iam::718378052708:user/sentry-smtp-ses-prod-user	1	AKIA2OQVLFRSDSIUIHS7 (Active, 118 days old)	118		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Abhishek garg	9 minutes ago	prod-811-credit-card	arn:aws:iam::718378052708:user/prod-811-credit-card	1	AKIA2OQVLFRSARAB6GFC (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	varun 	4 hours ago	moveit-kotak-811-cdp-peak-write-user	arn:aws:iam::718378052708:user/moveit-kotak-811-cdp-peak-write-user	1	AKIA2OQVLFRSCS4QTP6A (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Sidhartha Topcharla	13 hours ago	moveit-811-insurance-report-files-prod-user	arn:aws:iam::718378052708:user/moveit-811-insurance-report-files-prod-user	1	AKIA2OQVLFRSCVBBKBU2 (Active, 233 days old)	233		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Sidhartha Topcharla	146 days ago	ml-offline-feature-store-artifacts-s3-moveit-user	arn:aws:iam::718378052708:user/ml-offline-feature-store-artifacts-s3-moveit-user	1	AKIA2OQVLFRSBVIMLUOZ (Active, 182 days old)	182		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Dinesh Vakati	7 minutes ago	kotak-811-sf-ro-info-prod-s3-bucket-access-user	arn:aws:iam::718378052708:user/kotak-811-sf-ro-info-prod-s3-bucket-access-user	1	AKIA2OQVLFRSAGZS5MG2 (Active, 212 days old)	212		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Dinesh Vakati	None	kotak-811-liveliness-check-prod-s3-bucket-access-user	arn:aws:iam::718378052708:user/kotak-811-liveliness-check-prod-s3-bucket-access-user	1	AKIA2OQVLFRSCRZVTC5D (Active, 212 days old)	212		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Ravikumar Maurya	16 minutes ago	kotak-811-cdp-airflow-dsg-write-s3-moveit-user	arn:aws:iam::718378052708:user/kotak-811-cdp-airflow-dsg-write-s3-moveit-user	1	AKIA2OQVLFRSEXEKIDN6 (Active, 69 days old)	69		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Ashutosh pandey	174 days ago	k811-onb-prod-switch-over-dr-user	arn:aws:iam::718378052708:user/k811-onb-prod-switch-over-dr-user	1	AKIA2OQVLFRSHDLUWGT5 (Active, 170 days old)	170		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	vinayak.phulari@kotak.com	14 minutes ago	k811-indus-files-s3-bucket-read-access-user	arn:aws:iam::718378052708:user/k811-indus-files-s3-bucket-read-access-user	1	AKIA2OQVLFRSBTBF5Y6I (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	vinayak.phulari@kotak.com	8 days ago	k811-indus-file-failed-report-s3-bucket-access-user	arn:aws:iam::718378052708:user/k811-indus-file-failed-report-s3-bucket-access-user	1	AKIA2OQVLFRSLD644MQD (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	varun 	12 hours ago	cdp-user	arn:aws:iam::718378052708:user/cdp-user	1	AKIA2OQVLFRSCV2JEIBP (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Naryan kejriwal	188 days ago	cc-emi-prod-user	arn:aws:iam::718378052708:user/cc-emi-prod-user	1	AKIA2OQVLFRSM24KXZLC (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	not in use	None	811-vkyc-verified-plus-prod	arn:aws:iam::718378052708:user/811-vkyc-verified-plus-prod	1	AKIA2OQVLFRSNPQQJI4D (Active, 231 days old)	231		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	dishant	2 days ago	811-devops-user	arn:aws:iam::718378052708:user/811-devops-user	1	AKIA2OQVLFRSKFXQCZ4G (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Sudhanshu Bhardwaj	71 days ago	811-cdp-peak-write-moveit-user	arn:aws:iam::718378052708:user/811-cdp-peak-write-moveit-user	1	AKIA2OQVLFRSCMCZ5A3Q (Active, 140 days old)	140		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	dishant	none, 11 hours ago	zeebe-s3-backup-user	arn:aws:iam::483584640083:user/zeebe-s3-backup-user	2	AKIAXBF7EARJSBKDRAFP (Active, 203 days old), AKIAXBF7EARJXJCVYYGO (Active, 203 days old)	203	203	TWO ACCESS KEY - ROTATE ONE KEY & DEACTIVATE SECOND KEY	ACCESS KEY NOT YET ROTATED & NOT YET DEACTIAVTED							
+KMBL-811-NONPROD	Sai Kadiyala	17 minutes ago	super-moveit-s3-iam-user	arn:aws:iam::483584640083:user/super-moveit-s3-iam-user	1	AKIAXBF7EARJTMI2J2GP (Active, 291 days old)	291		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	varun 	2 hours ago	ses-smtp-user.20240507-145527	arn:aws:iam::483584640083:user/ses-smtp-user.20240507-145527	1	AKIAXBF7EARJ6XUFLAII (Active, 191 days old)	191		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	Manish	4 minutes ago	sentry-smtp-ses-non-prod-user	arn:aws:iam::483584640083:user/sentry-smtp-ses-non-prod-user	1	AKIAXBF7EARJUFIKVCMY (Active, 118 days old)	118		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	krishna Banala	20 hours ago	sales-force-iam-user-to-access-s3	arn:aws:iam::483584640083:user/sales-force-iam-user-to-access-s3	1	AKIAXBF7EARJ4RMIOXZT (Active, 276 days old)	276		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	dishant	None	recognition-access-dev	arn:aws:iam::483584640083:user/recognition-access-dev	1	AKIAXBF7EARJZTMLU5NQ (Active, 291 days old)	291		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	Ashutosh pandey	14 minutes ago	k811-onb-uat-switch-over-user	arn:aws:iam::483584640083:user/k811-onb-uat-switch-over-user	1	AKIAXBF7EARJ6EGM6D2A (Active, 291 days old)	291		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	Ashutosh pandey	12 minutes ago	k811-onb-dev-switch-over-user	arn:aws:iam::483584640083:user/k811-onb-dev-switch-over-user	1	AKIAXBF7EARJUUDI5EWT (Active, 291 days old)	291		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	dishant	34 days ago	k811-crossell-appconfig-user	arn:aws:iam::483584640083:user/k811-crossell-appconfig-user	1	AKIAXBF7EARJVSVRJAEL (Active, 291 days old)	291		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	varun 	2 hours ago	dc-charging-consumer-moveit-s3-iam-user	arn:aws:iam::483584640083:user/dc-charging-consumer-moveit-s3-iam-user	1	AKIAXBF7EARJUSJXWY4D (Active, 182 days old)	182		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	Ashutosh	174 days ago	811-onb-uat-dr-switch-over-user	arn:aws:iam::483584640083:user/811-onb-uat-dr-switch-over-user	1	AKIAXBF7EARJUH572GUK (Active, 182 days old)	182		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	varun 	6 days ago	811-cdp-peak-write-dev-moveit-user	arn:aws:iam::483584640083:user/811-cdp-peak-write-dev-moveit-user	1	AKIAXBF7EARJU3F2RQOU (Active, 147 days old)	147		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	Ashutosh	143 days ago	811-bre-s3-fetch-trigger-uat-moveit-user	arn:aws:iam::483584640083:user/811-bre-s3-fetch-trigger-uat-moveit-user	1	AKIAXBF7EARJ4UL3XPE7 (Active, 182 days old)	182		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							AccountName	Poc	Last use	UserName	Arn	AccessKeyCount	AccessKeyDetails	Access Key Age 1	Access Key Age 2	REVIEW COMMENTS	ACTION STATUS							
+KMBL-811-PROD	dishant	None, 13 days ago	zeebe-s3-backup-user - 	arn:aws:iam::718378052708:user/zeebe-s3-backup-user	2	AKIA2OQVLFRSHVDEHLWR (Active, 169 days old), AKIA2OQVLFRSBV42H3OI (Active, 169 days old)	169	169	TWO ACCESS KEY - ROTATE ONE KEY & DEACTIVATE SECOND KEY	ACCESS KEY NOT YET ROTATED & NOT YET DEACTIAVTED							
+KMBL-811-PROD	Ranjan Sharma	7 minutes ago	tata-smartflo-811-occ-desk	arn:aws:iam::718378052708:user/tata-smartflo-811-occ-desk	1	AKIA2OQVLFRSKVOLU764 (Active, 234 days old)	234		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Pranjal Gupta	49 minutes ago	super-user-clevertap-notifications-s3-access-user	arn:aws:iam::718378052708:user/super-user-clevertap-notifications-s3-access-user	1	AKIA2OQVLFRSHMXGWSWX (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	dishant	1 hour ago	811-devops-user	arn:aws:iam::483584640083:user/811-devops-user	1	AKIAXBF7EARJRPBQLMF6 (Active, 291 days old)	291		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	cloudxsupport.com	9 minutes ago	Splunk-KMBL-811-PROD-CLI	arn:aws:iam::718378052708:user/Splunk-KMBL-811-PROD-CLI	1	AKIA2OQVLFRSIFHUNV5W (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	varun 	5 minutes ago	ses-smtp-user-mwaa	arn:aws:iam::718378052708:user/ses-smtp-user-mwaa	1	AKIA2OQVLFRSH5SXECUC (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Ashutosh	1 hour ago	k811-onb-prod-switch-over-user	arn:aws:iam::718378052708:user/k811-onb-prod-switch-over-user	1	AKIA2OQVLFRSFF7MFXMF (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Manish	6 minutes ago	sentry-smtp-ses-prod-user	arn:aws:iam::718378052708:user/sentry-smtp-ses-prod-user	1	AKIA2OQVLFRSDSIUIHS7 (Active, 118 days old)	118		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Abhishek garg	9 minutes ago	prod-811-credit-card	arn:aws:iam::718378052708:user/prod-811-credit-card	1	AKIA2OQVLFRSARAB6GFC (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	varun 	4 hours ago	moveit-kotak-811-cdp-peak-write-user	arn:aws:iam::718378052708:user/moveit-kotak-811-cdp-peak-write-user	1	AKIA2OQVLFRSCS4QTP6A (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Sidhartha Topcharla	13 hours ago	moveit-811-insurance-report-files-prod-user	arn:aws:iam::718378052708:user/moveit-811-insurance-report-files-prod-user	1	AKIA2OQVLFRSCVBBKBU2 (Active, 233 days old)	233		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Sidhartha Topcharla	146 days ago	ml-offline-feature-store-artifacts-s3-moveit-user	arn:aws:iam::718378052708:user/ml-offline-feature-store-artifacts-s3-moveit-user	1	AKIA2OQVLFRSBVIMLUOZ (Active, 182 days old)	182		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Dinesh Vakati	7 minutes ago	kotak-811-sf-ro-info-prod-s3-bucket-access-user	arn:aws:iam::718378052708:user/kotak-811-sf-ro-info-prod-s3-bucket-access-user	1	AKIA2OQVLFRSAGZS5MG2 (Active, 212 days old)	212		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Dinesh Vakati	None	kotak-811-liveliness-check-prod-s3-bucket-access-user	arn:aws:iam::718378052708:user/kotak-811-liveliness-check-prod-s3-bucket-access-user	1	AKIA2OQVLFRSCRZVTC5D (Active, 212 days old)	212		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Ravikumar Maurya	16 minutes ago	kotak-811-cdp-airflow-dsg-write-s3-moveit-user	arn:aws:iam::718378052708:user/kotak-811-cdp-airflow-dsg-write-s3-moveit-user	1	AKIA2OQVLFRSEXEKIDN6 (Active, 69 days old)	69		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Ashutosh pandey	174 days ago	k811-onb-prod-switch-over-dr-user	arn:aws:iam::718378052708:user/k811-onb-prod-switch-over-dr-user	1	AKIA2OQVLFRSHDLUWGT5 (Active, 170 days old)	170		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	vinayak.phulari@kotak.com	14 minutes ago	k811-indus-files-s3-bucket-read-access-user	arn:aws:iam::718378052708:user/k811-indus-files-s3-bucket-read-access-user	1	AKIA2OQVLFRSBTBF5Y6I (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	vinayak.phulari@kotak.com	8 days ago	k811-indus-file-failed-report-s3-bucket-access-user	arn:aws:iam::718378052708:user/k811-indus-file-failed-report-s3-bucket-access-user	1	AKIA2OQVLFRSLD644MQD (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	varun 	12 hours ago	cdp-user	arn:aws:iam::718378052708:user/cdp-user	1	AKIA2OQVLFRSCV2JEIBP (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Naryan kejriwal	188 days ago	cc-emi-prod-user	arn:aws:iam::718378052708:user/cc-emi-prod-user	1	AKIA2OQVLFRSM24KXZLC (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	not in use	None	811-vkyc-verified-plus-prod	arn:aws:iam::718378052708:user/811-vkyc-verified-plus-prod	1	AKIA2OQVLFRSNPQQJI4D (Active, 231 days old)	231		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	dishant	2 days ago	811-devops-user	arn:aws:iam::718378052708:user/811-devops-user	1	AKIA2OQVLFRSKFXQCZ4G (Active, 283 days old)	283		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-PROD	Sudhanshu Bhardwaj	71 days ago	811-cdp-peak-write-moveit-user	arn:aws:iam::718378052708:user/811-cdp-peak-write-moveit-user	1	AKIA2OQVLFRSCMCZ5A3Q (Active, 140 days old)	140		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	dishant	none, 11 hours ago	zeebe-s3-backup-user	arn:aws:iam::483584640083:user/zeebe-s3-backup-user	2	AKIAXBF7EARJSBKDRAFP (Active, 203 days old), AKIAXBF7EARJXJCVYYGO (Active, 203 days old)	203	203	TWO ACCESS KEY - ROTATE ONE KEY & DEACTIVATE SECOND KEY	ACCESS KEY NOT YET ROTATED & NOT YET DEACTIAVTED							
+KMBL-811-NONPROD	Sai Kadiyala	17 minutes ago	super-moveit-s3-iam-user	arn:aws:iam::483584640083:user/super-moveit-s3-iam-user	1	AKIAXBF7EARJTMI2J2GP (Active, 291 days old)	291		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	varun 	2 hours ago	ses-smtp-user.20240507-145527	arn:aws:iam::483584640083:user/ses-smtp-user.20240507-145527	1	AKIAXBF7EARJ6XUFLAII (Active, 191 days old)	191		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	Manish	4 minutes ago	sentry-smtp-ses-non-prod-user	arn:aws:iam::483584640083:user/sentry-smtp-ses-non-prod-user	1	AKIAXBF7EARJUFIKVCMY (Active, 118 days old)	118		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	krishna Banala	20 hours ago	sales-force-iam-user-to-access-s3	arn:aws:iam::483584640083:user/sales-force-iam-user-to-access-s3	1	AKIAXBF7EARJ4RMIOXZT (Active, 276 days old)	276		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	dishant	None	recognition-access-dev	arn:aws:iam::483584640083:user/recognition-access-dev	1	AKIAXBF7EARJZTMLU5NQ (Active, 291 days old)	291		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	Ashutosh pandey	14 minutes ago	k811-onb-uat-switch-over-user	arn:aws:iam::483584640083:user/k811-onb-uat-switch-over-user	1	AKIAXBF7EARJ6EGM6D2A (Active, 291 days old)	291		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	Ashutosh pandey	12 minutes ago	k811-onb-dev-switch-over-user	arn:aws:iam::483584640083:user/k811-onb-dev-switch-over-user	1	AKIAXBF7EARJUUDI5EWT (Active, 291 days old)	291		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	dishant	34 days ago	k811-crossell-appconfig-user	arn:aws:iam::483584640083:user/k811-crossell-appconfig-user	1	AKIAXBF7EARJVSVRJAEL (Active, 291 days old)	291		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	varun 	2 hours ago	dc-charging-consumer-moveit-s3-iam-user	arn:aws:iam::483584640083:user/dc-charging-consumer-moveit-s3-iam-user	1	AKIAXBF7EARJUSJXWY4D (Active, 182 days old)	182		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	Ashutosh	174 days ago	811-onb-uat-dr-switch-over-user	arn:aws:iam::483584640083:user/811-onb-uat-dr-switch-over-user	1	AKIAXBF7EARJUH572GUK (Active, 182 days old)	182		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	varun 	6 days ago	811-cdp-peak-write-dev-moveit-user	arn:aws:iam::483584640083:user/811-cdp-peak-write-dev-moveit-user	1	AKIAXBF7EARJU3F2RQOU (Active, 147 days old)	147		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
+KMBL-811-NONPROD	Ashutosh	143 days ago	811-bre-s3-fetch-trigger-uat-moveit-user	arn:aws:iam::483584640083:user/811-bre-s3-fetch-trigger-uat-moveit-user	1	AKIAXBF7EARJ4UL3XPE7 (Active, 182 days old)	182		ONE ACCESS KEY - ROTATE THE KEY	ACCESS KEY NOT YET ROTATED							
