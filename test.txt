@@ -1,22 +1,5 @@
-Subject: Action Required – AWS Access Key Rotation
+Update Complete. ⎈Happy Helming!⎈
+Error from server (AlreadyExists): namespaces "coralogix" already exists
+helm upgrade --install prod-k811-coralogix-k811-cloudacqui-prod-eks   prod-k811-coralogix-k811-cloudacqui-prod-eks/k811-coralogix   -f /home/app_user/workspace/Agent3/_work/202/s/helm-charts/k811-coralogix/charts/k811-cloudacqui-prod-eks.yaml   --namespace coralogix   --kubeconfig /home/app_user/.kube/config-prod-cluster
+Error: UPGRADE FAILED: failed to create resource: Internal error occurred: failed calling webhook "validate.externalsecret.external-secrets.io": failed to call webhook: Post "https://external-secrets-webhook.external-secrets.svc:443/validate-external-secrets-io-v1beta1-externalsecret?timeout=5s": Address is not allowed
 
-Dear <Name>,
-
-As part of our AWS security compliance, we have identified a few IAM access keys that are either unused or older than 90 days.
-To maintain security best practices, we need to rotate these keys.
-
-If you are aware of these keys, please confirm which ones are currently in use so I can share a new key with you for update and then deactivate the old one.
-If you are not aware of these keys, please help me identify who might be using them.
-
-Please respond at the earliest to avoid any service interruptions.
-
-
-
-
-As part of our AWS security compliance, we have identified that your IAM access key is older than 90 days.
-To maintain security best practices, we need to rotate this key.
-
-If you are aware of this key, please confirm so I can share a new key with you for update and then deactivate the old one.
-If you are not aware of this key, please help me identify who might be using it.
-
-Please respond at the earliest to avoid any service interruptions.
