@@ -1,4 +1,2 @@
-ka get svc -n external-secrets
-NAME                       TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
-external-secrets-webhook   ClusterIP   172.20.41.113   <none>        443/TCP   3y5d
- 
+kubectl get validatingwebhookconfigurations | grep external-secrets
+kubectl describe validatingwebhookconfiguration external-secrets-webhook
