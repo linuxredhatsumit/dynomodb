@@ -1,5 +1,4 @@
-Update Complete. ⎈Happy Helming!⎈
-Error from server (AlreadyExists): namespaces "coralogix" already exists
-helm upgrade --install prod-k811-coralogix-k811-cloudacqui-prod-eks   prod-k811-coralogix-k811-cloudacqui-prod-eks/k811-coralogix   -f /home/app_user/workspace/Agent3/_work/202/s/helm-charts/k811-coralogix/charts/k811-cloudacqui-prod-eks.yaml   --namespace coralogix   --kubeconfig /home/app_user/.kube/config-prod-cluster
-Error: UPGRADE FAILED: failed to create resource: Internal error occurred: failed calling webhook "validate.externalsecret.external-secrets.io": failed to call webhook: Post "https://external-secrets-webhook.external-secrets.svc:443/validate-external-secrets-io-v1beta1-externalsecret?timeout=5s": Address is not allowed
-
+ka get svc -n external-secrets
+NAME                       TYPE        CLUSTER-IP      EXTERNAL-IP   PORT(S)   AGE
+external-secrets-webhook   ClusterIP   172.20.41.113   <none>        443/TCP   3y5d
+ 
