@@ -1,2 +1,10 @@
-kubectl get validatingwebhookconfigurations | grep external-secrets
-kubectl describe validatingwebhookconfiguration external-secrets-webhook
+ka get validatingwebhookconfigurations | grep external-secrets
+app_user@ip-10-59-81-252:~$ ka get validatingwebhookconfigurations
+NAME                                       WEBHOOKS   AGE
+api-gateway-kong-api-gateway-validations   3          65d
+cert-manager-webhook                       1          434d
+externalsecret-validate                    1          19h
+secretstore-validate                       2          19h
+vpc-resource-validating-webhook            2          3y136d
+app_user@ip-10-59-81-252:~$ ka describe validatingwebhookconfiguration external-secrets-webhook
+Error from server (NotFound): validatingwebhookconfigurations.admissionregistration.k8s.io "external-secrets-webhook" not found
