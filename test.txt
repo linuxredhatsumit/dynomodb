@@ -9,3 +9,14 @@ If you are aware of these keys, please confirm which ones are currently in use s
 If you are not aware of these keys, please help me identify who might be using them.
 
 Please respond at the earliest to avoid any service interruptions.
+
+
+
+
+As part of our AWS security compliance, we have identified that your IAM access key is older than 90 days.
+To maintain security best practices, we need to rotate this key.
+
+If you are aware of this key, please confirm so I can share a new key with you for update and then deactivate the old one.
+If you are not aware of this key, please help me identify who might be using it.
+
+Please respond at the earliest to avoid any service interruptions.
