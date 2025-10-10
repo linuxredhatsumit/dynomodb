@@ -1,1 +1,5 @@
-db.CL_LEAD_DTLS.find({},{ _id: 0, crn: 1, customerName: 1, source : 1}).toArray() want to output the db json in output file
+mongosh "mongodb://username:password@crosssell-docdb-cluster-1.cluster-cdn1gogpw5fc.ap-south-1.docdb.amazonaws.com:27017/yourDatabaseName?tls=true&replicaSet=rs0" \
+  --sslCAFile global-bundle.pem \
+  --quiet \
+  --eval 'printjson(db.CL_LEAD_DTLS.find({}, { _id: 0, crn: 1, customerName: 1, source: 1 }).toArray())' > output.json
+  
