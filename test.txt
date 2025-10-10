@@ -1,1 +1,11 @@
+Subject: Action Required – AWS Access Key Rotation
 
+Dear <Name>,
+
+As part of our AWS security compliance, we have identified a few IAM access keys that are either unused or older than 90 days.
+To maintain security best practices, we need to rotate these keys.
+
+If you are aware of these keys, please confirm which ones are currently in use so I can share a new key with you for update and then deactivate the old one.
+If you are not aware of these keys, please help me identify who might be using them.
+
+Please respond at the earliest to avoid any service interruptions.
