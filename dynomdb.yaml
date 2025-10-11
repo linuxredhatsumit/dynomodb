@@ -32,6 +32,67 @@ stages:
                   echo "##vso[task.setvariable variable=SRC_IMAGE]$SRC_IMAGE"
                 displayName: remove special charaters for docker tag
 
+
+                pipeline--
+
+                trigger: none
+
+variables:
+  - group: Kotak-ECR-Credentials
+  - group: onb-811-services      
+  - name: ENV
+    value: dev-arm     
+#pool details
+  - name: POOL_NAME
+    value: 'K811-DevOps'
+# Docker details
+  - name: AWS_REGION
+    value: ap-south-1
+  - name: AWS_ACCOUNT_ID
+    value: '483584640083'
+# For AWS Role Access
+  - name: ROLE_NAME
+    value: EKS_Setup_Role
+# Dockerfile Path
+  - name: DOCKERFILE_PATH
+    value: Dockerfile
+# helm related variables
+  - name: HELM_CHARTS_PATH
+    value: helm-charts/k811-istio-proxy/charts
+  - name: HELM_S3BUCKET_URL
+    value: s3://kotak811-helmcharts/dev/k811-istio-proxy/
+  - name: KUBE_CONFIG_PATH
+    value: /home/app_user/.kube/config-dev-arm
+  - name: NAMESPACE
+    value: dev
+
+parameters:
+  - name: service
+    displayName: 'Custom Istio Proxy'
+    type: string
+    default: 'k811-istio-proxy'
+    values:
+      - k811-istio-proxy
+  - name: BRANCH_NAME
+    displayName: BRANCH_NAME
+    type: string
+    default: development
+
+pool:
+  name: $(POOL_NAME)
+
+stages:          
+  - template: ../templates/dev/docker-build-istio.yaml
+    parameters:
+      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
+      service: '${{ parameters.service }}'           
+
+  - template: ../templates/dev/prisma-scan-istio.yaml
+    parameters: 
+      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
+      service: '${{ parameters.service }}'   
+
+
               - script: |
                   pwd
                   unset AWS_SESSION_TOKEN
