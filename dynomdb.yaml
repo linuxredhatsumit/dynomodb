@@ -1,87 +1,20 @@
-Login Succeeded
-#0 building with "default" instance using docker driver
+ARG PROXY_NAME=docker.io/istio-proxyv2:1.25.5
 
-#1 [internal] load build definition from Dockerfile
-#1 transferring dockerfile: 401B done
-#1 DONE 0.0s
+FROM golang:1.22.3-bookworm AS builder
 
-#2 [internal] load metadata for docker.io/library/golang:1.22.3-bookworm
-#2 DONE 0.3s
+WORKDIR /app
+COPY plugin/. .
 
-#3 [internal] load metadata for docker.io/library/istio-proxyv2:1.25.5
-#3 ERROR: pull access denied, repository does not exist or may require authorization: server message: insufficient_scope: authorization failed
-------
- > [internal] load metadata for docker.io/library/istio-proxyv2:1.25.5:
-------
-Dockerfile:16
---------------------
-  14 |     CMD ["tail","-f", "/dev/null"]
-  15 |     
-  16 | >>> FROM $PROXY_NAME
-  17 |     
-  18 |     COPY --from=builder --chmod=777 /app/simple.so /simple.so
---------------------
-ERROR: failed to solve: docker.io/istio-proxyv2:1.25.5: failed to resolve source metadata for docker.io/library/istio-proxyv2:1.25.5: pull access denied, repository does not exist or may require authorization: server message: insufficient_scope: authorization failed
+RUN go mod tidy
 
-##[error]Bash exited with code '1'.
-Finishing: Docker Build and Push
+ENV GOFLAGS=-buildvcs=false
 
+RUN go build -o simple.so -buildmode=c-shared .
 
-below pipleine
+CMD ["tail","-f", "/dev/null"]
 
-trigger: none
+FROM $PROXY_NAME
 
-variables:
-  - group: Kotak-ECR-Credentials
-  - group: onb-811-services      
-  - name: ENV
-    value: dev-arm     
-#pool details
-  - name: POOL_NAME
-    value: 'K811-DevOps'
-# Docker details
-  - name: AWS_REGION
-    value: ap-south-1
-  - name: AWS_ACCOUNT_ID
-    value: '483584640083'
-# For AWS Role Access
-  - name: ROLE_NAME
-    value: EKS_Setup_Role
-# Dockerfile Path
-  - name: DOCKERFILE_PATH
-    value: Dockerfile
-# helm related variables
-  - name: HELM_CHARTS_PATH
-    value: helm-charts/k811-istio-proxy/charts
-  - name: HELM_S3BUCKET_URL
-    value: s3://kotak811-helmcharts/dev/k811-istio-proxy/
-  - name: KUBE_CONFIG_PATH
-    value: /home/app_user/.kube/config-dev-arm
-  - name: NAMESPACE
-    value: dev
+COPY --from=builder --chmod=777 /app/simple.so /simple.so
 
-parameters:
-  - name: service
-    displayName: 'Custom Istio Proxy'
-    type: string
-    default: 'k811-istio-proxy'
-    values:
-      - k811-istio-proxy
-  - name: BRANCH_NAME
-    displayName: BRANCH_NAME
-    type: string
-    default: development
-
-pool:
-  name: $(POOL_NAME)
-
-stages:          
-  - template: ../templates/dev/docker-build-istio.yaml
-    parameters:
-      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
-      service: '${{ parameters.service }}'           
-
-  - template: ../templates/dev/prisma-scan-istio.yaml
-    parameters: 
-      BRANCH_NAME: '${{ parameters.BRANCH_NAME }}'
-      service: '${{ parameters.service }}'   
+ENTRYPOINT ["/usr/local/bin/pilot-agent"]
