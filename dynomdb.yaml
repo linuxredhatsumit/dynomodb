@@ -1,20 +1,49 @@
-ARG PROXY_NAME=docker.io/istio-proxyv2:1.25.5
 
-FROM golang:1.22.3-bookworm AS builder
 
-WORKDIR /app
-COPY plugin/. .
+below is docker-build-istio.yaml
 
-RUN go mod tidy
+stages:
+      - stage: DevDocker
+        jobs:
+          - job: Dev
+            timeoutInMinutes: 120
+            pool:
+              name: $(POOL_NAME)
+              # demands:
+              #   - agent.name -equals $(Agent_Name)
+            # variables:
+            #   Agent_Name: $[ stageDependencies.Dev.BuildAndDeploy.outputs['passOutput.AgentName'] ]
+            steps:
+              - checkout: self
+                clean: false
+              - script: |
+                  set -e;
+                  rm -rf $(${{ parameters.service }}_repository_name);
+                  git clone https://$(PAT)@kmbl-devops.visualstudio.com/Kotak%20811%20Onboarding%20App/_git/$(${{ parameters.service }}_repository_name) -b ${{ parameters.BRANCH_NAME }};
+                  echo "###################";
+                  echo "$(${{ parameters.service }}_repository_name) is using ${{ parameters.BRANCH_NAME }} branch";
+                displayName: Git Clone $(${{ parameters.service }}_repository_name) repository
 
-ENV GOFLAGS=-buildvcs=false
+              - script: |
+                  echo ${{ parameters.IMAGE_NAME }}
+                  IMAGE_NAME=`echo ${{ parameters.IMAGE_NAME }}`
+                  SRC_IMAGE=`echo $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_GOLDEN):${{ parameters.SRC_PROXY_IMAGE }}`
+                  echo "##vso[task.setvariable variable=IMAGE_NAME]$IMAGE_NAME"
+                  echo "##vso[task.setvariable variable=SRC_IMAGE]$SRC_IMAGE"
+                displayName: remove special charaters for docker tag
 
-RUN go build -o simple.so -buildmode=c-shared .
-
-CMD ["tail","-f", "/dev/null"]
-
-FROM $PROXY_NAME
-
-COPY --from=builder --chmod=777 /app/simple.so /simple.so
-
-ENTRYPOINT ["/usr/local/bin/pilot-agent"]
+              - script: |
+                  pwd
+                  unset AWS_SESSION_TOKEN
+                  unset AWS_SECRET_ACCESS_KEY
+                  unset AWS_ACCESS_KEY_ID
+                  CREDENTIALS=`aws sts assume-role --role-arn arn:aws:iam::$(AWS_ACCOUNT_ID):role/$(ROLE_NAME) --role-session-name $(Build.DefinitionName)-$(Build.BuildNumber)` 
+                  export AWS_SESSION_TOKEN=`echo $CREDENTIALS | jq -r '.Credentials.SessionToken'`
+                  export AWS_SECRET_ACCESS_KEY=`echo $CREDENTIALS | jq -r '.Credentials.SecretAccessKey'`
+                  export AWS_ACCESS_KEY_ID=`echo $CREDENTIALS | jq -r '.Credentials.AccessKeyId'`
+                  aws ecr get-login-password --region $(AWS_REGION) | docker login --username AWS --password-stdin $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com
+                  # docker buildx build --platform linux/amd64 -f $(DOCKERFILE_PATH) -t $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_FOLDER_NAME_DEV)/$(${{ parameters.service }}_ecr_dev):$(IMAGE_NAME) --push .
+                  docker build --network=host --build-arg PROXY_NAME=$SRC_IMAGE -f $(DOCKERFILE_PATH) -t $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_FOLDER_NAME_DEV)/$(${{ parameters.service }}_ecr_dev):$(IMAGE_NAME) . ${{parameters.buildArgs}}
+                  docker push $(AWS_ACCOUNT_ID).dkr.ecr.$(AWS_REGION).amazonaws.com/$(ECR_FOLDER_NAME_DEV)/$(${{ parameters.service }}_ecr_dev):$(IMAGE_NAME)
+                displayName: "Docker Build and Push"
+                workingDirectory: $(System.DefaultWorkingDirectory)/$(${{ parameters.service }}_repository_name)/
