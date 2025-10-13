@@ -1,18 +1,1 @@
-KMBL350986@KBMK24-00000929 ca-devops % git log master ..develop --oneline
-fatal: ambiguous argument '..develop': unknown revision or path not in the working tree.
-Use '--' to separate paths from revisions, like this:
-'git <command> [<revision>...] -- [<file>...]'
-KMBL350986@KBMK24-00000929 ca-devops % git log master..develop --oneline 
-fatal: ambiguous argument 'master..develop': unknown revision or path not in the working tree.
-Use '--' to separate paths from revisions, like this:
-'git <command> [<revision>...] -- [<file>...]'
-KMBL350986@KBMK24-00000929 ca-devops % git branch -r                       
-  origin/HEAD -> origin/master
-  origin/azure-pipelines
-  origin/develop
-  origin/development
-  origin/main
-  origin/master
-  origin/renovate/node-22.x
-  origin/task-master
-KMBL350986@KBMK24-00000929 ca-devops % 
+auth?csrf=dfaksdfsadf&isWeb=true&mobile=7009609167:1 Access to XMLHttpRequest at 'https://811apppurezento.kotak811.com/leads/v1/generate-otp?channel=811APP' from origin 'https://d27d7qmzcxnt5n.cloudfront.net' has been blocked by CORS policy: Response to preflight request doesn't pass access control check: It does not have HTTP ok status.
