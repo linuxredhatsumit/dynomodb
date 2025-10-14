@@ -1,6 +1,1 @@
-ka get deployment -n external-secrets
-NAME                               READY   UP-TO-DATE   AVAILABLE   AGE
-external-secrets                   1/1     1            1           3y5d
-external-secrets-cert-controller   1/1     1            1           19h
-external-secrets-webhook           1/1     1            1           3y5d
- 
+Error: UPGRADE FAILED: cannot patch "cloudacqui-super-externalsecret" with kind ExternalSecret: Internal error occurred: failed calling webhook "validate.externalsecret.external-secrets.io": failed to call webhook: Post "https://external-secrets-webhook.external-secrets.svc:443/validate-external-secrets-io-v1beta1-externalsecret?timeout=5s": Address is not allowed && cannot patch "cloudacqui-super-secretstore" with kind SecretStore: Internal error occurred: failed calling webhook "validate.secretstore.external-secrets.io": failed to call webhook: Post "https://external-secrets-webhook.external-secrets.svc:443/validate-external-secrets-io-v1beta1-secretstore?timeout=5s": Address is not allowed
