@@ -1,1 +1,10 @@
-66      	Wed Oct 15 00:21:52 2025	failed    	cloudacqui-super-1.20251015.2	1.20251015.2	Upgrade "prod-cloudacqui-super" failed: cannot patch "cloudacqui-super-externalsecret" with kind ExternalSecret: Internal error occurred: failed calling webhook "validate.externalsecret.external-secrets.io": failed to call webhook: Post "https://external-secrets-webhook.external-secrets.svc:443/validate-external-secrets-io-v1beta1-externalsecret?timeout=5s": Address is not allowed && cannot patch "cloudacqui-super-secretstore" with kind SecretStore: Internal error occurred: failed calling webhook "validate.secretstore.external-secrets.io": failed to call webhook: Post "https://external-secrets-webhook.external-secrets.svc:443/validate-external-secrets-io-v1beta1-secretstore?timeout=5s": Address is not allowed
+app_user@ip-10-59-81-252:~$ ka get externalsecret -A
+NAMESPACE    NAME                              STORE                          REFRESH INTERVAL   STATUS              READY
+acqui-ca     acquiminca-backend                secretstore-backend            1m                 SecretSynced        True
+acqui-ca     secret-backend                    secretstore-backend            15m                SecretSynced        True
+acqui        acquimin-backend                  secretstore-backend            1m                 SecretSyncedError   False
+acqui        mantis-backend                    secretstore-backend            1m                 SecretSynced        True
+acqui        secret-backend                    secretstore-backend            30s                SecretSynced        True
+acqui        secret-directus                   directus                       15m                SecretSynced        True
+super-prod   cloudacqui-super-externalsecret   cloudacqui-super-secretstore   1m                 SecretSynced        True
+app_user@ip-10-59-81-252:~$ 
