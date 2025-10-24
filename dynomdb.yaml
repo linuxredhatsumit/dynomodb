@@ -1,25 +1,142 @@
-Dns reslovaliton to check if it’s public or internal
-DNS lookup
-https://mxtoolbox.com/SuperTool.aspx?action=a%3a811insurance.kotak811.com&run=toolpage
+Step-by-Step: DNS Resolution & Certificate Validation Process
+1️⃣ DNS Resolution Check
 
-If no recored than it’s internal
+Goal: Determine whether the domain is public or internal.
 
-If internal than check the ACM
+How to Check:
 
-Associated resources (5)  check the assinon
-Open the jira 
+Go to: https://mxtoolbox.com/SuperTool.aspx
 
-Create both csr
+Select DNS Lookup (A Record)
+Example:
 811insurance.kotak811.com
+
+Interpretation:
+
+✅ If you see a public IP or DNS record → It’s a Public Domain.
+
+❌ If there’s no DNS record found → It’s likely Internal / Private DNS.
+
+2️⃣ If the Domain is Internal
+Next Steps:
+
+Check the AWS Certificate Manager (ACM)
+
+Go to AWS Console → Certificate Manager (ACM)
+
+Look for certificates related to 811insurance.kotak811.com
+
+Review Associated Resources (generally you’ll see ~5 entries)
+
+Verify which services or load balancers are using the certificate.
+
+Check the “Assignment”
+
+Identify whether the certificate is attached to:
+
+ALB (Application Load Balancer)
+
+NLB (Network Load Balancer)
+
+CloudFront, or
+
+API Gateway
+
+Open a Jira Ticket
+
+Title: Certificate Renewal for Internal Domain
+
+Add details:
+
+Domain name(s)
+
+Environment (Dev/UAT/Prod)
+
+Expiration date
+
+Associated AWS resources
+
+Next action (CSR creation, renewal, or validation)
+
+Create both CSRs (Certificate Signing Requests):
+
+For internal domains:
+
+811insurance.kotak811.com
+
 811insurance.kotak811.bank.in
-Check with dev/tpm , who are need to notify for this.
+
+Use OpenSSL or ACM (depending on internal policy)
+
+Notify Dev / TPM Teams
+
+Check with development or TPM (Technical Project Manager) teams:
+
+Who needs to be informed?
+
+Who owns the service behind these domains?
+
+3️⃣ If the Domain is Public
+Next Steps:
+
+Check DNS Configuration
+
+Use MXToolbox or dig/nslookup:
+
+dig 811insurance.kotak811.com
 
 
-If it’s public 
-First check the dns
+Identify if DNS is managed by Cloudflare or another provider.
 
-First check in cloudflare to check which type of certificate, 
-Universal or custom
-If universal than cloudfralre will manage
-If custom than we have to manage(update the cerfitecate)
-Need to check 
+Check in Cloudflare Dashboard
+
+Login to Cloudflare
+
+Open the domain (kotak811.com)
+
+Go to SSL/TLS → Overview
+
+Identify Certificate Type:
+
+🔹 Universal SSL:
+
+Cloudflare automatically manages and renews the SSL certificate.
+
+No manual action needed.
+
+🔹 Custom SSL:
+
+You have uploaded a custom certificate manually.
+
+You must manage renewal manually:
+
+Check ACM or wherever cert was generated.
+
+Renew certificate before expiry.
+
+Re-upload updated certificate to Cloudflare.
+
+4️⃣ Summary of Actions
+Domain	DNS Type	Certificate Type	Next Action
+811insurance.kotak811.com	TBD	TBD	Check DNS, then ACM or Cloudflare
+811insurance.kotak811.bank.in	TBD	TBD	Same as above
+5️⃣ Communication Flow
+
+When in doubt:
+
+Check DNS first (public/internal)
+
+Check ACM (for internal)
+
+Check Cloudflare (for public)
+
+Notify Dev/TPM team
+
+Open Jira for tracking certificate renewal/update
+
+Create/renew CSRs as required
+
+Would you like me to prepare this as a PowerPoint slide deck (PPTX) or a PDF handout for your conference?
+I can format it neatly with your company context (Kotak811 / insurance service) and visuals for DNS & Cloudflare flow.
+
+ChatGPT can make mistakes. Check impo
