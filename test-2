@@ -1,14 +1,5 @@
-{
-  "Sid": "AllowAPIGatewayInvoke-verifyplus",
-  "Effect": "Allow",
-  "Principal": {
-    "Service": "apigateway.amazonaws.com"
-  },
-  "Action": "lambda:InvokeFunction",
-  "Resource": "arn:aws:lambda:ap-south-1:483584640083:function:API-to-Cognito-Lambda",
-  "Condition": {
-    "ArnLike": {
-      "AWS:SourceArn": "arn:aws:execute-api:ap-south-1:483584640083:xkayupzdk5/authorizers/khq4a1"
-    }
-  }
-}
+curl --location 'https://811appumami.uat.kotak811.com/vplus/biometric/v1/validate' \
+--header 'X-TENANT-ID: SALES160807' \
+--header 'Content-Type: application/json' \
+--header 'Accept: application/json' \
+--header 'Authorization: Bearer eyJraWQiOiJUR2w3N2NJOGdpMEt6eGl3VE93Y0dlNVVzVlZvYmxmdk1udTc2UmtRRWJZPSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiI2MzVkYXQ5bjFvaWxmaW01c2VvdXB2cTE3YiIsInRva2VuX3VzZSI6ImFjY2VzcyIsInNjb3BlIjoiazgxMVwvd2tjIiwiYXV0aF90aW1lIjoxNzYxMjg3MTE4LCJpc3MiOiJodHRwczpcL1wvY29nbm
