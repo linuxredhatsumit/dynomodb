@@ -1,10 +1,29 @@
-app_user@ip-10-59-81-252:~$ ka get externalsecret -A
-NAMESPACE    NAME                              STORE                          REFRESH INTERVAL   STATUS              READY
-acqui-ca     acquiminca-backend                secretstore-backend            1m                 SecretSynced        True
-acqui-ca     secret-backend                    secretstore-backend            15m                SecretSynced        True
-acqui        acquimin-backend                  secretstore-backend            1m                 SecretSyncedError   False
-acqui        mantis-backend                    secretstore-backend            1m                 SecretSynced        True
-acqui        secret-backend                    secretstore-backend            30s                SecretSynced        True
-acqui        secret-directus                   directus                       15m                SecretSynced        True
-super-prod   cloudacqui-super-externalsecret   cloudacqui-super-secretstore   1m                 SecretSynced        True
-app_user@ip-10-59-81-252:~$ 
+Please review the Subject: Cloudflare Blocking Large Request Payloads on UAT Environment
+
+Body:
+
+Hi Team,
+
+I’m facing an issue with the UAT endpoint:
+https://811appumami.uat.kotak811.com/vplus/biometric/v1/validate
+
+When I send small JSON payloads, the request works successfully.
+However, for larger payloads, Cloudflare returns a “Sorry, you have been blocked” error page.
+
+Could you please check if there’s a Cloudflare WAF rule or body size restriction causing this block?
+
+Details:
+
+Environment: UAT
+
+Endpoint: /vplus/biometric/v1/validate
+
+Cloudflare Ray ID (if available): [paste from the block page]
+
+Public IP: [your IP, e.g., 163.116.196.100]
+
+Approx. payload size: [e.g., 250 KB]
+
+Timestamp: [insert time/date with timezone]
+
+Please review the Cloudflare logs for this Ray ID to confirm if a request body or WAF rule is triggering the block. logs for this Ray ID to con
