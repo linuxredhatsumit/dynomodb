@@ -1,5 +1,67 @@
-curl --location 'https://811appumami.uat.kotak811.com/vplus/biometric/v1/validate' \
---header 'X-TENANT-ID: SALES160807' \
---header 'Content-Type: application/json' \
---header 'Accept: application/json' \
---header 'Authorization: Bearer eyJraWQiOiJUR2w3N2NJOGdpMEt6eGl3VE93Y0dlNVVzVlZvYmxmdk1udTc2UmtRRWJZPSIsImFsZyI6IlJTMjU2In0.eyJzdWIiOiI2MzVkYXQ5bjFvaWxmaW01c2VvdXB2cTE3YiIsInRva2VuX3VzZSI6ImFjY2VzcyIsInNjb3BlIjoiazgxMVwvd2tjIiwiYXV0aF90aW1lIjoxNzYxMjg3MTE4LCJpc3MiOiJodHRwczpcL1wvY29nbm
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  annotations:
+    meta.helm.sh/release-name: uat-k811-leads
+    meta.helm.sh/release-namespace: 811-uat
+  creationTimestamp: "2024-02-14T11:58:33Z"
+  generation: 1
+  labels:
+    app.kubernetes.io/managed-by: Helm
+  name: k811-leads
+  namespace: 811-uat
+  resourceVersion: "824567429"
+  uid: fbcc32cf-1800-4e43-81de-59d8672191ce
+spec:
+  gateways:
+  - gateway
+  hosts:
+  - '*'
+  http:
+  - match:
+    - uri:
+        prefix: /leads/v3/api-docs
+    route:
+    - destination:
+        host: k811-leads
+        port:
+          number: 8080
+      weight: 100
+  - match:
+    - uri:
+        prefix: /leads/swagger-ui
+    route:
+    - destination:
+        host: k811-leads
+        port:
+          number: 8080
+      weight: 100
+  - match:
+    - uri:
+        prefix: /leads/docs
+    route:
+    - destination:
+        host: k811-leads
+        port:
+          number: 8080
+      weight: 100
+  - match:
+    - uri:
+        prefix: /leads
+    route:
+    - destination:
+        host: k811-leads
+        port:
+          number: 8080
+      headers:
+        response:
+          add:
+            Cache-Control: no-store
+            Content-Security-Policy: default-src 'none'
+          remove:
+          - Server
+      weight: 100
+                                                                                                                                                                         67,17         Bot
+
+
+want to add 
