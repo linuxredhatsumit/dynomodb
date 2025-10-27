@@ -1,460 +1,116 @@
-Error: creating API Gateway Stage (motor-insurance-api-gw-stage): operation error API Gateway: CreateStage, https response error StatusCode: 400, RequestID: d5ed5c61-c6c7-4d3d-8f44-d8da8e8a846b, BadRequestException: Deployment id does not exist
-│ 
-│   with module.secondary_api_gateway[0].aws_api_gateway_stage.this[0],
-│   on .terraform/modules/secondary_api_gateway/modules/apigateway/main.tf line 81, in resource "aws_api_gateway_stage" "this":
-│   81: resource "aws_api_gateway_stage" "this" {
-
-below is code
-
-apigw.tf
-########################################
-# API Gateway Module for primary region
-########################################
-module "primary_api_gateway" {
-    count            = var.api_gateway_details != null ? 1 : 0
-    source           = "git::https://kmbl-devops@dev.azure.com/kmbl-devops/kotak811-devops-codebase/_git/k811-terraform-modules//modules/apigateway?ref=v1.0.0"
-    providers        = { aws = aws.primary }
-    name             = "k811-${var.k811_service_name}-internal-api-gw-${local.env}"
-    stage_name       = var.api_gateway_details["stage_name"]
-    endpoint_type    = "PRIVATE"
-    vpc_endpoint_ids = local.primary_vpc_endpoint
-    body = jsonencode({
-    openapi = "3.0.1"
-    info = {
-        title   = "initialdeployment"
-        version = "1.0"
-    }
-    paths = {
-        "/path1" = {
-        get = {
-            x-amazon-apigateway-integration = {
-            httpMethod           = "GET"
-            payloadFormatVersion = "1.0"
-            type                 = "HTTP_PROXY"
-            uri                  = "https://ip-ranges.amazonaws.com/ip-ranges.json"
-            }
-        }
-        }
-    }
-    })
-    endpoint_configuration = {
-    disable_execute_api_endpoint = true
-    types                        = "PRIVATE"
-    vpc_endpoint_ids             = local.primary_vpc_endpoint
-    }
-    context              = module.this.context
-    logging_level        = "INFO"
-    metrics_enabled      = false
-    xray_tracing_enabled = false
-    data_trace_enabled   = true
-    rest_api_policy      = <<EOF
-    {
-    "Version": "2012-10-17",
-    "Statement": [
-    {
-        "Effect": "Allow",
-        "Principal": {
-        "AWS": "*"
-        },
-        "Action": "execute-api:Invoke",
-        "Resource": "${module.primary_api_gateway[0].execution_arn}/*"
-    },
-        {
-            "Effect": "Deny",
-            "Principal": "*",
-            "Action": "execute-api:Invoke",
-            "Resource": [
-                "execute-api:/*"
-            ],
-            "Condition" : {
-                "StringNotEquals": {
-                    "aws:SourceVpce": "${local.primary_vpc_endpoint}"
-                }
-            }
-        }
-    ]
-    }
-    EOF
-    access_log_format = <<EOF
-    {
-    "requestTime": "$context.requestTime",
-    "requestId": "$context.requestId",
-    "httpMethod": "$context.httpMethod",
-    "path": "$context.path",
-    "resourcePath": "$context.resourcePath",
-    "status": $context.status,
-    "responseLatency": $context.responseLatency,
-    "xrayTraceId": "$context.xrayTraceId",
-    "integrationRequestId": "$context.integration.requestId",
-    "functionResponseStatus": "$context.integration.status",
-    "integrationLatency": "$context.integration.latency",
-    "integrationServiceStatus": "$context.integration.integrationStatus",
-    "authorizeResultStatus": "$context.authorize.status",
-    "authorizerServiceStatus": "$context.authorizer.status",
-    "authorizerLatency": "$context.authorizer.latency",
-    "authorizerRequestId": "$context.authorizer.requestId",
-    "ip": "$context.identity.sourceIp",
-    "userAgent": "$context.identity.userAgent",
-    "principalId": "$context.authorizer.principalId",
-    "cognitoUser": "$context.identity.cognitoIdentityId",
-    "user": "$context.identity.user"
-    }
-    EOF
-}
-
-##########################################
-# API Gateway Module for secondary region
-##########################################
-module "secondary_api_gateway" {
-    count            = var.api_gateway_details != null && var.create_in_secondary ? 1 : 0
-    source           = "git::https://kmbl-devops@dev.azure.com/kmbl-devops/kotak811-devops-codebase/_git/k811-terraform-modules//modules/apigateway?ref=v1.0.0"
-    providers        = { aws = aws.secondary }
-    name             = "k811-${var.k811_service_name}-internal-api-gw-${local.env}-dr"
-    stage_name       = var.api_gateway_details["stage_name"]
-    endpoint_type    = "PRIVATE"
-    vpc_endpoint_ids = local.secondary_vpc_endpoint
-    body = jsonencode({
-    openapi = "3.0.1"
-    info = {
-        title   = "initialdeployment"
-        version = "1.0"
-    }
-    paths = {
-        "/path1" = {
-        get = {
-            x-amazon-apigateway-integration = {
-            httpMethod           = "GET"
-            payloadFormatVersion = "1.0"
-            type                 = "HTTP_PROXY"
-            uri                  = "https://ip-ranges.amazonaws.com/ip-ranges.json"
-            }
-        }
-        }
-    }
-    })
-    endpoint_configuration = {
-    disable_execute_api_endpoint = true
-    types                        = "PRIVATE"
-    vpc_endpoint_ids             = local.secondary_vpc_endpoint
-    }
-    context              = module.this.context
-    logging_level        = "INFO"
-    metrics_enabled      = false
-    xray_tracing_enabled = false
-    data_trace_enabled   = true
-    rest_api_policy      = <<EOF
-    {
-    "Version": "2012-10-17",
-    "Statement": [
-    {
-        "Effect": "Allow",
-        "Principal": {
-        "AWS": "*"
-        },
-        "Action": "execute-api:Invoke",
-        "Resource": "${module.secondary_api_gateway[0].execution_arn}/*"
-    },
-        {
-            "Effect": "Deny",
-            "Principal": "*",
-            "Action": "execute-api:Invoke",
-            "Resource": [
-                "execute-api:/*"
-            ],
-            "Condition" : {
-                "StringNotEquals": {
-                    "aws:SourceVpce": "${local.secondary_vpc_endpoint}"
-                }
-            }
-        }
-    ]
-    }
-    EOF
-    access_log_format = <<EOF
-    {
-    "requestTime": "$context.requestTime",
-    "requestId": "$context.requestId",
-    "httpMethod": "$context.httpMethod",
-    "path": "$context.path",
-    "resourcePath": "$context.resourcePath",
-    "status": $context.status,
-    "responseLatency": $context.responseLatency,
-    "xrayTraceId": "$context.xrayTraceId",
-    "integrationRequestId": "$context.integration.requestId",
-    "functionResponseStatus": "$context.integration.status",
-    "integrationLatency": "$context.integration.latency",
-    "integrationServiceStatus": "$context.integration.integrationStatus",
-    "authorizeResultStatus": "$context.authorize.status",
-    "authorizerServiceStatus": "$context.authorizer.status",
-    "authorizerLatency": "$context.authorizer.latency",
-    "authorizerRequestId": "$context.authorizer.requestId",
-    "ip": "$context.identity.sourceIp",
-    "userAgent": "$context.identity.userAgent",
-    "principalId": "$context.authorizer.principalId",
-    "cognitoUser": "$context.identity.cognitoIdentityId",
-    "user": "$context.identity.user"
-    }
-    EOF
-}
-
-#####################################################
-# APIGW CUSTOM DOMAIN NAME Mapping for primary rgion
-#####################################################
-resource "aws_apigatewayv2_api_mapping" "primary_api_gw_mapping" {
-    for_each        = try(var.api_gateway_details["primary_custom_domains"], {}) 
-    provider        = aws.primary
-    api_id          = module.primary_api_gateway[0].id
-    domain_name     = each.value["name"]
-    stage           = var.api_gateway_details["stage_name"]
-    api_mapping_key = each.value["key"]
-    depends_on      = [ module.primary_api_gateway[0]]
-}
-
-########################################################
-# APIGW CUSTOM DOMAIN NAME Mapping for secondary region
-########################################################
-resource "aws_apigatewayv2_api_mapping" "secondary_api_gw_mapping" {
-    for_each        = try(var.api_gateway_details["secondary_custom_domains"], {})
-    provider        = aws.secondary
-    api_id          = module.secondary_api_gateway[0].id
-    domain_name     = each.value["name"]
-    stage           = var.api_gateway_details["stage_name"]
-    api_mapping_key = each.value["key"]
-    depends_on      = [ module.secondary_api_gateway[0]]
-}
-
-##########
-# API key
-##########
-resource "random_password" "api_key" {
-    count   = try(var.api_gateway_details["create_key_authorizer"], false) == true ? 1 : 0
-    length  = 25
-    special = false
-}
-
-#############################################################
-# APIGW Key based authorizer + Usage Plan for primary region
-#############################################################
-resource "aws_api_gateway_usage_plan" "primary_usage_plan" {
-    count    = try(var.api_gateway_details["create_key_authorizer"], false) == true ? 1 : 0
-    provider = aws.primary
-    name     = "k811-${var.k811_service_name}-usage-plan-${local.env}"
-    api_stages {
-        api_id = module.primary_api_gateway[0].id
-        stage  = var.api_gateway_details["stage_name"]
-    }
-    depends_on = [ module.primary_api_gateway[0] ]
-}
-
-resource "aws_api_gateway_api_key" "primary_api_key" {
-    count    = try(var.api_gateway_details["create_key_authorizer"], false) == true ? 1 : 0
-    provider = aws.primary
-    name     = "k811-${var.k811_service_name}-api-key-${local.env}"
-    value    = random_password.api_key[0].result
-    tags     = {
-        Name          = "k811-${var.k811_service_name}-api-key-${local.env}"
-        resource-name = "k811-${var.k811_service_name}-api-key-${local.env}"
-    }
-}
-
-resource "aws_api_gateway_usage_plan_key" "primary_usage_plan_api_key" {
-    count         = try(var.api_gateway_details["create_key_authorizer"], false) == true ? 1 : 0
-    provider      = aws.primary
-    key_id        = aws_api_gateway_api_key.primary_api_key[0].id
-    key_type      = "API_KEY"
-    usage_plan_id = aws_api_gateway_usage_plan.primary_usage_plan[0].id
-}
-###############################################################
-# APIGW Key based authorizer + Usage Plan for secondary region
-###############################################################
-resource "aws_api_gateway_usage_plan" "secondary_usage_plan" {
-    count    = try(var.api_gateway_details["create_key_authorizer"], false) && var.create_in_secondary == true ? 1 : 0
-    provider = aws.secondary
-    name     = "k811-${var.k811_service_name}-usage-plan-${local.env}"
-    api_stages {
-        api_id = module.secondary_api_gateway[0].id
-        stage  = var.api_gateway_details["stage_name"]
-    }
-    depends_on = [ module.secondary_api_gateway[0] ]
-}
-
-resource "aws_api_gateway_api_key" "secondary_api_key" {
-    count    = try(var.api_gateway_details["create_key_authorizer"], false) && var.create_in_secondary == true ? 1 : 0
-    provider = aws.secondary
-    name     = "k811-${var.k811_service_name}-api-key-${local.env}"
-    value    = random_password.api_key[0].result
-    tags     = {
-        Name          = "k811-${var.k811_service_name}-api-key-${local.env}"
-        resource-name = "k811-${var.k811_service_name}-api-key-${local.env}"
-    }
-}
-
-resource "aws_api_gateway_usage_plan_key" "secondary_usage_plan_key" {
-    count         = try(var.api_gateway_details["create_key_authorizer"], false) && var.create_in_secondary == true ? 1 : 0
-    provider      = aws.secondary
-    key_id        = aws_api_gateway_api_key.secondary_api_key[0].id
-    key_type      = "API_KEY"
-    usage_plan_id = aws_api_gateway_usage_plan.secondary_usage_plan[0].id
-}
-
-###########################################################################
-# Custom Authorizer + Trigger for Api to Cognito Lambda for primary region
-###########################################################################
-resource "aws_api_gateway_authorizer" "primary_custom_authorizer" {
-    count                            = try(var.api_gateway_details["create_custom_authorizer"], false) == true ? 1 : 0
-    provider                         = aws.primary
-    name                             = local.primary_custom_authorizer_name
-    rest_api_id                      = module.primary_api_gateway[0].id
-    type                             = "REQUEST"
-    identity_validation_expression   = "^(Bearer )[a-zA-Z0-9\\-_]+?\\.[a-zA-Z0-9\\-_]+?\\.([a-zA-Z0-9\\-_]+)$"
-    identity_source                  = "method.request.header.Authorization"
-    authorizer_uri                   = "arn:aws:apigateway:${local.primary_region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${local.primary_region}:${local.account_id}:function:${local.primary_custom_authorizer_lambda_name}/invocations"
-    authorizer_result_ttl_in_seconds = "60"
-}
-
-resource "aws_lambda_permission" "primary_lambda_permission" {
-    count         = try(var.api_gateway_details["create_custom_authorizer"], false) == true ? 1 : 0
-    provider      = aws.primary
-    action        = "lambda:InvokeFunction"
-    function_name = local.primary_custom_authorizer_lambda_name
-    principal     = "apigateway.amazonaws.com"
-    source_arn    = "${module.primary_api_gateway[0].execution_arn}/authorizers/${aws_api_gateway_authorizer.primary_custom_authorizer[count.index].id}"
-    depends_on    = [ aws_api_gateway_authorizer.primary_custom_authorizer[0] ]
-}
-
-#############################################################################
-# Custom Authorizer + Trigger for Api to Cognito Lambda for secondary region
-#############################################################################
-resource "aws_api_gateway_authorizer" "secondary_custom_authorizer" {
-    count                            = try(var.api_gateway_details["create_custom_authorizer"], false) && var.create_in_secondary == true ? 1 : 0
-    provider                         = aws.secondary
-    name                             = local.secondary_custom_authorizer_name
-    rest_api_id                      = module.secondary_api_gateway[0].id
-    type                             = "REQUEST"
-    identity_validation_expression   = "^(Bearer )[a-zA-Z0-9\\-_]+?\\.[a-zA-Z0-9\\-_]+?\\.([a-zA-Z0-9\\-_]+)$"
-    identity_source                  = "method.request.header.Authorization"
-    authorizer_uri                   = "arn:aws:apigateway:${local.secondary_region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${local.secondary_region}:${local.account_id}:function:${local.secondary_custom_authorizer_lambda_name}/invocations"
-    authorizer_result_ttl_in_seconds = "60"
-}
-
-resource "aws_lambda_permission" "secondary_lambda_permission" {
-    count         = try(var.api_gateway_details["create_custom_authorizer"], false) && var.create_in_secondary == true ? 1 : 0
-    provider      = aws.secondary
-    action        = "lambda:InvokeFunction"
-    function_name = local.secondary_custom_authorizer_lambda_name
-    principal     = "apigateway.amazonaws.com"
-    source_arn    = "${module.secondary_api_gateway[0].execution_arn}/authorizers/${aws_api_gateway_authorizer.secondary_custom_authorizer[count.index].id}"
-    depends_on    = [ aws_api_gateway_authorizer.secondary_custom_authorizer[0] ]
-}
-
-###############################################################################
-# SCC Custom Authorizer + Trigger for Api to Cognito Lambda for primary region
-###############################################################################
-resource "aws_api_gateway_authorizer" "primary_scc_custom_authorizer" {
-    count                            = try(var.api_gateway_details["create_scc_authorizer"], false) ? 1 : 0
-    provider                         = aws.primary
-    name                             = local.primary_custom_authorizer_name
-    rest_api_id                      = module.primary_api_gateway[0].id
-    type                             = "REQUEST"
-    identity_source                  = "method.request.header.Authorization"
-    authorizer_uri                   = "arn:aws:apigateway:${local.primary_region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${local.primary_region}:${local.account_id}:function:${local.primary_scc_authorizer_lambda_name}/invocations"
-    authorizer_result_ttl_in_seconds = "60"
-}
-resource "aws_lambda_permission" "primary_lambda_permission_scc" {
-    count         = try(var.api_gateway_details["create_scc_authorizer"], false) ? 1 : 0
-    provider      = aws.primary
-    action        = "lambda:InvokeFunction"
-    function_name = local.primary_scc_authorizer_lambda_name
-    principal     = "apigateway.amazonaws.com"
-    source_arn    = "${module.primary_api_gateway[0].execution_arn}/authorizers/${aws_api_gateway_authorizer.primary_scc_custom_authorizer[count.index].id}"
-    depends_on    = [ aws_api_gateway_authorizer.primary_scc_custom_authorizer[0] ]
-}
-
-#################################################################################
-# SCC Custom Authorizer + Trigger for Api to Cognito Lambda for secondary region
-#################################################################################
-resource "aws_api_gateway_authorizer" "secondary_scc_custom_authorizer" {
-    count                            = try(var.api_gateway_details["create_scc_authorizer"], false) && var.create_in_secondary == true ? 1 : 0
-    provider                         = aws.secondary
-    name                             = local.secondary_custom_authorizer_name
-    rest_api_id                      = module.secondary_api_gateway[0].id
-    type                             = "REQUEST"
-    identity_source                  = "method.request.header.Authorization"
-    authorizer_uri                   = "arn:aws:apigateway:${local.secondary_region}:lambda:path/2015-03-31/functions/arn:aws:lambda:${local.secondary_region}:${local.account_id}:function:${local.secondary_scc_authorizer_lambda_name}/invocations"
-    authorizer_result_ttl_in_seconds = "60"
-}
-resource "aws_lambda_permission" "secondary_lambda_permission_scc" {
-    count         = try(var.api_gateway_details["create_scc_authorizer"], false) && var.create_in_secondary == true ? 1 : 0
-    provider                         = aws.secondary
-    action        = "lambda:InvokeFunction"
-    function_name = local.secondary_scc_authorizer_lambda_name
-    principal     = "apigateway.amazonaws.com"
-    source_arn    = "${module.secondary_api_gateway[0].execution_arn}/authorizers/${aws_api_gateway_authorizer.secondary_scc_custom_authorizer[count.index].id}"
-    depends_on    = [ aws_api_gateway_authorizer.secondary_scc_custom_authorizer[0] ]
-}
+apiVersion: networking.istio.io/v1
+kind: VirtualService
+metadata:
+  annotations:
+    meta.helm.sh/release-name: uat-k811-cc-applications
+    meta.helm.sh/release-namespace: 811-uat
+  creationTimestamp: "2025-07-16T07:57:18Z"
+  generation: 7
+  labels:
+    app.kubernetes.io/managed-by: Helm
+  name: k811-cc-applications
+  namespace: 811-uat
+  resourceVersion: "1203139212"
+  uid: db7917c0-f3fe-4824-bfd5-95275024b0e5
+spec:
+  gateways:
+  - gateway
+  hosts:
+  - '*'
+  http:
+  - match:
+    - uri:
+        prefix: /cc-applications/docs
+    route:
+    - destination:
+        host: k811-cc-applications
+        port:
+          number: 8080
+      weight: 100
+  - match:
+    - uri:
+        prefix: /cc-applications/redoc
+    route:
+    - destination:
+        host: k811-cc-applications
+        port:
+          number: 8080
+      weight: 100
+  - corsPolicy:
+      allowOrigins:
+      - exact: https://scc.uat.kotak811.com
+      - exact: https://scc.uat.kota811.bank.in
+    match:
+    - uri:
+        prefix: /cc-applications
+    route:
+    - destination:
+        host: k811-cc-applications
+        port:
+          number: 8080
+      headers:
+        response:
+          add:
+            Access-Control-Allow-Headers: traceparent, tracestate
+            AllowedOrigins: kotak811.com, kotak811.bank.in
+            Cache-Control: no-cache, no-store, must-revalidate, max-age=0, post-check=0,
+              pre-check=0
+            Content-Security-Policy: default-src 'none';  script-src 'none';  connect-src
+              'self';  img-src 'self';  style-src 'self'; base-uri 'self';form-action
+              'self'
+      weight: 100
 
 
-terrform.tfvars
-k811_service_name      = "motor-insurance" // Poject Name to be deployed like ddlm, ksec, upi-payments etc
-ticket_id              = "DEVOPS-10164"    // JIRA ID
-created_date           = "10-24-2025"     // Date of creation exclusively in mm-dd-yyyy format
-application_manager    = "Ram Singh"
+how to correct so that it can add 
+  - corsPolicy:
+      allowOrigins:
+      - exact: https://scc.uat.kotak811.com
+      - exact: https://scc.uat.kota811.bank.in
 
-ecr_name               = "811prodonb/motor-insurance"
-primary_appconfig_id   = "jl0psfn"                     // Update with the app config id in secondary region for application created
-secondary_appconfig_id = "cy4warb"                    // Update with the app config id in secondary region for application created
-
-create_in_secondary = true                          // If set to true then creates in secondary region else defaults to false
-
-# sqs_details = {                                     // SQS to be created. Remove/ comment this attribute if not needed
-#     "motor-insurance-sqs1" = {
-#         name         = "motor-insurance-sqs-1"
-#     },
-#     "motor-insurance-sqs2" = {
-#         name         = "motor-insurance-sqs-2"
-#     }
-# }
-
-api_gateway_details = {                                          // API GW to be created. Remove/ comment this attribute if not needed
-    stage_name               = "motor-insurance-api-gw-stage"
-    # create_custom_authorizer = true                              // If true, then created custom authorizer
-    create_scc_authorizer    = true                              // If true, then created scc authorizer
-    # create_key_authorizer    = false                            // If true, then created api key based authorizer (Both primary and secondary will have same key value)
-    primary_custom_domains = {                                   // Custom domains to create in primary
-        domain1 = {
-            name = "811apppurezento.kotak811.com"
-            key  = "motor-insurance"
-        },
-        domain2 = {
-            name = "811onb.kotak811.com"
-            key  = "motor-insurance"
-        }
-    }
-    secondary_custom_domains = {                                 // Custom domains to create in secondary
-        domain1 = {
-            name = "811onb.kotak811.com"
-            key  = "motor-insurance"
-        }
-        # domain2 = {
-        #     name = "811onb.uat.kotak811.com"
-        #     key  = "sample-key-path"
-        # },
-        # domain3 = {
-        #     name = "811appumami-dr.uat.kotak811.com"
-        #     key  = "sample-key-path"
-        # }
-    }
-}
-
-appconfig_profile = {                                           // App config secrets profile for MSK & RDS
-    # create_msk_profile = false
-    create_rds_profile = true
-    # create_common_profile= true
-}
-
-# s3_details = {                                                  // Name of s3 to be created (By default it creates CRR is create_in_secondary is set to true)
-#     "motor-insurance" = {
-#         name = "motor-insurance"
-#     }
-# }
-
+in below template
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: {{ .Chart.Name }} 
+  namespace: {{ .Values.namespace }}
+spec:
+  gateways:
+  - {{ .Values.gateways.gateway }} 
+  hosts:
+  - {{ .Values.gateways.host | quote }}
+  http:
+  - match:
+    - uri:
+        prefix: {{ .Values.gateways.prefix }}/docs
+    route:
+    - destination:
+        host: {{ .Values.service.name }}
+        port:
+          number: {{ .Values.gateways.internalPort }}
+      weight: {{ .Values.gateways.weightvalue }}
+  - match:
+    - uri:
+        prefix: {{ .Values.gateways.prefix }}/redoc
+    route:
+    - destination:
+        host: {{ .Values.service.name }}
+        port:
+          number: {{ .Values.gateways.internalPort }}
+      weight: {{ .Values.gateways.weightvalue }}
+  - match:
+    - uri:
+        prefix: {{ .Values.gateways.prefix }}
+    route:
+    - destination:
+        host: {{ .Values.service.name }}
+        port:
+          number: {{ .Values.gateways.internalPort }}
+      weight: {{ .Values.gateways.weightvalue }}
+      headers:
+        response: 
+          add:
+            Content-Security-Policy: "default-src 'none';  script-src 'none';  connect-src 'self';  img-src 'self';  style-src 'self'; base-uri 'self';form-action 'self'"
+            Cache-Control: "no-cache, no-store, must-revalidate, max-age=0, post-check=0, pre-check=0"
+            Access-Control-Allow-Headers: "traceparent, tracestate"
+            Access-Control-Allow-Origin: {{ .Values.acao }}
+            AllowedOrigins: kotak811.com
