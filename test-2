@@ -65,3 +65,7 @@ spec:
 
 
 want to add 
+  - corsPolicy:
+      allowOrigins:
+      - exact: https://loan.uat.kotak811.com
+      - exact: https://loan.uat.kota811.bank.in
