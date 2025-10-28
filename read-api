@@ -1,14 +1,11 @@
-
-if __name__ == "__main__":
-    main()
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
-  name: {{ .Chart.Name }}
+  name: {{ .Chart.Name }} 
   namespace: {{ .Values.namespace }}
 spec:
   gateways:
-  - {{ .Values.gateways.gateway }}
+  - {{ .Values.gateways.gateway }} 
   hosts:
   - {{ .Values.gateways.host | quote }}
   http:
@@ -21,7 +18,6 @@ spec:
         port:
           number: {{ .Values.gateways.internalPort }}
       weight: {{ .Values.gateways.weightvalue }}
-
   - match:
     - uri:
         prefix: {{ .Values.gateways.prefix }}/redoc
@@ -31,15 +27,7 @@ spec:
         port:
           number: {{ .Values.gateways.internalPort }}
       weight: {{ .Values.gateways.weightvalue }}
-
-  - {{- if .Values.cors.allowOrigins }}
-    corsPolicy:
-      allowOrigins:
-      {{- range .Values.cors.allowOrigins }}
-      - exact: {{ . | quote }}
-      {{- end }}
-    {{- end }}
-    match:
+  - match:
     - uri:
         prefix: {{ .Values.gateways.prefix }}
     route:
@@ -49,9 +37,10 @@ spec:
           number: {{ .Values.gateways.internalPort }}
       weight: {{ .Values.gateways.weightvalue }}
       headers:
-        response:
+        response: 
           add:
             Content-Security-Policy: "default-src 'none';  script-src 'none';  connect-src 'self';  img-src 'self';  style-src 'self'; base-uri 'self';form-action 'self'"
             Cache-Control: "no-cache, no-store, must-revalidate, max-age=0, post-check=0, pre-check=0"
             Access-Control-Allow-Headers: "traceparent, tracestate"
-            AllowedOrigins: kotak811.com, kotak811.bank.in
+            Access-Control-Allow-Origin: {{ .Values.acao }}
+            AllowedOrigins: kotak811.com
