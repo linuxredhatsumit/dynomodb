@@ -1,20 +1,180 @@
-Request for Code Review - DynamoDB Auto Scaling Script (UAT Tested)
+ module.iam_user.aws_iam_access_key.this_no_pgp[0] will be created
+  + resource "aws_iam_access_key" "this_no_pgp" {
+      + create_date                    = (known after apply)
+      + encrypted_secret               = (known after apply)
+      + encrypted_ses_smtp_password_v4 = (known after apply)
+      + id                             = (known after apply)
+      + key_fingerprint                = (known after apply)
+      + secret                         = (sensitive value)
+      + ses_smtp_password_v4           = (sensitive value)
+      + status                         = "Active"
+      + user                           = "k811-indus-files-s3-bucket-read-access-user"
+    }
+how it's coming above one below is my tf
+provider "aws" {
+  region = local.region
+}
 
-Dear Team,
+locals {
+  name = "k811-indus-files-s3-bucket-read-access"
+  region = "ap-south-1"
 
-I hope this email finds you well. I’ve recently enhanced the DynamoDB Auto Scaling Management script by integrating initialReadUnits and initialWriteUnits parameters to allow custom initial capacity settings when switching to PROVISIONED mode. The updated script has been thoroughly tested in the UAT environment and is now functioning as expected. I’d like to request your review to ensure it aligns with our quality standards before we proceed to production.
+  tags = {
+    entity               = "KMBL"
+    application-name     = "811 Onboarding App"
+    application-id       = "APP-01783"
+    application-owner    = "Amlan Mandal"
+    application-manager  = "Anilkumar singam"
+    vertical-tlt         = "Manish A"
+    application-rating   = "high"
+    ticket-id            = "DEVOPS-715 DEVOPS-5658"
+    environment          = "dev"
+    project-name         = "811-ONB"
+    resource-name        = "iam-prod-app"
+    budget-type          = "rtb"
+    monitoring           = "yes"
+    db-engine            = "NA"
+    created-date         = "09-21-2023"
+    instance-node-type   = "NA"
+    backup               = "no"
+    scheduler-start      = "NA"
+    scheduler-stop       = "NA"
+    end-date             = "NA"
+    created-by-terraform = "yes"
+    terraform-version    = "1.8.4"
+  }
+}
 
-The script has been validated against a comprehensive set of edge cases to ensure robustness. The covered scenarios include:
+module "iam_user" {
+  source = "../../../../../terraform-modules/iam/modules/iam-user"
 
-Successful switching from PAY_PER_REQUEST to PROVISIONED mode with custom initialReadUnits and initialWriteUnits values.
-Handling GSI configurations, including cases with valid throughput settings (ReadCapacityUnits and WriteCapacityUnits) and invalid settings that trigger appropriate error handling.
-Managing mode switch failures, especially when GSIs are present, with logging to identify issues without halting execution.
-Auto-scaling registration for both table-level capacities (Read and Write) and GSI-level capacities, including edge cases where minimum and maximum capacities are set to the same value.
-Dry-run mode operation to simulate changes without applying them, ensuring no unintended modifications.
-Recovery from delayed mode propagation, where the table status becomes ACTIVE but the billing mode lags.
-Validation of GSI name and count mismatches between the table and configuration file, with proper error reporting.
-The updated code is committed to the development branch. Please focus your review on the update_billing_mode, wait_for_table_active, and main functions, where the new parameters and logic have been integrated. I’ve reverted the wait logic to its original infinite loop to maintain stability while adding a post-wait mode verification for visibility. UAT logs are available upon request if you need to dive deeper into the test results.
+  create_user = true
 
-Please provide your feedback, suggestions, or any concerns by EOD Tuesday, July 29, 2025, to allow time for adjustments. Feel free to reach out if you need clarification or assistance accessing the code or logs.
+  name          = "${local.name}-user"
+  force_destroy = true
 
-Thank you for your time and support in this process!
+  create_iam_access_key = true
+  iam_access_key_status = "Active"
+  create_iam_user_login_profile = false
+
+  tags = "${merge({"Name"= "${local.name}-user"}, local.tags)}"
+}
+
+# remove this part once key is replaced in moveit jobs
+resource "aws_iam_access_key" "second" {
+
+  user    = module.iam_user.iam_user_name
+  status  = "Active"
+}
+
+resource "aws_iam_access_key" "new" {
+
+  user    = module.iam_user.iam_user_name
+  status  = "Active"
+}
+#####################################################################################
+# IAM group for users with custom access
+#####################################################################################
+module "iam_group_with_custom_policies" {
+  source = "../../../../../terraform-modules/iam/modules/iam-group-with-policies"
+
+  name = "${local.name}-group"
+
+  group_users = [
+    module.iam_user.iam_user_name
+  ]
+
+  attach_iam_self_management_policy = false
+
+  custom_group_policy_arns = [
+    module.iam_policy.arn
+  ]
+
+  tags = "${merge({"Name"= "${local.name}-group"}, local.tags)}"
+}
+
+#########################################
+# IAM policy
+#########################################
+
+module "iam_policy" {
+  source = "../../../../../terraform-modules/iam/modules/iam-policy"
+
+  name        = "${local.name}-policy"
+  path        = "/"
+  description = "Customized policy for the ${local.name} to access aws services"
+
+  policy = <<EOF
+{
+    "Version": "2012-10-17",
+    "Statement": [
+        {
+			"Sid": "VisualEditor0",
+			"Effect": "Allow",
+			"Action": [
+				"s3:GetObjectAcl",
+        "s3:GetObject",
+        "s3:ListBucketMultipartUploads",
+        "s3:ListBucketVersions",
+        "s3:ListBucket",
+        "s3:GetBucketLocation",
+        "s3:ListMultipartUploadParts"
+			],
+			"Resource": [
+				"arn:aws:s3:::811-scc-grouped-indus-file-prod/*",
+        "arn:aws:s3:::811-scc-grouped-indus-file-prod",
+				"arn:aws:s3:::811-scc-grouped-indus-file-copied-prod/*",
+        "arn:aws:s3:::811-scc-grouped-indus-file-copied-prod"
+			]
+		},
+		{
+			"Sid": "VisualEditor1",
+			"Effect": "Allow",
+			"Action": [
+                "s3:ListAllMyBuckets",
+                "s3:ListAccessPoints",
+                "s3:ListJobs",
+                "s3:ListMultiRegionAccessPoints"
+            ],
+			"Resource": "*"
+		},
+		{
+			"Sid": "VisualEditor2",
+			"Effect": "Allow",
+			"Action": [
+				"s3:PutObject",
+        "s3:PutObjectRetention",
+        "s3:PutObjectVersionTagging",
+        "s3:PutObjectTagging",
+        "s3:ListBucket",
+        "s3:GetBucketLocation"
+			],
+			"Resource": [
+                "arn:aws:s3:::811-scc-grouped-indus-file-copied-prod",
+                "arn:aws:s3:::811-scc-grouped-indus-file-copied-prod/*"
+            ]
+		}
+    ]
+}
+EOF
+
+  tags = "${merge({"PolicyDescription"= "Created for accessing the prod scc grouped indus s3 files from on-premise server"}, local.tags)}"
+}
+
+###############################################################
+#Backend Terraform State
+###############################################################
+terraform {
+  backend "s3" {
+    #Replace this with your bucket name!
+    bucket            = "kotak811-prod-terraform-state"
+    key               = "kotak811/env/kotak811-prod/iam/iam-users/k811-indus-files-s3-bucket-read-access/iam.tfstate"
+    region            = "ap-south-1"
+    #Replace this with your DynamoDB table name!
+    dynamodb_table    = "tf-up-and-run-locks"
+    encrypt           = true
+    }
+}
+
+i have not defiend this_no_pgp"
+
