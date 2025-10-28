@@ -1,8 +1,8 @@
+app_user@KBUTEC81L20293:~$ kcuat edit vs k811-loan-leads-service -n loan-leads-uat
 error: virtualservices.networking.istio.io "k811-loan-leads-service" could not be patched: admission webhook "validation.istio.io" denied the request: configuration is invalid: HTTP route, redirect or direct_response is required
-You can run `kubectl replace -f /tmp/kubectl-edit-216926021.yaml` to try this update again.
+You can run `kubectl replace -f /tmp/kubectl-edit-1033030786.yaml` to try this update again.
 
 
-i did below
 
 # Please edit the object below. Lines beginning with a '#' will be ignored,
 # and an empty file will abort the edit. If an error occurs while saving this file will be
@@ -35,7 +35,7 @@ spec:
   - headers:
       response:
         set:
-                Access-Control-Allow-Origin: https://loan.uat.kotak811.com, https://loan.uat.kotak811.bank.in
+          Access-Control-Allow-Origin: https://loan.uat.kotak811.com, https://loan.uat.kotak811.bank.in
     match:
     - uri:
         prefix: /lls
