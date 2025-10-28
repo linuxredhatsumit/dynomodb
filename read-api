@@ -27,7 +27,14 @@ spec:
         port:
           number: {{ .Values.gateways.internalPort }}
       weight: {{ .Values.gateways.weightvalue }}
-  - match:
+  - {{- if .Values.cors.allowOrigins }}
+    corsPolicy:
+      allowOrigins:
+      {{- range .Values.cors.allowOrigins }}
+      - exact: {{ . | quote }}
+      {{- end }}
+    {{- end }}
+    match:
     - uri:
         prefix: {{ .Values.gateways.prefix }}
     route:
