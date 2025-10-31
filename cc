@@ -1,278 +1,324 @@
-
 provider "aws" {
-    region = local.region
+  region = "ap-south-1"
 }
 
 locals {
-    name = "k811-onb-dev-eks-admin-sa"
-    region = "ap-south-1"
+  domain_name = "terraform-aws-modules.modules.tf"
 }
-###############################
-# IAM Role for onb-dev SA
-###############################
-module "eks_sa_iam_role" {
-    source = "../../../../../terraform-modules/iam/modules/iam-assumable-role-with-oidc"
 
-    create_role = true
+################################################################################
+# The terraform_remote_state Data Source
+################################################################################
+data "terraform_remote_state" "vpc" {
+  backend = "s3"
 
-    role_name = local.name
+  config = {
+    bucket = "kotak811-prod-terraform-state"
+    key    = "kotak811/env/kotak811-prod/vpc/vpc.tfstate"
+    region = "ap-south-1"
+  }
+}
 
-    tags = {
+
+
+#################################################################
+# ALB Security Group
+#################################################################
+
+module "security_group" {
+  source = "../../../../terraform-modules/sg"
+
+  name        = "crossell-prod-internal-alb-sg"
+  description = "Security group for onb-internal ALB SG"
+  vpc_id      = data.terraform_remote_state.vpc.outputs.vpc_id
+
+  use_name_prefix        = false
+  revoke_rules_on_delete = true
+
+  egress_rules = ["all-all"]
+  ingress_with_cidr_blocks = [
+    {
+      from_port   = 443
+      to_port     = 443
+      protocol    = "tcp"
+      description = "DEVOPS-1547 - HTTPS"
+      cidr_blocks = "0.0.0.0/0"
+    },
+    {
+      from_port   = 80
+      to_port     = 80
+      protocol    = "tcp"
+      description = "DEVOPS-1547 - HTTP"
+      cidr_blocks = "10.0.0.0/8"
+    }
+  ]
+  tags = {
+    entity               = "KMBL"
+    application-name     = "811_AWS_CROSS_SELL"
+    application-id       = "APP-01797"
+    application-owner    = "Ranjit Mohan"
+    application-manager  = "Imran Ansari"
+    vertical-tlt         = "Ranjit Mohan"
+    application-rating   = "high"
+    ticket-id            = "DEVOPS-1547"
+    environment          = "production"
+    project-name         = "811-Crossell"
+    budget-type          = "rtb"
+    monitoring           = "yes"
+    db-engine            = "NA"
+    created-date         = "02-28-2024"
+    instance-node-type   = "NA"
+    backup               = "NA"
+    scheduler-start      = "NA"
+    scheduler-stop       = "NA"
+    end-date             = "NA"
+    created-by-terraform = "yes"
+    terraform-version    = "1.8.4"
+    resource-name        = "ec2-crossell-prod-tg"
+    project-811          = "CROSSELL"
+    db-engine-version    = "NA"
+  }
+  # ingress_cidr_blocks = ["0.0.0.0/0"]
+  # ingress_rules       = ["http-80-tcp", "https-443-tcp"]
+  # egress_rules        = ["all-all"]
+}
+
+
+##################################################################
+# Application Load Balancer
+##################################################################
+
+module "alb" {
+  source = "../../../../terraform-modules/alb"
+
+  name = "k811-crossell-prod-internal-alb"
+
+  load_balancer_type = "application"
+
+  vpc_id                     = data.terraform_remote_state.vpc.outputs.vpc_id
+  security_groups            = [module.security_group.security_group_id]
+  subnets                    = slice(data.terraform_remote_state.vpc.outputs.private_subnets, 3, 6)
+  internal                   = true
+  enable_deletion_protection = true
+
+  #   # See notes in README (ref: https://github.com/terraform-providers/terraform-provider-aws/issues/7987)
+  #   access_logs = {
+  #     bucket = module.log_bucket.s3_bucket_id
+  #   }
+
+  access_logs = {
+    enabled = true
+    bucket  = "aws-observability-logs-e569c200"
+    prefix  = "k811-crossell-prod-internal-alb-logs"
+  }
+
+  http_tcp_listeners = [
+    {
+      port               = 80
+      protocol           = "HTTP"
+      target_group_index = 0
+      # action_type        = "redirect"
+      # redirect  = {
+      #   port        = "443"
+      #   protocol    = "HTTPS"
+      #   status_code = "HTTP_301"
+      # }
+    }
+  ]
+
+  http_tcp_listener_rules = [
+    {
+      http_listener_index = 0
+      priority            = 1
+      actions = [{
+        type               = "forward"
+        target_group_index = 0
+      }]
+      conditions = [{
+        host_headers = ["passbook-internal.kotak811.com"]
+      }]
+    }
+  ]
+
+  https_listeners = [
+    {
+      port               = 443
+      protocol           = "HTTPS"
+      ssl_policy         = "ELBSecurityPolicy-TLS-1-2-2017-01"
+      certificate_arn    = "arn:aws:acm:ap-south-1:718378052708:certificate/b1a2167d-2ef8-4d9d-9e04-692d07b089b3"
+      target_group_index = 0
+    }
+  ]
+
+  https_listener_rules = [
+    {
+      https_listener_index = 0
+      priority             = 1
+      actions = [{
+        type               = "forward"
+        target_group_index = 0
+      }]
+      conditions = [{
+        host_headers = ["passbook.kotak811.com"]
+      }]
+    },
+    {
+      https_listener_index = 0
+      priority             = 2
+      actions = [{
+        type               = "forward"
+        target_group_index = 0
+      }]
+      conditions = [{
+        host_headers = ["passbook.kotak811.com"]
+      }]
+    },
+    {
+      https_listener_index = 0
+      priority             = 3
+      actions = [{
+        type               = "forward"
+        target_group_index = 0
+      }]
+      conditions = [{
+        host_headers = ["passbook-internal.kotak811.com"]
+      }]
+    }
+  ]
+
+  target_groups = [
+    {
+      name = "crossell-prod-internal-alb-tg"
+      #      name_prefix          = "prod-onb-"
+      backend_protocol     = "HTTP"
+      backend_port         = 30712
+      target_type          = "instance"
+      deregistration_delay = 10
+      health_check = {
+        enabled             = true
+        interval            = 30
+        path                = "/healthz"
+        port                = "traffic-port"
+        healthy_threshold   = 3
+        unhealthy_threshold = 3
+        timeout             = 6
+        protocol            = "HTTP"
+        matcher             = "200-399"
+      }
+      tags = {
         entity               = "KMBL"
-        application-name     = "811 Onboarding App"
-        application-id       = "APP-01783"
-        application-owner    = "Amlan Mandal"
-        application-manager  = "Anilkumar singam"
-        vertical-tlt         = "Manish A"
+        application-name     = "811_AWS_CROSS_SELL"
+        application-id       = "APP-01797"
+        application-owner    = "Ranjit Mohan"
+        application-manager  = "Imran Ansari"
+        vertical-tlt         = "Ranjit Mohan"
         application-rating   = "high"
-        ticket-id            = "DEVOPS-1172 DEVOPS-3056"
-        environment          = "dev"
-        project-name         = "811-ONB"
-        Name                 = "k811-onb-dev-eks-admin-sa"
+        ticket-id            = "DEVOPS-1547"
+        environment          = "production"
+        project-name         = "811-Crossell"
         budget-type          = "rtb"
         monitoring           = "yes"
         db-engine            = "NA"
-        created-date         = "11-21-2023"
+        created-date         = "02-28-2024"
         instance-node-type   = "NA"
-        backup               = "no"
+        backup               = "NA"
         scheduler-start      = "NA"
         scheduler-stop       = "NA"
         end-date             = "NA"
         created-by-terraform = "yes"
         terraform-version    = "1.4.6"
-        resource-name        =  "iam-onb-admin-role"
-        project-811          = "ONB"
-    }
+        resource-name        = "ec2-crossell-prod-tg"
+        project-811          = "CROSSELL"
+        db-engine-version    = "NA"
+      }
+    },
+    # {
+    #   name                 = "passbook-prod-internal-alb-tg"
+    #   backend_protocol     = "HTTP"
+    #   backend_port         = 30712
+    #   target_type          = "instance"
+    #   deregistration_delay = 10
+    #   health_check = {
+    #     enabled             = true
+    #     interval            = 30
+    #     path                = "/healthz"
+    #     port                = "traffic-port"
+    #     healthy_threshold   = 3
+    #     unhealthy_threshold = 3
+    #     timeout             = 6
+    #     protocol            = "HTTP"
+    #     matcher             = "200-399"
+    #   }
+    #   tags = {
+    #     entity               = "KMBL"
+    #     application-name     = "811_AWS_CROSS_SELL"
+    #     application-id       = "APP-01797"
+    #     application-owner    = "Ranjit Mohan"
+    #     application-manager  = "Imran Ansari"
+    #     vertical-tlt         = "Ranjit Mohan"
+    #     application-rating   = "high"
+    #     ticket-id            = "DEVOPS-4317"
+    #     environment          = "production"
+    #     project-name         = "811-Crossell"
+    #     budget-type          = "rtb"
+    #     monitoring           = "yes"
+    #     db-engine            = "NA"
+    #     created-date         = "09-13-2024"
+    #     instance-node-type   = "NA"
+    #     backup               = "NA"
+    #     scheduler-start      = "NA"
+    #     scheduler-stop       = "NA"
+    #     end-date             = "NA"
+    #     created-by-terraform = "yes"
+    #     terraform-version    = "1.8.4"
+    #     resource-name        = "ec2-crossell-prod-tg"
+    #     project-811          = "CROSSELL"
+    #     db-engine-version    = "NA"
+    #   }
+    # }
+  ]
 
-    #   provider_url  = "oidc.eks.ap-south-1.amazonaws.com/id/ECF3C103D341F9CA41520CDD582CB807"
-    provider_urls = ["oidc.eks.ap-south-1.amazonaws.com/id/ECF3C103D341F9CA41520CDD582CB807","oidc.eks.ap-south-1.amazonaws.com/id/0D04991F1AA697F7FD8125ABFBEE2857"]
+  tags = {
+    entity               = "KMBL"
+    application-name     = "811_AWS_CROSS_SELL"
+    application-id       = "APP-01797"
+    application-owner    = "Ranjit Mohan"
+    application-manager  = "Imran Ansari"
+    vertical-tlt         = "Ranjit Mohan"
+    application-rating   = "high"
+    ticket-id            = "DEVOPS-1547"
+    environment          = "production"
+    project-name         = "811-Crossell"
+    budget-type          = "rtb"
+    monitoring           = "yes"
+    db-engine            = "NA"
+    created-date         = "02-28-2024"
+    instance-node-type   = "NA"
+    backup               = "NA"
+    scheduler-start      = "NA"
+    scheduler-stop       = "NA"
+    end-date             = "NA"
+    created-by-terraform = "yes"
+    terraform-version    = "1.4.6"
+    resource-name        = "elb-crossell-prod-alb"
+    project-811          = "CROSSELL"
+    db-engine-version    = "NA"
+  }
 
-    role_policy_arns = [
-    module.iam_policy.arn,
-    "arn:aws:iam::aws:policy/AmazonCognitoPowerUser"
-    ]
-
-    oidc_fully_qualified_subjects = ["system:serviceaccount:dev:811-onb-dev-sa-admin"]
 }
 
-#########################################
-# IAM policy
-#########################################
-module "iam_policy" {
-    source = "../../../../../terraform-modules/iam/modules/iam-policy"
-
-    name        = "${local.name}-policy"
-    path        = "/"
-    description = "Customized policy for the ${local.name} to access aws services" 
-
-    policy = <<EOF
-{
-    "Version": "2012-10-17",
-    "Statement": [
-        {
-            "Effect": "Allow",
-            "Action": [
-                "ssm:GetParameters",
-                "ssm:PutParameter",
-                "ssm:GetParameter"
-            ],
-            "Resource": [
-                "arn:aws:ssm:ap-south-1:483584640083:parameter/dev/811-ONB/k811-be-admin/*",
-                "arn:aws:ssm:ap-south-1:483584640083:parameter/dev/811-ONB/COMMON_*"
-            ]
-        },
-        {
-            "Action": [
-                "kms:Decrypt",
-                "kms:Encrypt",
-                "kms:GenerateDataKey"
-            ],
-            "Effect": "Allow",
-            "Resource": [
-                "arn:aws:kms:ap-south-1:483584640083:key/fd55a4ac-4afd-467f-b41d-ce6881f6cd61",
-                "arn:aws:kms:ap-south-1:483584640083:key/cc498c37-f3b6-4dfa-a9fb-4e98996be115",
-                "arn:aws:kms:ap-south-1:286714098649:key/d8bdefed-688c-496d-b438-1c955676fcca"
-            ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "ssm:DescribeParameters",
-                "secretsmanager:DescribeSecret",
-                "secretsmanager:GetSecretValue"
-            ],
-            "Resource": [
-              "arn:aws:secretsmanager:ap-south-1:483584640083:secret:dev/istio_codec/symmetric-mIBuc8",
-              "arn:aws:secretsmanager:ap-south-1:483584640083:secret:dev/istio_codec/hybrid-tUT4KP"
-              ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "s3:GetObject"
-            ],
-            "Resource": [
-                "arn:aws:s3:::cloudacqui-backend-uat",
-                "arn:aws:s3:::cloudacqui-backend-uat/*",
-                "arn:aws:s3:::kotak-811-liveliness-check-dev",
-                "arn:aws:s3:::kotak-811-liveliness-check-dev/*",
-                "arn:aws:s3:::uat-vkyc-attachments",         
-                "arn:aws:s3:::uat-vkyc-attachments/*"
-            ]
-        },
-        {
-            "Action": [
-                "s3:GetObject",
-                "s3:PutObject",
-                "s3:ListBucket"
-            ],
-            "Effect": "Allow",
-            "Resource": [
-                "arn:aws:s3:::rewards-proposal-dev",
-                "arn:aws:s3:::rewards-proposal-dev/*",
-                "arn:aws:s3:::reward-offer-config-dev",
-                "arn:aws:s3:::reward-offer-config-dev/*",
-                "arn:aws:s3:::s3-admin-be",
-                "arn:aws:s3:::s3-admin-be/*",
-                "arn:aws:s3:::811-scc-liquidation-failure-reports-dev",
-                "arn:aws:s3:::811-scc-liquidation-failure-reports-dev/*",
-                "arn:aws:s3:::hv-kotak-811-liveliness-check-dev",
-                "arn:aws:s3:::hv-kotak-811-liveliness-check-dev/*
-            ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "lambda:InvokeFunction"
-            ],
-            "Resource": "arn:aws:lambda:ap-south-1:483584640083:function:811_lambda_rewards_process_offers"
-        },
-        {
-            "Sid": "VisualEditor0",
-            "Effect": "Allow",
-            "Action": [
-                "sns:ListTagsForResource",
-                "sns:ListSubscriptionsByTopic",
-                "sns:Publish",
-                "sns:GetTopicAttributes",
-                "sns:GetDataProtectionPolicy"
-            ],
-            "Resource": [
-                "arn:aws:sns:ap-south-1:483584640083:NOTIFICATION_TOPIC_dev"
-            ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "dynamodb:Query",
-                "dynamodb:GetItem",
-                "dynamodb:ListContributorInsights",
-                "dynamodb:ListGlobalTables",
-                "dynamodb:ListTables",
-                "dynamodb:ListBackups",
-                "dynamodb:ListImports",
-                "dynamodb:ListExports"
-            ],
-            "Resource": [
-                "arn:aws:dynamodb:ap-south-1:483584640083:table/USER_PROFILE_dev*",
-                "arn:aws:dynamodb:ap-south-1:483584640083:table/UPI_CUSTOMER_PROFILE_dev*",
-                "arn:aws:dynamodb:ap-south-1:483584640083:table/REWARDS_JOURNEY_dev*",
-                "arn:aws:dynamodb:ap-south-1:483584640083:table/CASHBACK_TRANSACTION_dev*",
-                "arn:aws:dynamodb:ap-south-1:483584640083:table/REWARDS_EVENT_dev*",
-                "arn:aws:dynamodb:ap-south-1:483584640083:table/REWARDS_dev*",
-                "arn:aws:dynamodb:ap-south-1:483584640083:table/REWARDS_PROPOSAL_dev*"
-            ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "dynamodb:UpdateItem",
-                "dynamodb:PutItem"
-            ],
-            "Resource": [
-                "arn:aws:dynamodb:ap-south-1:483584640083:table/REWARDS_PROPOSAL_dev*"
-            ]
-        },
-        {
-            "Action": [
-                "ses:GetAccount",
-                "ses:List*"
-            ],
-            "Effect": "Allow",
-            "Resource": "*"
-        },
-        {
-            "Action": [
-                "ses:SendRawEmail"
-            ],
-            "Effect": "Allow",
-            "Resource": "arn:aws:ses:ap-south-1:483584640083:identity/kotak811.com"
-        },
-        {
-            "Sid": "DEVOPS8020",
-            "Effect": "Allow",
-            "Action": [
-                "s3:*"
-            ],
-            "Resource": [
-                "arn:aws:s3:::s3-admin-be/media/*",
-                "arn:aws:s3:::s3-admin-be/static/*"
-            ]
-        },
-        {
-            "Effect": "Allow",
-            "Action": [
-                "appconfig:ListTagsForResource",
-                "appconfig:GetHostedConfigurationVersion",
-                "appconfig:GetDeployment",
-                "appconfig:ListEnvironments",
-                "appconfig:StartDeployment",
-                "appconfig:GetExtensionAssociation",
-                "appconfig:GetLatestConfiguration",
-                "appconfig:ListDeployments",
-                "appconfig:GetExtension",
-                "appconfig:GetEnvironment",
-                "appconfig:GetDeploymentStrategy",
-                "appconfig:ListConfigurationProfiles",
-                "appconfig:GetConfiguration",
-                "appconfig:GetApplication",
-                "appconfig:GetConfigurationProfile",
-                "appconfig:ListHostedConfigurationVersions",
-                "appconfig:StartConfigurationSession"
-            ],
-            "Resource": [
-                "arn:aws:appconfig:ap-south-1:483584640083:application/61i9ozu",
-                "arn:aws:appconfig:ap-south-1:483584640083:application/61i9ozu/configurationprofile/*",
-                "arn:aws:appconfig:ap-south-1:483584640083:application/61i9ozu/environment/*"
-            ]
-        }
-    ]
-}
-EOF
-}
 
 ###############################################################
 #Backend Terraform State
 ###############################################################
 terraform {
-    backend "s3" {
-        bucket            = "kotak811-terraform-state"
-        key               = "kotak811/env/kotak811-dev/iam/onb-sa-roles/admin/iam.tfstate"
-        region            = "ap-south-1"
-        dynamodb_table    = "tf-up-and-run-locks"
-        encrypt           = true
-    }
+  backend "s3" {
+    #Replace this with your bucket name!
+    bucket = "kotak811-prod-terraform-state"
+    key    = "kotak811/env/kotak811-prod/alb/crossell-alb-internal/alb.tfstate"
+    region = "ap-south-1"
+    #Replace this with your DynamoDB table name!
+    dynamodb_table = "tf-up-and-run-locks"
+    encrypt        = true
+  }
 }
-
-
-below error
-
-
-Planning failed. Terraform encountered an error while generating this plan.
-
-╷
-│ Error: "policy" contains an invalid JSON policy: invalid character '\n' in string literal, at byte offset 2771
-│ 
-│   with module.iam_policy.aws_iam_policy.policy[0],
-│   on ../../../../../terraform-modules/iam/modules/iam-policy/main.tf line 8, in resource "aws_iam_policy" "policy":
-│    8:   policy = var.policy
