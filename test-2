@@ -1,71 +1,95 @@
+app_user@ip-10-59-81-252:~$ kprod get vs k811-cc-applications -n prod -oyaml
 apiVersion: networking.istio.io/v1
 kind: VirtualService
 metadata:
   annotations:
-    meta.helm.sh/release-name: uat-k811-leads
-    meta.helm.sh/release-namespace: 811-uat
-  creationTimestamp: "2024-02-14T11:58:33Z"
-  generation: 1
+    meta.helm.sh/release-name: prod-k811-cc-applications
+    meta.helm.sh/release-namespace: prod
+  creationTimestamp: "2023-09-11T12:44:51Z"
+  generation: 4
   labels:
     app.kubernetes.io/managed-by: Helm
-  name: k811-leads
-  namespace: 811-uat
-  resourceVersion: "824567429"
-  uid: fbcc32cf-1800-4e43-81de-59d8672191ce
+  name: k811-cc-applications
+  namespace: prod
+  resourceVersion: "891494392"
+  uid: 208734f6-fca8-4179-baa6-1216921eab50
 spec:
   gateways:
   - gateway
   hosts:
   - '*'
   http:
-  - match:
+  - corsPolicy:
+      allowOrigins:
+      - exact: https://creditcard-on-fd.kotak811.com
+      - exact: https://creditcard-on-fd.kotak811.bank.in
+    match:
     - uri:
-        prefix: /leads/v3/api-docs
+        prefix: /cc-applications
     route:
     - destination:
-        host: k811-leads
-        port:
-          number: 8080
-      weight: 100
-  - match:
-    - uri:
-        prefix: /leads/swagger-ui
-    route:
-    - destination:
-        host: k811-leads
-        port:
-          number: 8080
-      weight: 100
-  - match:
-    - uri:
-        prefix: /leads/docs
-    route:
-    - destination:
-        host: k811-leads
-        port:
-          number: 8080
-      weight: 100
-  - match:
-    - uri:
-        prefix: /leads
-    route:
-    - destination:
-        host: k811-leads
+        host: k811-cc-applications
         port:
           number: 8080
       headers:
         response:
           add:
-            Cache-Control: no-store
-            Content-Security-Policy: default-src 'none'
-          remove:
-          - Server
+            Access-Control-Allow-Headers: traceparent, tracestate
+            Access-Control-Allow-Origin: '*'
+            AllowedOrigins: kotak811.com, kotak811.bank.in
+            Cache-Control: no-cache, no-store, must-revalidate, max-age=0, post-check=0,
+              pre-check=0
+            Content-Security-Policy: default-src 'none';  script-src 'none';  connect-src
+              'self';  img-src 'self';  style-src 'self'; base-uri 'self';form-action
+              'self'
       weight: 100
-                                                                                                                                                                         67,17         Bot
-
-
-want to add 
-  - corsPolicy:
+below is virtualservvice.yaml
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: {{ .Chart.Name }} 
+  namespace: {{ .Values.namespace }}
+spec:
+  gateways:
+  - {{ .Values.gateways.gateway }} 
+  hosts:
+  - {{ .Values.gateways.host | quote }}
+  http:
+  - match:
+    - uri:
+        prefix: {{ .Values.gateways.prefix }}
+    route:
+    - destination:
+        host: {{ .Values.service.name }}
+        port:
+          number: {{ .Values.gateways.internalPort }}
+      weight: {{ .Values.gateways.weightvalue }}
+  - {{- if .Values.cors.allowOrigins }}
+    corsPolicy:
       allowOrigins:
-      - exact: https://loan.uat.kotak811.com
-      - exact: https://loan.uat.kota811.bank.in
+      {{- range .Values.cors.allowOrigins }}
+      - exact: {{ . | quote }}
+      {{- end }}
+    {{- end }}
+      headers:
+        response: 
+          add:
+            Content-Security-Policy: "default-src 'none';  script-src 'none';  connect-src 'self';  img-src 'self';  style-src 'self'; base-uri 'self';form-action 'self'"
+            Cache-Control: "no-cache, no-store, must-revalidate, max-age=0, post-check=0, pre-check=0"
+            Access-Control-Allow-Headers: "traceparent, tracestate"
+            Access-Control-Allow-Origin: '*'
+            AllowedOrigins: kotak811.com, kotak811.bank.in           
+
+
+
+belue is part of value.yaml
+service:
+  name: k811-cc-applications
+  type: ClusterIP
+  externalPort: 8080
+  internalPort: 8080
+  portName: k811-cc-applications
+cors:
+   allowOrigins:
+      - https://creditcard-on-fd.kotak811.com
+      - https://creditcard-on-fd.kotak811.bank.in
