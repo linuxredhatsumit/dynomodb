@@ -1,35 +1,45 @@
-apiVersion: networking.istio.io/v1alpha3
+app_user@ip-10-59-81-252:~$ kprod get vs k811-cc-applications -n prod -oyaml
+apiVersion: networking.istio.io/v1
 kind: VirtualService
 metadata:
-  name: {{ .Chart.Name }}
-  namespace: {{ .Values.namespace }}
+  annotations:
+    meta.helm.sh/release-name: prod-k811-cc-applications
+    meta.helm.sh/release-namespace: prod
+  creationTimestamp: "2023-09-11T12:44:51Z"
+  generation: 5
+  labels:
+    app.kubernetes.io/managed-by: Helm
+  name: k811-cc-applications
+  namespace: prod
+  resourceVersion: "893082716"
+  uid: 208734f6-fca8-4179-baa6-1216921eab50
 spec:
   gateways:
-    - {{ .Values.gateways.gateway }}
+  - gateway
   hosts:
-    - {{ .Values.gateways.host | quote }}
+  - '*'
   http:
-    - match:
-        - uri:
-            prefix: {{ .Values.gateways.prefix }}
-      route:
-        - destination:
-            host: {{ .Values.service.name }}
-            port:
-              number: {{ .Values.gateways.internalPort }}
-          weight: {{ .Values.gateways.weightvalue }}
-      {{- if .Values.cors.allowOrigins }}
-      corsPolicy:
-        allowOrigins:
-        {{- range .Values.cors.allowOrigins }}
-          - exact: {{ . | quote }}
-        {{- end }}
-      {{- end }}
-      headers:
-        response:
-          add:
-            Content-Security-Policy: "default-src 'none'; script-src 'none'; connect-src 'self'; img-src 'self'; style-src 'self'; base-uri 'self'; form-action 'self'"
-            Cache-Control: "no-cache, no-store, must-revalidate, max-age=0, post-check=0, pre-check=0"
-            Access-Control-Allow-Headers: "traceparent, tracestate"
-            Access-Control-Allow-Origin: "*"
-            AllowedOrigins: "kotak811.com, kotak811.bank.in"
+  - corsPolicy:
+      allowOrigins:
+      - exact: https://creditcard-on-fd.kotak811.com
+      - exact: https://creditcard-on-fd.kotak811.bank.in
+    headers:
+      response:
+        add:
+          Access-Control-Allow-Headers: traceparent, tracestate
+          Access-Control-Allow-Origin: '*'
+          AllowedOrigins: kotak811.com, kotak811.bank.in
+          Cache-Control: no-cache, no-store, must-revalidate, max-age=0, post-check=0,
+            pre-check=0
+          Content-Security-Policy: default-src 'none'; script-src 'none'; connect-src
+            'self'; img-src 'self'; style-src 'self'; base-uri 'self'; form-action
+            'self'
+    match:
+    - uri:
+        prefix: /cc-applications
+    route:
+    - destination:
+        host: k811-cc-applications
+        port:
+          number: 8080
+      weight: 100
