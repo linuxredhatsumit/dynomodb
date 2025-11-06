@@ -1,4 +1,49 @@
-aws ssm get-parameter --name "/dev/811-CROSSELL/agent-assisted-portal/SAML_IDP_CERT_PATH_BANK_IN" --region ap-south-1
-aws ssm get-parameter --name "/dev/811-CROSSELL/agent-assisted-portal/SAML_PRIVATE_KEY_PATH_BANK_IN" --region ap-south-1
-aws ssm get-parameter --name "/dev/811-CROSSELL/agent-assisted-portal/SAML_IDP_CERT_BANK_IN" --region ap-south-1
-aws ssm get-parameter --name "/dev/811-CROSSELL/agent-assisted-portal/SAML_PRIVATE_KEY_BANK_IN" --region ap-south-1
+app_user@KBUTEC81L20293:~$ aws ssm get-parameter --name "/dev/811-CROSSELL/agent-assisted-portal/SAML_IDP_CERT_PATH_BANK_IN" --region ap-south-1
+{
+    "Parameter": {
+        "Name": "/dev/811-CROSSELL/agent-assisted-portal/SAML_IDP_CERT_PATH_BANK_IN",
+        "Type": "String",
+        "Value": "/mnt/secrets/SAML_IDP_CERT_BANK_IN",
+        "Version": 2,
+        "LastModifiedDate": "2025-11-05T15:32:41.961000+00:00",
+        "ARN": "arn:aws:ssm:ap-south-1:483584640083:parameter/dev/811-CROSSELL/agent-assisted-portal/SAML_IDP_CERT_PATH_BANK_IN",
+        "DataType": "text"
+    }
+}
+app_user@KBUTEC81L20293:~$ aws ssm get-parameter --name "/dev/811-CROSSELL/agent-assisted-portal/SAML_PRIVATE_KEY_PATH_BANK_IN" --region ap-south-1
+{
+    "Parameter": {
+        "Name": "/dev/811-CROSSELL/agent-assisted-portal/SAML_PRIVATE_KEY_PATH_BANK_IN",
+        "Type": "String",
+        "Value": "/mnt/secrets/SAML_PRIVATE_KEY_BANK_IN",
+        "Version": 2,
+        "LastModifiedDate": "2025-11-05T15:32:41.965000+00:00",
+        "ARN": "arn:aws:ssm:ap-south-1:483584640083:parameter/dev/811-CROSSELL/agent-assisted-portal/SAML_PRIVATE_KEY_PATH_BANK_IN",
+        "DataType": "text"
+    }
+}
+app_user@KBUTEC81L20293:~$ aws ssm get-parameter --name "/dev/811-CROSSELL/agent-assisted-portal/SAML_IDP_CERT_BANK_IN" --region ap-south-1
+{
+    "Parameter": {
+        "Name": "/dev/811-CROSSELL/agent-assisted-portal/SAML_IDP_CERT_BANK_IN",
+        "Type": "SecureString",
+        "Value": "AQICAHj2fJsjtxh46MIIIHQYJKoZIhvcNAQcBMB4fRJf1li2TdSeKYW2XWtaMc5GSNq470syrEtnp9ibXzSuXfEn50Pl/SJjRL8VS79kaO2aQ7vEV/ok5XxgTfOllEjdk9+rjqUg/hesSFAOIiRl3+YrGbmjo9WBnsKoogWnIoeCSKK4k+ol6i+Zbv37lXo3jlXVOUoZYJPxBPnuWQo5e9PKHBzhJCQTTMl07yGlg98TCfqDFpj51/vtpGK/l8O5xt0lIYIfk5vIfpH6fIQfq+XvP+oh7DUC5ETUjIbv1OxEdKSUL8tR2Hbk16BYIXSKxFlMyJN6TzucF/uCiSuXRbbBR41orzxjrU7+cadqtW372eDkr9NWGr0gm/kVNOgthwn7UvSWh7yQaf5+vKDe4revDpM3EAxcOmriCGlAp4+aanFqtS5AWrhuvVFHGPJUCGrJK8mfyn4MF0g42X+Ro3szWQOasXWvnjXYB9w2agzOhZjoycZwwUTgDn99LYvw22ITBG82LOgGsAE6jeMEYfDoRgPM5lrUvcUyZZzUJrQyWFf1j/iOyKttqAOePbsBLQDvhSrGwAwmbITDYariBa0Y8lsiVHvkQ5V0M4ntWXh79b7tMRXAV/d6dBYvpoV7Ydw0BCTN8y5jMvgDYf4Y0z+dWK0/Wxc7zRklpdVzDcncUc2Wz0ds0CGZo7/EDK3TI3nT+uvXPjXXa1W+H9Itq+73+zGfYwUph+cFTlOz8/1MoWq1iE4hjIDNKCem6QZ24j5o9vnEs2AY7W8OK9ZsBXLlN9UwUw7dl7LrqP+gG1mBePvRwHTEGzM8OJk3J5idfA2OXmeifXYSHv1CwalAJOmR4Qk9LAIcomtsR9HGAx53AjzVA3xmqQd4zMnFQLEugWOrjuxLHR7aNye1/cdM3ih6IduDzzuwNfbsJiLl71zt9Euzdi4OLpg5srShYq62LO9YTMGY3nDcQPN15Jvej2PzS/aRQJh1DNJVfXhKLegLZPdskMJinL2/d2S9lzqw4oAJszMWrXigH03kbtGzK0Z9cV9CPqDxT45yx4zR1OuaPkGC3flKCDtw+pwaE/BCr7JCUVwIQDzaJ3C0Sd9iHwt1zUJXM8HYY80VUcWBL4BSuo4Sz59BwZOLF4WvgoT0hPvKMPRapCF2Ok0ANOY8WSSmiF6Mkv1fEb//DkBjf+y2oBfCKoadDkNH4Zb1b59BGdRZpvZgSnneJwDiMznHimLKh4m63ipQtvfltzuyw06vmSSkPOTr0fXbtyKlWcB13swhC1dQ2+y2xdQ2LjMBkhIpBz41a0KB+5kr0rNvqfPgSMDyxtJb5T7mkrEJDxodRqiHCUrRfsjvMbMIlfRv0UvP/zKGBPS/K0dvRW5Uyliw0FuVtqG8wCiIqLRKU6lpM++BooTszFN4//viiq59xuAqb3YxASeDfF5zni+0+T2ZlH0jUdEmUolv3lIJZeGKopXemcVFat4Q3IWQwfLpR8SO2D7idByKuk3WqoKwkyFoY9lxR8rff39WtHT8Xxd+iRulkcgZMpLQJxrTVI0xGi/rDQfhqOS6f6mG+8y3jBA33IDOLm1lHg9KBIXTyLXUg24cGb+IrpStIdtZMuriKQvakx1PK6YvEmPSD28Id6+7tqDxDhKJ9zFXc7tiMp0NMoKoKoYbs4xPLcOoz8GYDJ5AxxDMOlUrAq7unsXNyRxXJCrBJZp3wVy4IklumNnO+5L4pcgTJPV5NejaQEklLUUU89miM58VbRKfRf+pvu37iD9UyQi4g51nMdlBQYiq6u2EOEV9PGtyR7cQE9UizEdhosaG4Eys+XXf5jjNU58+nUoZFSitznmhPU6l2Aj4vtVjNLFNsuVysqFdqqi3Ke//g+f2FFSGDduM/v+fLe0rizJaPtUMXWDqLcZLgHQVH0nhD2LPftjMbpaE8zXnFQOZNrEnywr2NrunF/nS/WsDO5wpMmsuk5gjO8Z5PH6xpS6dcxCdP7NNooKK419AJmD1c8KkPm0TPLUhRECT/YhajJdsvU0W7oO8T+538VrBdl6G1m3OnP3Mq2Ytu7u8LL75BSQ0P9PFO8imJX0Ixm7xx/DR6cfad2vRYFFFfBxNKBOHt1pUl3Qfa7qu8zOLQsXdRnenbMMKAnCJRgSJKpYjCIrgCHPKJpIecIlUWIshbqTQsya1MXYAGocyMBxn5YJR97vIDOw/7XRe1PEC+W0ni4PmZ7TGhlFeBlfl7PJ7QobNCZuhpuKNELvFcowPc/OaFN4V3nOJewMXQBRVGABKY2bIA8WW8TFREB0xEVg7FlrQyKZ9phLegy1HxLiZHmPVokyd5Fu4Ikv2H6Vc7p+StovhjpoTH1yTT/xrBf+Qi5rPO9ifQNqnC7nNC3FcjqJlSCoU+eHSR416uW1oEqfuNPLNw/s0KQd7O4CHLzw+YDwPs66tb+600j7Ymmx0tvZx4olreLSNEhokSCVwyJ8cLkTym7OlKSJ5mVz0fbNEmoprhx7EslvOxvDgfjKhO9wRAimkzk8CJw678VqTInTFFxPb5GxHBu2tUmqDYqLpK8x/4DRlSA9vpB7Cj9/6/wolrFIwk9y+YiCejroNmVhpHPnbHv8MDYqc8WJkBOGJIQ8Sm6GzM4QMh+ox5u+v2mCqZfscUd5k=",
+        "Version": 1,
+        "LastModifiedDate": "2025-11-05T15:32:41.966000+00:00",
+        "ARN": "arn:aws:ssm:ap-south-1:483584640083:parameter/dev/811-CROSSELL/agent-assisted-portal/SAML_IDP_CERT_BANK_IN",
+        "DataType": "text"
+    }
+}
+app_user@KBUTEC81L20293:~$ aws ssm get-parameter --name "/dev/811-CROSSELL/agent-assisted-portal/SAML_PRIVATE_KEY_BANK_IN" --region ap-south-1
+{
+    "Parameter": {
+        "Name": "/dev/811-CROSSELL/agent-assisted-portal/SAML_PRIVATE_KEY_BANK_IN",
+        "Type": "SecureString",
+        "Value": "a05m+fNffE3SEuUb2YPW5SUeZ30cd6t1DGUtfMRJCxSRMaYS7M72OBA/bllpMwoEyVdSx6bJwXSGmzD1/ZFq4x1JHMUedboACyqOlqM22qnQUtWcS1AMWBKwFTIFamex8sT1HIcSeLV2O5NeOw8TiunQo=",
+        "Version": 1,
+        "LastModifiedDate": "2025-11-05T15:32:41.954000+00:00",
+        "ARN": "arn:aws:ssm:ap-south-1:483584640083:parameter/dev/811-CROSSELL/agent-assisted-portal/SAML_PRIVATE_KEY_BANK_IN",
+        "DataType": "text"
+    }
+}
+app_user@KBUTEC81L20293:~$
