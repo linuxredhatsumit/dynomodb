@@ -1,69 +1,239 @@
-pp_user@KBUTEC81L20293:~$ kcdev get secretproviderclass -n agent-portal-dev -oyaml
-apiVersion: v1
-items:
-- apiVersion: secrets-store.csi.x-k8s.io/v1
-  kind: SecretProviderClass
-  metadata:
-    annotations:
-      meta.helm.sh/release-name: dev-agent-assisted-portal
-      meta.helm.sh/release-namespace: agent-portal-dev
-    creationTimestamp: "2025-07-17T11:55:39Z"
-    generation: 4
-    labels:
-      app.kubernetes.io/managed-by: Helm
-    name: agent-assisted-portal-spc
-    namespace: agent-portal-dev
-    resourceVersion: "415760474"
-    uid: 3039fcc7-aaa3-443a-a35e-1e8200efac7a
-  spec:
-    parameters:
-      objects: |
-        - objectName: "/dev/811-CROSSELL/agent-assisted-portal/SAML_IDP_CERT"
-          objectType: "ssmparameter"
-          objectAlias: SAML_IDP_CERT
-        - objectName: "/dev/811-CROSSELL/agent-assisted-portal/SAML_PRIVATE_KEY"
-          objectType: "ssmparameter"
-          objectAlias: SAML_PRIVATE_KEY
-        - objectName: "/dev/811-CROSSELL/agent-assisted-portal/SAML_IDP_CERT_PATH"
-          objectType: "ssmparameter"
-          objectAlias: SAML_IDP_CERT_PATH
-        - objectName: "/dev/811-CROSSELL/agent-assisted-portal/SAML_PRIVATE_KEY_PATH"
-          objectType: "ssmparameter"
-          objectAlias: SAML_PRIVATE_KEY_PATH
-        - objectName: "/dev/811-CROSSELL/agent-assisted-portal/SAML_IDP_CERT_PATH_BANK_IN"
-          objectType: "ssmparameter"
-          objectAlias: SAML_IDP_CERT_PATH_BANK_IN
-        - objectName: "/dev/811-CROSSELL/agent-assisted-portal/SAML_PRIVATE_KEY_PATH_BANK_IN"
-          objectType: "ssmparameter"
-          objectAlias: SAML_PRIVATE_KEY_PATH_BANK_IN
-        - objectName: "/dev/811-CROSSELL/agent-assisted-portal/SAML_IDP_CERT_BANK_IN"
-          objectType: "ssmparameter"
-          objectAlias: SAML_IDP_CERT_BANK_IN
-        - objectName: "/dev/811-CROSSELL/agent-assisted-portal/SAML_PRIVATE_KEY_BANK_IN"
-          objectType: "ssmparameter"
-          objectAlias: SAML_PRIVATE_KEY_BANK_IN
-    provider: aws
-    secretObjects:
-    - data:
-      - key: SAML_IDP_CERT
-        objectName: SAML_IDP_CERT
-      - key: SAML_PRIVATE_KEY
-        objectName: SAML_PRIVATE_KEY
-      - key: SAML_IDP_CERT_PATH
-        objectName: SAML_IDP_CERT_PATH
-      - key: SAML_PRIVATE_KEY_PATH
-        objectName: SAML_PRIVATE_KEY_PATH
-      - key: SAML_IDP_CERT_BANK_IN
-        objectName: SAML_IDP_CERT_BANK_IN
-      - key: SAML_PRIVATE_KEY_BANK_IN
-        objectName: SAML_PRIVATE_KEY_BANK_IN
-      - key: SAML_IDP_CERT_PATH_BANK_IN
-        objectName: SAML_IDP_CERT_PATH_BANK_IN
-      - key: SAML_PRIVATE_KEY_PATH_BANK_IN
-        objectName: SAML_PRIVATE_KEY_PATH_BANK_IN
-      secretName: agent-assisted-portal-secrets
-      type: Opaque
-kind: List
-metadata:
-  resourceVersion: ""
-app_user@KBUTEC81L20293:~$
+app_user@KBUTEC81L20293:~$ kcdev describe po agent-assisted-portal-5b8bb56998-kr2vf -n agent-portal-dev
+Name:             agent-assisted-portal-5b8bb56998-kr2vf
+Namespace:        agent-portal-dev
+Priority:         0
+Service Account:  811-dev-sa-agent-asissted-portal
+Node:             ip-100-64-174-185.ap-south-1.compute.internal/100.64.174.185
+Start Time:       Thu, 06 Nov 2025 11:39:18 +0000
+Labels:           app=agent-assisted-portal
+                  pod-template-hash=5b8bb56998
+                  security.istio.io/tlsMode=istio
+                  service.istio.io/canonical-name=agent-assisted-portal
+                  service.istio.io/canonical-revision=latest
+Annotations:      istio.io/rev: default
+                  kubectl.kubernetes.io/default-container: agent-assisted-portal
+                  kubectl.kubernetes.io/default-logs-container: agent-assisted-portal
+                  kubectl.kubernetes.io/restartedAt: 2025-11-06T11:39:18Z
+                  prometheus.io/path: /stats/prometheus
+                  prometheus.io/port: 15020
+                  prometheus.io/scrape: true
+                  sidecar.istio.io/status:
+                    {"initContainers":["istio-init"],"containers":["istio-proxy"],"volumes":["workload-socket","credential-socket","workload-certs","istio-env...
+Status:           Running
+IP:               100.64.182.167
+IPs:
+  IP:           100.64.182.167
+Controlled By:  ReplicaSet/agent-assisted-portal-5b8bb56998
+Init Containers:
+  istio-init:
+    Container ID:  containerd://62e85e58d003922c7ba6bc161edf6468dc6003399559475209add412d9ad684f
+    Image:         483584640083.dkr.ecr.ap-south-1.amazonaws.com/811onb/goldenimages:istio-proxyv2-1.22.0-distroless
+    Image ID:      483584640083.dkr.ecr.ap-south-1.amazonaws.com/811onb/goldenimages@sha256:d537f43f35811aed5b85402c448522837cab0512a72525fe1c93413065dffdac
+    Port:          <none>
+    Host Port:     <none>
+    Args:
+      istio-iptables
+      -p
+      15001
+      -z
+      15006
+      -u
+      1337
+      -m
+      REDIRECT
+      -i
+      *
+      -x
+
+      -b
+      *
+      -d
+      15090,15021,15020
+      --log_output_level=default:info
+    State:          Terminated
+      Reason:       Completed
+      Exit Code:    0
+      Started:      Thu, 06 Nov 2025 11:39:19 +0000
+      Finished:     Thu, 06 Nov 2025 11:39:19 +0000
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      cpu:     2
+      memory:  1Gi
+    Requests:
+      cpu:     10m
+      memory:  40Mi
+    Environment:
+      AWS_STS_REGIONAL_ENDPOINTS:   regional
+      AWS_DEFAULT_REGION:           ap-south-1
+      AWS_REGION:                   ap-south-1
+      AWS_ROLE_ARN:                 arn:aws:iam::483584640083:role/811-dev-sa-agent-asissted-portal-role
+      AWS_WEB_IDENTITY_TOKEN_FILE:  /var/run/secrets/eks.amazonaws.com/serviceaccount/token
+    Mounts:
+      /var/run/secrets/eks.amazonaws.com/serviceaccount from aws-iam-token (ro)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-vrtfp (ro)
+Containers:
+  agent-assisted-portal:
+    Container ID:   containerd://02e5fddc1dc0cc2477cf81ce7d2ef772c3c5501fd8883b815fe0ae570e02f052
+    Image:          483584640083.dkr.ecr.ap-south-1.amazonaws.com/811devagentassistedportal/agent_assisted_portal:AgentAssistedPortal-sso_domain_migration-20251106.2
+    Image ID:       483584640083.dkr.ecr.ap-south-1.amazonaws.com/811devagentassistedportal/agent_assisted_portal@sha256:396e02bafca581cab091b2770cb86ac7e23bdd8d7265f977968fbddb042145cd
+    Port:           8080/TCP
+    Host Port:      0/TCP
+    State:          Waiting
+      Reason:       CrashLoopBackOff
+    Last State:     Terminated
+      Reason:       Error
+      Exit Code:    1
+      Started:      Thu, 06 Nov 2025 11:39:35 +0000
+      Finished:     Thu, 06 Nov 2025 11:39:40 +0000
+    Ready:          False
+    Restart Count:  1
+    Limits:
+      cpu:     1
+      memory:  2Gi
+    Requests:
+      cpu:      500m
+      memory:   1Gi
+    Liveness:   http-get http://:15020/app-health/agent-assisted-portal/livez delay=600s timeout=10s period=10s #success=1 #failure=3
+    Readiness:  http-get http://:15020/app-health/agent-assisted-portal/readyz delay=0s timeout=70s period=10s #success=1 #failure=3
+    Environment Variables from:
+      agent-assisted-portal-configmap  ConfigMap  Optional: false
+      agent-assisted-portal-secrets    Secret     Optional: false
+    Environment:
+      NODE:                          (v1:status.hostIP)
+      OTEL_EXPORTER_OTLP_ENDPOINT:  http://$(NODE):4318
+      AWS_STS_REGIONAL_ENDPOINTS:   regional
+      AWS_DEFAULT_REGION:           ap-south-1
+      AWS_REGION:                   ap-south-1
+      AWS_ROLE_ARN:                 arn:aws:iam::483584640083:role/811-dev-sa-agent-asissted-portal-role
+      AWS_WEB_IDENTITY_TOKEN_FILE:  /var/run/secrets/eks.amazonaws.com/serviceaccount/token
+    Mounts:
+      /mnt/secrets from secrets-store-inline (ro)
+      /var/run/secrets/eks.amazonaws.com/serviceaccount from aws-iam-token (ro)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-vrtfp (ro)
+  istio-proxy:
+    Container ID:  containerd://0b9ecb5de8a0ea1c7a3c632ab6a2714d0ff09adad9882edc59bbe09374a313f5
+    Image:         docker.io/istio/proxyv2:1.22.0-distroless
+    Image ID:      483584640083.dkr.ecr.ap-south-1.amazonaws.com/811onb/goldenimages@sha256:d537f43f35811aed5b85402c448522837cab0512a72525fe1c93413065dffdac
+    Port:          15090/TCP
+    Host Port:     0/TCP
+    Args:
+      proxy
+      sidecar
+      --domain
+      $(POD_NAMESPACE).svc.cluster.local
+      --proxyLogLevel=warning
+      --proxyComponentLogLevel=misc:error
+      --log_output_level=default:info
+    State:          Running
+      Started:      Thu, 06 Nov 2025 11:39:28 +0000
+    Ready:          True
+    Restart Count:  0
+    Limits:
+      cpu:     2
+      memory:  1Gi
+    Requests:
+      cpu:      10m
+      memory:   40Mi
+    Readiness:  http-get http://:15021/healthz/ready delay=0s timeout=3s period=15s #success=1 #failure=4
+    Startup:    http-get http://:15021/healthz/ready delay=0s timeout=3s period=1s #success=1 #failure=600
+    Environment:
+      PILOT_CERT_PROVIDER:           istiod
+      CA_ADDR:                       istiod.istio-system.svc:15012
+      POD_NAME:                      agent-assisted-portal-5b8bb56998-kr2vf (v1:metadata.name)
+      POD_NAMESPACE:                 agent-portal-dev (v1:metadata.namespace)
+      INSTANCE_IP:                    (v1:status.podIP)
+      SERVICE_ACCOUNT:                (v1:spec.serviceAccountName)
+      HOST_IP:                        (v1:status.hostIP)
+      ISTIO_CPU_LIMIT:               2 (limits.cpu)
+      PROXY_CONFIG:                  {"image":{"imageType":"distroless"}}
+
+      ISTIO_META_POD_PORTS:          [
+                                         {"containerPort":8080,"protocol":"TCP"}
+                                     ]
+      ISTIO_META_APP_CONTAINERS:     agent-assisted-portal
+      GOMEMLIMIT:                    1073741824 (limits.memory)
+      GOMAXPROCS:                    2 (limits.cpu)
+      ISTIO_META_CLUSTER_ID:         Kubernetes
+      ISTIO_META_NODE_NAME:           (v1:spec.nodeName)
+      ISTIO_META_INTERCEPTION_MODE:  REDIRECT
+      ISTIO_META_WORKLOAD_NAME:      agent-assisted-portal
+      ISTIO_META_OWNER:              kubernetes://apis/apps/v1/namespaces/agent-portal-dev/deployments/agent-assisted-portal
+      ISTIO_META_MESH_ID:            cluster.local
+      TRUST_DOMAIN:                  cluster.local
+      ISTIO_KUBE_APP_PROBERS:        {"/app-health/agent-assisted-portal/livez":{"httpGet":{"path":"/health/","port":8080,"scheme":"HTTP"},"timeoutSeconds":10},"/app-health/agent-assisted-portal/readyz":{"httpGet":{"path":"/health/","port":8080,"scheme":"HTTP"},"timeoutSeconds":70}}
+      AWS_STS_REGIONAL_ENDPOINTS:    regional
+      AWS_DEFAULT_REGION:            ap-south-1
+      AWS_REGION:                    ap-south-1
+      AWS_ROLE_ARN:                  arn:aws:iam::483584640083:role/811-dev-sa-agent-asissted-portal-role
+      AWS_WEB_IDENTITY_TOKEN_FILE:   /var/run/secrets/eks.amazonaws.com/serviceaccount/token
+    Mounts:
+      /etc/istio/pod from istio-podinfo (rw)
+      /etc/istio/proxy from istio-envoy (rw)
+      /var/lib/istio/data from istio-data (rw)
+      /var/run/secrets/credential-uds from credential-socket (rw)
+      /var/run/secrets/eks.amazonaws.com/serviceaccount from aws-iam-token (ro)
+      /var/run/secrets/istio from istiod-ca-cert (rw)
+      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-vrtfp (ro)
+      /var/run/secrets/tokens from istio-token (rw)
+      /var/run/secrets/workload-spiffe-credentials from workload-certs (rw)
+      /var/run/secrets/workload-spiffe-uds from workload-socket (rw)
+Conditions:
+  Type                        Status
+  PodReadyToStartContainers   True
+  Initialized                 True
+  Ready                       False
+  ContainersReady             False
+  PodScheduled                True
+Volumes:
+  aws-iam-token:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  86400
+  workload-socket:
+    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:
+    SizeLimit:  <unset>
+  credential-socket:
+    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:
+    SizeLimit:  <unset>
+  workload-certs:
+    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:
+    SizeLimit:  <unset>
+  istio-envoy:
+    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:     Memory
+    SizeLimit:  <unset>
+  istio-data:
+    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
+    Medium:
+    SizeLimit:  <unset>
+  istio-podinfo:
+    Type:  DownwardAPI (a volume populated by information about the pod)
+    Items:
+      metadata.labels -> labels
+      metadata.annotations -> annotations
+  istio-token:
+    Type:                    Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:  43200
+  istiod-ca-cert:
+    Type:      ConfigMap (a volume populated by a ConfigMap)
+    Name:      istio-ca-root-cert
+    Optional:  false
+  secrets-store-inline:
+    Type:              CSI (a Container Storage Interface (CSI) volume source)
+    Driver:            secrets-store.csi.k8s.io
+    FSType:
+    ReadOnly:          true
+    VolumeAttributes:      secretProviderClass=agent-assisted-portal-spc
+  kube-api-access-vrtfp:
+    Type:                     Projected (a volume that contains injected data from multiple sources)
+    TokenExpirationSeconds:   3607
+    ConfigMapName:            kube-root-ca.crt
+    ConfigMapOptional:        <nil>
+    DownwardAPI:              true
+QoS Class:                    Burstable
+Node-Selectors:               <none>
+Tolerations:                  node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
+                              node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
