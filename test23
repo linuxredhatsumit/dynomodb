@@ -1,239 +1,68 @@
-app_user@KBUTEC81L20293:~$ kcdev describe po agent-assisted-portal-5b8bb56998-kr2vf -n agent-portal-dev
-Name:             agent-assisted-portal-5b8bb56998-kr2vf
-Namespace:        agent-portal-dev
-Priority:         0
-Service Account:  811-dev-sa-agent-asissted-portal
-Node:             ip-100-64-174-185.ap-south-1.compute.internal/100.64.174.185
-Start Time:       Thu, 06 Nov 2025 11:39:18 +0000
-Labels:           app=agent-assisted-portal
-                  pod-template-hash=5b8bb56998
-                  security.istio.io/tlsMode=istio
-                  service.istio.io/canonical-name=agent-assisted-portal
-                  service.istio.io/canonical-revision=latest
-Annotations:      istio.io/rev: default
-                  kubectl.kubernetes.io/default-container: agent-assisted-portal
-                  kubectl.kubernetes.io/default-logs-container: agent-assisted-portal
-                  kubectl.kubernetes.io/restartedAt: 2025-11-06T11:39:18Z
-                  prometheus.io/path: /stats/prometheus
-                  prometheus.io/port: 15020
-                  prometheus.io/scrape: true
-                  sidecar.istio.io/status:
-                    {"initContainers":["istio-init"],"containers":["istio-proxy"],"volumes":["workload-socket","credential-socket","workload-certs","istio-env...
-Status:           Running
-IP:               100.64.182.167
-IPs:
-  IP:           100.64.182.167
-Controlled By:  ReplicaSet/agent-assisted-portal-5b8bb56998
-Init Containers:
-  istio-init:
-    Container ID:  containerd://62e85e58d003922c7ba6bc161edf6468dc6003399559475209add412d9ad684f
-    Image:         483584640083.dkr.ecr.ap-south-1.amazonaws.com/811onb/goldenimages:istio-proxyv2-1.22.0-distroless
-    Image ID:      483584640083.dkr.ecr.ap-south-1.amazonaws.com/811onb/goldenimages@sha256:d537f43f35811aed5b85402c448522837cab0512a72525fe1c93413065dffdac
-    Port:          <none>
-    Host Port:     <none>
-    Args:
-      istio-iptables
-      -p
-      15001
-      -z
-      15006
-      -u
-      1337
-      -m
-      REDIRECT
-      -i
-      *
-      -x
+pp_user@KBUTEC81L20293:~$ kcdev logs -f agent-assisted-portal-5f4d65bb75-dq9zr -n agent-portal-dev  --previous
 
-      -b
-      *
-      -d
-      15090,15021,15020
-      --log_output_level=default:info
-    State:          Terminated
-      Reason:       Completed
-      Exit Code:    0
-      Started:      Thu, 06 Nov 2025 11:39:19 +0000
-      Finished:     Thu, 06 Nov 2025 11:39:19 +0000
-    Ready:          True
-    Restart Count:  0
-    Limits:
-      cpu:     2
-      memory:  1Gi
-    Requests:
-      cpu:     10m
-      memory:  40Mi
-    Environment:
-      AWS_STS_REGIONAL_ENDPOINTS:   regional
-      AWS_DEFAULT_REGION:           ap-south-1
-      AWS_REGION:                   ap-south-1
-      AWS_ROLE_ARN:                 arn:aws:iam::483584640083:role/811-dev-sa-agent-asissted-portal-role
-      AWS_WEB_IDENTITY_TOKEN_FILE:  /var/run/secrets/eks.amazonaws.com/serviceaccount/token
-    Mounts:
-      /var/run/secrets/eks.amazonaws.com/serviceaccount from aws-iam-token (ro)
-      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-vrtfp (ro)
-Containers:
-  agent-assisted-portal:
-    Container ID:   containerd://02e5fddc1dc0cc2477cf81ce7d2ef772c3c5501fd8883b815fe0ae570e02f052
-    Image:          483584640083.dkr.ecr.ap-south-1.amazonaws.com/811devagentassistedportal/agent_assisted_portal:AgentAssistedPortal-sso_domain_migration-20251106.2
-    Image ID:       483584640083.dkr.ecr.ap-south-1.amazonaws.com/811devagentassistedportal/agent_assisted_portal@sha256:396e02bafca581cab091b2770cb86ac7e23bdd8d7265f977968fbddb042145cd
-    Port:           8080/TCP
-    Host Port:      0/TCP
-    State:          Waiting
-      Reason:       CrashLoopBackOff
-    Last State:     Terminated
-      Reason:       Error
-      Exit Code:    1
-      Started:      Thu, 06 Nov 2025 11:39:35 +0000
-      Finished:     Thu, 06 Nov 2025 11:39:40 +0000
-    Ready:          False
-    Restart Count:  1
-    Limits:
-      cpu:     1
-      memory:  2Gi
-    Requests:
-      cpu:      500m
-      memory:   1Gi
-    Liveness:   http-get http://:15020/app-health/agent-assisted-portal/livez delay=600s timeout=10s period=10s #success=1 #failure=3
-    Readiness:  http-get http://:15020/app-health/agent-assisted-portal/readyz delay=0s timeout=70s period=10s #success=1 #failure=3
-    Environment Variables from:
-      agent-assisted-portal-configmap  ConfigMap  Optional: false
-      agent-assisted-portal-secrets    Secret     Optional: false
-    Environment:
-      NODE:                          (v1:status.hostIP)
-      OTEL_EXPORTER_OTLP_ENDPOINT:  http://$(NODE):4318
-      AWS_STS_REGIONAL_ENDPOINTS:   regional
-      AWS_DEFAULT_REGION:           ap-south-1
-      AWS_REGION:                   ap-south-1
-      AWS_ROLE_ARN:                 arn:aws:iam::483584640083:role/811-dev-sa-agent-asissted-portal-role
-      AWS_WEB_IDENTITY_TOKEN_FILE:  /var/run/secrets/eks.amazonaws.com/serviceaccount/token
-    Mounts:
-      /mnt/secrets from secrets-store-inline (ro)
-      /var/run/secrets/eks.amazonaws.com/serviceaccount from aws-iam-token (ro)
-      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-vrtfp (ro)
-  istio-proxy:
-    Container ID:  containerd://0b9ecb5de8a0ea1c7a3c632ab6a2714d0ff09adad9882edc59bbe09374a313f5
-    Image:         docker.io/istio/proxyv2:1.22.0-distroless
-    Image ID:      483584640083.dkr.ecr.ap-south-1.amazonaws.com/811onb/goldenimages@sha256:d537f43f35811aed5b85402c448522837cab0512a72525fe1c93413065dffdac
-    Port:          15090/TCP
-    Host Port:     0/TCP
-    Args:
-      proxy
-      sidecar
-      --domain
-      $(POD_NAMESPACE).svc.cluster.local
-      --proxyLogLevel=warning
-      --proxyComponentLogLevel=misc:error
-      --log_output_level=default:info
-    State:          Running
-      Started:      Thu, 06 Nov 2025 11:39:28 +0000
-    Ready:          True
-    Restart Count:  0
-    Limits:
-      cpu:     2
-      memory:  1Gi
-    Requests:
-      cpu:      10m
-      memory:   40Mi
-    Readiness:  http-get http://:15021/healthz/ready delay=0s timeout=3s period=15s #success=1 #failure=4
-    Startup:    http-get http://:15021/healthz/ready delay=0s timeout=3s period=1s #success=1 #failure=600
-    Environment:
-      PILOT_CERT_PROVIDER:           istiod
-      CA_ADDR:                       istiod.istio-system.svc:15012
-      POD_NAME:                      agent-assisted-portal-5b8bb56998-kr2vf (v1:metadata.name)
-      POD_NAMESPACE:                 agent-portal-dev (v1:metadata.namespace)
-      INSTANCE_IP:                    (v1:status.podIP)
-      SERVICE_ACCOUNT:                (v1:spec.serviceAccountName)
-      HOST_IP:                        (v1:status.hostIP)
-      ISTIO_CPU_LIMIT:               2 (limits.cpu)
-      PROXY_CONFIG:                  {"image":{"imageType":"distroless"}}
+264 static files copied to '/k811/app/staticFiles', 264 post-processed.
+Traceback (most recent call last):
+  File "/opt/pysetup/.venv/lib/python3.10/site-packages/environ/environ.py", line 387, in get_value
+    value = self.ENVIRON[var_name]
+  File "/usr/local/lib/python3.10/os.py", line 680, in __getitem__
+    raise KeyError(key) from None
+KeyError: 'SAML_PRIVATE_KEY_PATH_BANK_IN'
 
-      ISTIO_META_POD_PORTS:          [
-                                         {"containerPort":8080,"protocol":"TCP"}
-                                     ]
-      ISTIO_META_APP_CONTAINERS:     agent-assisted-portal
-      GOMEMLIMIT:                    1073741824 (limits.memory)
-      GOMAXPROCS:                    2 (limits.cpu)
-      ISTIO_META_CLUSTER_ID:         Kubernetes
-      ISTIO_META_NODE_NAME:           (v1:spec.nodeName)
-      ISTIO_META_INTERCEPTION_MODE:  REDIRECT
-      ISTIO_META_WORKLOAD_NAME:      agent-assisted-portal
-      ISTIO_META_OWNER:              kubernetes://apis/apps/v1/namespaces/agent-portal-dev/deployments/agent-assisted-portal
-      ISTIO_META_MESH_ID:            cluster.local
-      TRUST_DOMAIN:                  cluster.local
-      ISTIO_KUBE_APP_PROBERS:        {"/app-health/agent-assisted-portal/livez":{"httpGet":{"path":"/health/","port":8080,"scheme":"HTTP"},"timeoutSeconds":10},"/app-health/agent-assisted-portal/readyz":{"httpGet":{"path":"/health/","port":8080,"scheme":"HTTP"},"timeoutSeconds":70}}
-      AWS_STS_REGIONAL_ENDPOINTS:    regional
-      AWS_DEFAULT_REGION:            ap-south-1
-      AWS_REGION:                    ap-south-1
-      AWS_ROLE_ARN:                  arn:aws:iam::483584640083:role/811-dev-sa-agent-asissted-portal-role
-      AWS_WEB_IDENTITY_TOKEN_FILE:   /var/run/secrets/eks.amazonaws.com/serviceaccount/token
-    Mounts:
-      /etc/istio/pod from istio-podinfo (rw)
-      /etc/istio/proxy from istio-envoy (rw)
-      /var/lib/istio/data from istio-data (rw)
-      /var/run/secrets/credential-uds from credential-socket (rw)
-      /var/run/secrets/eks.amazonaws.com/serviceaccount from aws-iam-token (ro)
-      /var/run/secrets/istio from istiod-ca-cert (rw)
-      /var/run/secrets/kubernetes.io/serviceaccount from kube-api-access-vrtfp (ro)
-      /var/run/secrets/tokens from istio-token (rw)
-      /var/run/secrets/workload-spiffe-credentials from workload-certs (rw)
-      /var/run/secrets/workload-spiffe-uds from workload-socket (rw)
-Conditions:
-  Type                        Status
-  PodReadyToStartContainers   True
-  Initialized                 True
-  Ready                       False
-  ContainersReady             False
-  PodScheduled                True
-Volumes:
-  aws-iam-token:
-    Type:                    Projected (a volume that contains injected data from multiple sources)
-    TokenExpirationSeconds:  86400
-  workload-socket:
-    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
-    Medium:
-    SizeLimit:  <unset>
-  credential-socket:
-    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
-    Medium:
-    SizeLimit:  <unset>
-  workload-certs:
-    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
-    Medium:
-    SizeLimit:  <unset>
-  istio-envoy:
-    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
-    Medium:     Memory
-    SizeLimit:  <unset>
-  istio-data:
-    Type:       EmptyDir (a temporary directory that shares a pod's lifetime)
-    Medium:
-    SizeLimit:  <unset>
-  istio-podinfo:
-    Type:  DownwardAPI (a volume populated by information about the pod)
-    Items:
-      metadata.labels -> labels
-      metadata.annotations -> annotations
-  istio-token:
-    Type:                    Projected (a volume that contains injected data from multiple sources)
-    TokenExpirationSeconds:  43200
-  istiod-ca-cert:
-    Type:      ConfigMap (a volume populated by a ConfigMap)
-    Name:      istio-ca-root-cert
-    Optional:  false
-  secrets-store-inline:
-    Type:              CSI (a Container Storage Interface (CSI) volume source)
-    Driver:            secrets-store.csi.k8s.io
-    FSType:
-    ReadOnly:          true
-    VolumeAttributes:      secretProviderClass=agent-assisted-portal-spc
-  kube-api-access-vrtfp:
-    Type:                     Projected (a volume that contains injected data from multiple sources)
-    TokenExpirationSeconds:   3607
-    ConfigMapName:            kube-root-ca.crt
-    ConfigMapOptional:        <nil>
-    DownwardAPI:              true
-QoS Class:                    Burstable
-Node-Selectors:               <none>
-Tolerations:                  node.kubernetes.io/not-ready:NoExecute op=Exists for 300s
-                              node.kubernetes.io/unreachable:NoExecute op=Exists for 300s
+The above exception was the direct cause of the following exception:
+
+Traceback (most recent call last):
+  File "/k811/app/manage.py", line 22, in <module>
+    main()
+  File "/k811/app/manage.py", line 18, in main
+    execute_from_command_line(sys.argv)
+  File "/opt/pysetup/.venv/lib/python3.10/site-packages/django/core/management/__init__.py", line 442, in execute_from_command_line
+    utility.execute()
+  File "/opt/pysetup/.venv/lib/python3.10/site-packages/django/core/management/__init__.py", line 436, in execute
+    self.fetch_command(subcommand).run_from_argv(self.argv)
+  File "/opt/pysetup/.venv/lib/python3.10/site-packages/django/core/management/base.py", line 412, in run_from_argv
+    self.execute(*args, **cmd_options)
+  File "/opt/pysetup/.venv/lib/python3.10/site-packages/django/core/management/base.py", line 458, in execute
+    output = self.handle(*args, **options)
+  File "/opt/pysetup/.venv/lib/python3.10/site-packages/django/core/management/base.py", line 106, in wrapper
+    res = handle_func(*args, **kwargs)
+  File "/opt/pysetup/.venv/lib/python3.10/site-packages/django/core/management/commands/migrate.py", line 100, in handle
+    self.check(databases=[database])
+  File "/opt/pysetup/.venv/lib/python3.10/site-packages/django/core/management/base.py", line 485, in check
+    all_issues = checks.run_checks(
+  File "/opt/pysetup/.venv/lib/python3.10/site-packages/django/core/checks/registry.py", line 88, in run_checks
+    new_errors = check(app_configs=app_configs, databases=databases)
+  File "/opt/pysetup/.venv/lib/python3.10/site-packages/django/core/checks/urls.py", line 14, in check_url_config
+    return check_resolver(resolver)
+  File "/opt/pysetup/.venv/lib/python3.10/site-packages/django/core/checks/urls.py", line 24, in check_resolver
+    return check_method()
+  File "/opt/pysetup/.venv/lib/python3.10/site-packages/django/urls/resolvers.py", line 494, in check
+    for pattern in self.url_patterns:
+  File "/opt/pysetup/.venv/lib/python3.10/site-packages/django/utils/functional.py", line 57, in __get__
+    res = instance.__dict__[self.name] = self.func(instance)
+  File "/opt/pysetup/.venv/lib/python3.10/site-packages/django/urls/resolvers.py", line 715, in url_patterns
+    patterns = getattr(self.urlconf_module, "urlpatterns", self.urlconf_module)
+  File "/opt/pysetup/.venv/lib/python3.10/site-packages/django/utils/functional.py", line 57, in __get__
+    res = instance.__dict__[self.name] = self.func(instance)
+  File "/opt/pysetup/.venv/lib/python3.10/site-packages/django/urls/resolvers.py", line 708, in urlconf_module
+    return import_module(self.urlconf_name)
+  File "/usr/local/lib/python3.10/importlib/__init__.py", line 126, in import_module
+    return _bootstrap._gcd_import(name[level:], package, level)
+  File "<frozen importlib._bootstrap>", line 1050, in _gcd_import
+  File "<frozen importlib._bootstrap>", line 1027, in _find_and_load
+  File "<frozen importlib._bootstrap>", line 1006, in _find_and_load_unlocked
+  File "<frozen importlib._bootstrap>", line 688, in _load_unlocked
+  File "<frozen importlib._bootstrap_external>", line 883, in exec_module
+  File "<frozen importlib._bootstrap>", line 241, in _call_with_frames_removed
+  File "/k811/app/agentassistedportal/urls_public.py", line 25, in <module>
+    import customer.views.agent_customer_search
+  File "/k811/app/customer/views/agent_customer_search.py", line 19, in <module>
+    from agentassistedportal import settings
+  File "/k811/app/agentassistedportal/settings/__init__.py", line 38, in <module>
+    from agentassistedportal.saml import *  # noqa: F403
+  File "/k811/app/agentassistedportal/saml.py", line 174, in <module>
+    "key_file": env.str("SAML_PRIVATE_KEY_PATH_BANK_IN"),
+  File "/opt/pysetup/.venv/lib/python3.10/site-packages/environ/environ.py", line 212, in str
+    value = self.get_value(var, cast=str, default=default)
+  File "/opt/pysetup/.venv/lib/python3.10/site-packages/environ/environ.py", line 391, in get_value
+    raise ImproperlyConfigured(error_msg) from exc
+django.core.exceptions.ImproperlyConfigured: Set the SAML_PRIVATE_KEY_PATH_BANK_IN environment variable
