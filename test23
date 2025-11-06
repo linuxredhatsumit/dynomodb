@@ -1,87 +1,69 @@
-deployment
-
-apiVersion: apps/v1
-kind: Deployment
+pp_user@KBUTEC81L20293:~$ kcdev get secretproviderclass -n agent-portal-dev -oyaml
+apiVersion: v1
+items:
+- apiVersion: secrets-store.csi.x-k8s.io/v1
+  kind: SecretProviderClass
+  metadata:
+    annotations:
+      meta.helm.sh/release-name: dev-agent-assisted-portal
+      meta.helm.sh/release-namespace: agent-portal-dev
+    creationTimestamp: "2025-07-17T11:55:39Z"
+    generation: 4
+    labels:
+      app.kubernetes.io/managed-by: Helm
+    name: agent-assisted-portal-spc
+    namespace: agent-portal-dev
+    resourceVersion: "415760474"
+    uid: 3039fcc7-aaa3-443a-a35e-1e8200efac7a
+  spec:
+    parameters:
+      objects: |
+        - objectName: "/dev/811-CROSSELL/agent-assisted-portal/SAML_IDP_CERT"
+          objectType: "ssmparameter"
+          objectAlias: SAML_IDP_CERT
+        - objectName: "/dev/811-CROSSELL/agent-assisted-portal/SAML_PRIVATE_KEY"
+          objectType: "ssmparameter"
+          objectAlias: SAML_PRIVATE_KEY
+        - objectName: "/dev/811-CROSSELL/agent-assisted-portal/SAML_IDP_CERT_PATH"
+          objectType: "ssmparameter"
+          objectAlias: SAML_IDP_CERT_PATH
+        - objectName: "/dev/811-CROSSELL/agent-assisted-portal/SAML_PRIVATE_KEY_PATH"
+          objectType: "ssmparameter"
+          objectAlias: SAML_PRIVATE_KEY_PATH
+        - objectName: "/dev/811-CROSSELL/agent-assisted-portal/SAML_IDP_CERT_PATH_BANK_IN"
+          objectType: "ssmparameter"
+          objectAlias: SAML_IDP_CERT_PATH_BANK_IN
+        - objectName: "/dev/811-CROSSELL/agent-assisted-portal/SAML_PRIVATE_KEY_PATH_BANK_IN"
+          objectType: "ssmparameter"
+          objectAlias: SAML_PRIVATE_KEY_PATH_BANK_IN
+        - objectName: "/dev/811-CROSSELL/agent-assisted-portal/SAML_IDP_CERT_BANK_IN"
+          objectType: "ssmparameter"
+          objectAlias: SAML_IDP_CERT_BANK_IN
+        - objectName: "/dev/811-CROSSELL/agent-assisted-portal/SAML_PRIVATE_KEY_BANK_IN"
+          objectType: "ssmparameter"
+          objectAlias: SAML_PRIVATE_KEY_BANK_IN
+    provider: aws
+    secretObjects:
+    - data:
+      - key: SAML_IDP_CERT
+        objectName: SAML_IDP_CERT
+      - key: SAML_PRIVATE_KEY
+        objectName: SAML_PRIVATE_KEY
+      - key: SAML_IDP_CERT_PATH
+        objectName: SAML_IDP_CERT_PATH
+      - key: SAML_PRIVATE_KEY_PATH
+        objectName: SAML_PRIVATE_KEY_PATH
+      - key: SAML_IDP_CERT_BANK_IN
+        objectName: SAML_IDP_CERT_BANK_IN
+      - key: SAML_PRIVATE_KEY_BANK_IN
+        objectName: SAML_PRIVATE_KEY_BANK_IN
+      - key: SAML_IDP_CERT_PATH_BANK_IN
+        objectName: SAML_IDP_CERT_PATH_BANK_IN
+      - key: SAML_PRIVATE_KEY_PATH_BANK_IN
+        objectName: SAML_PRIVATE_KEY_PATH_BANK_IN
+      secretName: agent-assisted-portal-secrets
+      type: Opaque
+kind: List
 metadata:
-  namespace: {{ .Values.namespace }}
-  name: {{ .Chart.Name }}
-  labels:
-    chart: "{{ .Chart.Name }}-{{ .Chart.Version | replace "+" "_" }}"
-spec:
-  progressDeadlineSeconds: {{ .Values.deadlineSeconds }}
-  selector:
-    matchLabels:
-      app: {{ .Chart.Name }}
-  template:
-    metadata:
-      labels:
-        app: {{ .Chart.Name }}  
-    spec:
-      serviceAccountName: {{ .Values.serviceaccount.name }}
-      topologySpreadConstraints:
-        - maxSkew : 1
-          topologyKey: topology.kubernetes.io/zone
-          whenUnsatisfiable: ScheduleAnyway
-          labelSelector:
-            matchExpressions:
-            - key: app
-              operator: In
-              values:
-              - {{ .Chart.Name }}
-      affinity:
-        nodeAffinity:
-          requiredDuringSchedulingIgnoredDuringExecution:
-            nodeSelectorTerms:
-            - matchExpressions:
-              - key: {{ .Values.node.name }}
-                operator: {{ .Values.node.operator }}
-                {{- range .Values.nodegroup }}
-                values: {{.}}
-                {{- end }}
-      containers:
-      - name: {{ .Chart.Name }}
-        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
-        imagePullPolicy: {{ .Values.image.pullPolicy }}
-        ports:
-        - containerPort: {{ .Values.service.internalPort }}
-        volumeMounts:
-          - name: secrets-store-inline
-            mountPath: "/mnt/secrets"
-            readOnly: true
-        env:
-          - name: NODE
-            valueFrom:
-              fieldRef:
-                fieldPath: status.hostIP
-          - name: OTEL_EXPORTER_OTLP_ENDPOINT
-            value: {{ .Values.otel.OTEL_EXPORTER_OTLP_ENDPOINT }}
-        envFrom:
-        - configMapRef:
-            name: {{ .Chart.Name }}-configmap
-        - secretRef:
-            name: {{ .Chart.Name }}-secrets
-        livenessProbe:
-          httpGet:
-            path: {{ .Values.probePath }}
-            port: {{ .Values.service.internalPort }}
-          initialDelaySeconds: {{ .Values.livenessProbe.initialDelaySeconds }}
-          periodSeconds: {{ .Values.livenessProbe.periodSeconds }}
-          successThreshold: {{ .Values.livenessProbe.successThreshold }}
-          timeoutSeconds: {{ .Values.livenessProbe.timeoutSeconds }}
-        readinessProbe:
-          httpGet:
-            path: {{ .Values.probePath }}
-            port: {{ .Values.service.internalPort }}
-          initialDelaySeconds: {{ .Values.readinessProbe.initialDelaySeconds }}
-          periodSeconds: {{ .Values.readinessProbe.periodSeconds }}
-          successThreshold: {{ .Values.readinessProbe.successThreshold }}
-          timeoutSeconds: {{ .Values.readinessProbe.timeoutSeconds }}
-        resources:
-          {{- toYaml .Values.resources | nindent 12 }}
-      volumes:
-        - name: secrets-store-inline
-          csi:
-            driver: secrets-store.csi.k8s.io
-            readOnly: true
-            volumeAttributes:
-              secretProviderClass: {{ .Chart.Name }}-spc
+  resourceVersion: ""
+app_user@KBUTEC81L20293:~$
