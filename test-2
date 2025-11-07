@@ -1,74 +1,14 @@
-UAT teamplate virtualervice
-
 apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
-  name: {{ .Chart.Name }} 
+  name: {{ .Chart.Name }}
   namespace: {{ .Values.namespace }}
 spec:
   gateways:
-  - {{ .Values.gateways.gateway }} 
+  - {{ .Values.gateways.gateway }}
   hosts:
-  - {{ .Values.gateways.host | quote }}
-  http:
-  - match:
-    - uri:
-        prefix: {{ .Values.gateways.prefixv2 }}
-    route:
-    - destination:
-        host: {{ .Values.service.name }}
-        port:
-          number: {{ .Values.gateways.internalPort }}
-      weight: {{ .Values.gateways.weightvalue }}
-      headers:
-        response: 
-          add:
-            Content-Security-Policy: "default-src 'none'"
-            Cache-Control: "no-cache, no-store, must-revalidate, max-age=0, post-check=0, pre-check=0"
-            Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
-            AllowedMethods: "['GET', 'POST']"
-            AllowedOrigins: "null"
-            Access-Control-Allow-Origin: "null"
-            AllowCredentials: "false"
-          remove:
-          - Server
-          - Allow
-  - match:
-    - uri:
-        prefix: {{ .Values.gateways.prefix }}
-    route:
-    - destination:
-        host: {{ .Values.service.name }}
-        port:
-          number: {{ .Values.gateways.internalPort }}
-      weight: {{ .Values.gateways.weightvalue }}
-      headers:
-        response: 
-          add:
-            Content-Security-Policy: "default-src 'none'"
-            Cache-Control: "no-cache, no-store, must-revalidate, max-age=0, post-check=0, pre-check=0"
-            Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
-            AllowedMethods: "['GET', 'POST']"
-            AllowedOrigins: "null"
-            AllowCredentials: "false"
-          remove:
-          - Server
-          - Allow
-
-
-
-prod virtual service
-
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: {{ .Chart.Name }} 
-  namespace: {{ .Values.namespace }}
-spec:
-  gateways:
-  - {{ .Values.gateways.gateway }} 
-  hosts:
-  - {{ .Values.gateways.host | quote }}
+  - "apy.kotak811.com"
+  - "apy.kotak811.bank.in"
   http:
   - match:
     - uri:
@@ -80,12 +20,10 @@ spec:
           number: {{ .Values.gateways.internalPort }}
       weight: {{ .Values.gateways.weightvalue }}
       headers:
-        response: 
+        response:
           add:
             Content-Security-Policy: "default-src 'none'"
             Cache-Control: "no-store"
+            Access-Control-Allow-Origin: "https://apy.kotak811.bank.in, https://apy.kotak811.com"
           remove:
           - Server
-
-
-so i have alias in cloudfront as apy.kotak811.bank.in along with apy.kotak811.com. same working for uat but not working for prod. above is virsutal service
