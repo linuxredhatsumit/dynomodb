@@ -1,29 +1,22 @@
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: {{ .Chart.Name }}
-  namespace: {{ .Values.namespace }}
-spec:
-  gateways:
-  - {{ .Values.gateways.gateway }}
-  hosts:
-  - "apy.kotak811.com"
-  - "apy.kotak811.bank.in"
-  http:
-  - match:
-    - uri:
-        prefix: {{ .Values.gateways.prefix }}
-    route:
-    - destination:
-        host: {{ .Values.service.name }}
-        port:
-          number: {{ .Values.gateways.internalPort }}
-      weight: {{ .Values.gateways.weightvalue }}
-      headers:
-        response:
-          add:
-            Content-Security-Policy: "default-src 'none'"
-            Cache-Control: "no-store"
-            Access-Control-Allow-Origin: "https://apy.kotak811.bank.in, https://apy.kotak811.com"
-          remove:
-          - Server
+fetch("https://811apppurezento.kotak811.com/apy/v1/generate-otp", {
+  "headers": {
+    "accept": "application/json, text/plain, */*",
+    "accept-language": "en-GB,en-US;q=0.9,en;q=0.8",
+    "content-type": "text/plain",
+    "priority": "u=1, i",
+    "sec-ch-ua": "\"Google Chrome\";v=\"141\", \"Not?A_Brand\";v=\"8\", \"Chromium\";v=\"141\"",
+    "sec-ch-ua-mobile": "?0",
+    "sec-ch-ua-platform": "\"macOS\"",
+    "sec-fetch-dest": "empty",
+    "sec-fetch-mode": "cors",
+    "sec-fetch-site": "same-site",
+    "x-api-key": "o4LOrAGAWK5pTgIrixDT4aIGcd49eZhm3HkX6qsx",
+    "x-pl-key": "DePVqIQZYIi/sjAw9G6p83I8d1dpKhIfx7NDnpxU0bSRHesuYg73HHUAJmInXDteEA0lG/VAKajHic/pM+sBO5z8cvryEuql0kj1ybPKJ6x+PUM+b6E3q1glrtV1FNd4W5i3yy0EOYuAoZpvrWKD+cmMwvKwVv3P46JPtBOwdU8=",
+    "x-session-id": "8129ca82-51e2-414b-839a-403c877c1232"
+  },
+  "referrer": "https://apy.kotak811.com/",
+  "body": "Cf30Zz0LJzExlMXiU+ZeSJ4XQu84vDs1UqCVYDHj3mZzylGupIWbSfeuRn6s+xf8B3QaUArg59Q38AbiAnatvcsypWaNZ/k=",
+  "method": "POST",
+  "mode": "cors",
+  "credentials": "omit"
+});
