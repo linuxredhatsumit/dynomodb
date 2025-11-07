@@ -1,45 +1,91 @@
-app_user@ip-10-59-81-252:~$ kprod get vs k811-cc-applications -n prod -oyaml
-apiVersion: networking.istio.io/v1
+UAT teamplate virtualervice
+
+apiVersion: networking.istio.io/v1alpha3
 kind: VirtualService
 metadata:
-  annotations:
-    meta.helm.sh/release-name: prod-k811-cc-applications
-    meta.helm.sh/release-namespace: prod
-  creationTimestamp: "2023-09-11T12:44:51Z"
-  generation: 5
-  labels:
-    app.kubernetes.io/managed-by: Helm
-  name: k811-cc-applications
-  namespace: prod
-  resourceVersion: "893082716"
-  uid: 208734f6-fca8-4179-baa6-1216921eab50
+  name: {{ .Chart.Name }} 
+  namespace: {{ .Values.namespace }}
 spec:
   gateways:
-  - gateway
+  - {{ .Values.gateways.gateway }} 
   hosts:
-  - '*'
+  - {{ .Values.gateways.host | quote }}
   http:
-  - corsPolicy:
-      allowOrigins:
-      - exact: https://creditcard-on-fd.kotak811.com
-      - exact: https://creditcard-on-fd.kotak811.bank.in
-    headers:
-      response:
-        add:
-          Access-Control-Allow-Headers: traceparent, tracestate
-          Access-Control-Allow-Origin: '*'
-          AllowedOrigins: kotak811.com, kotak811.bank.in
-          Cache-Control: no-cache, no-store, must-revalidate, max-age=0, post-check=0,
-            pre-check=0
-          Content-Security-Policy: default-src 'none'; script-src 'none'; connect-src
-            'self'; img-src 'self'; style-src 'self'; base-uri 'self'; form-action
-            'self'
-    match:
+  - match:
     - uri:
-        prefix: /cc-applications
+        prefix: {{ .Values.gateways.prefixv2 }}
     route:
     - destination:
-        host: k811-cc-applications
+        host: {{ .Values.service.name }}
         port:
-          number: 8080
-      weight: 100
+          number: {{ .Values.gateways.internalPort }}
+      weight: {{ .Values.gateways.weightvalue }}
+      headers:
+        response: 
+          add:
+            Content-Security-Policy: "default-src 'none'"
+            Cache-Control: "no-cache, no-store, must-revalidate, max-age=0, post-check=0, pre-check=0"
+            Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+            AllowedMethods: "['GET', 'POST']"
+            AllowedOrigins: "null"
+            Access-Control-Allow-Origin: "null"
+            AllowCredentials: "false"
+          remove:
+          - Server
+          - Allow
+  - match:
+    - uri:
+        prefix: {{ .Values.gateways.prefix }}
+    route:
+    - destination:
+        host: {{ .Values.service.name }}
+        port:
+          number: {{ .Values.gateways.internalPort }}
+      weight: {{ .Values.gateways.weightvalue }}
+      headers:
+        response: 
+          add:
+            Content-Security-Policy: "default-src 'none'"
+            Cache-Control: "no-cache, no-store, must-revalidate, max-age=0, post-check=0, pre-check=0"
+            Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
+            AllowedMethods: "['GET', 'POST']"
+            AllowedOrigins: "null"
+            AllowCredentials: "false"
+          remove:
+          - Server
+          - Allow
+
+
+
+prod virtual service
+
+apiVersion: networking.istio.io/v1alpha3
+kind: VirtualService
+metadata:
+  name: {{ .Chart.Name }} 
+  namespace: {{ .Values.namespace }}
+spec:
+  gateways:
+  - {{ .Values.gateways.gateway }} 
+  hosts:
+  - {{ .Values.gateways.host | quote }}
+  http:
+  - match:
+    - uri:
+        prefix: {{ .Values.gateways.prefix }}
+    route:
+    - destination:
+        host: {{ .Values.service.name }}
+        port:
+          number: {{ .Values.gateways.internalPort }}
+      weight: {{ .Values.gateways.weightvalue }}
+      headers:
+        response: 
+          add:
+            Content-Security-Policy: "default-src 'none'"
+            Cache-Control: "no-store"
+          remove:
+          - Server
+
+
+so i have alias in cloudfront as apy.kotak811.bank.in along with apy.kotak811.com. same working for uat but not working for prod. above is virsutal service
