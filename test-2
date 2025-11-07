@@ -11,28 +11,6 @@ spec:
   http:
   - match:
     - uri:
-        prefix: {{ .Values.gateways.prefixv2 }}
-    route:
-    - destination:
-        host: {{ .Values.service.name }}
-        port:
-          number: {{ .Values.gateways.internalPort }}
-      weight: {{ .Values.gateways.weightvalue }}
-      headers:
-        response: 
-          add:
-            Content-Security-Policy: "default-src 'none'"
-            Cache-Control: "no-cache, no-store, must-revalidate, max-age=0, post-check=0, pre-check=0"
-            Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
-            AllowedMethods: "['GET', 'POST']"
-            AllowedOrigins: "null"
-            Access-Control-Allow-Origin: "null"
-            AllowCredentials: "false"
-          remove:
-          - Server
-          - Allow
-  - match:
-    - uri:
         prefix: {{ .Values.gateways.prefix }}
     route:
     - destination:
@@ -44,11 +22,6 @@ spec:
         response: 
           add:
             Content-Security-Policy: "default-src 'none'"
-            Cache-Control: "no-cache, no-store, must-revalidate, max-age=0, post-check=0, pre-check=0"
-            Strict-Transport-Security: max-age=31536000; includeSubDomains; preload
-            AllowedMethods: "['GET', 'POST']"
-            AllowedOrigins: "null"
-            AllowCredentials: "false"
+            Cache-Control: "no-store"
           remove:
           - Server
-          - Allow
