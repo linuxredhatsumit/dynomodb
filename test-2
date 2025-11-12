@@ -1,66 +1,39 @@
-Plan: 0 to add, 2 to change, 0 to destroy.
-module.alb.aws_lb.this[0]: Modifying... [id=arn:aws:elasticloadbalancing:ap-south-1:483584640083:loadbalancer/app/k811-ghi-frontend-uat-alb/e1be3009a5856910]
-╷
-│ Error: modifying ELBv2 Load Balancer (arn:aws:elasticloadbalancing:ap-south-1:483584640083:loadbalancer/app/k811-ghi-frontend-uat-alb/e1be3009a5856910) attributes: operation error Elastic Load Balancing v2: ModifyLoadBalancerAttributes, https response error StatusCode: 400, RequestID: a55e076e-d758-4b4b-b9f9-79c91df2b75a, InvalidConfigurationRequest: Access Denied for bucket: aws-observability-logs-a0c48470. Please check S3bucket permission
-│ 
-│   with module.alb.aws_lb.this[0],
-│   on ../../../../../../terraform-modules/alb/main.tf line 5, in resource "aws_lb" "this":
-│    5: resource "aws_lb" "this" {
-
-
-below is TF
-
-provider "aws" {
+https://acqui-uat.kotprovider "aws" {
   region = local.region
 }
 
 locals {
   domain_name = "terraform-aws-modules.modules.tf"
-  name        = "k811-ghi-frontend-uat-alb"
+  name        = "k811-bl-uat-internal-alb"
   region      = "ap-south-1"
 
   tags = {
-    Name                = local.name
-    Usecase             = "For uat GHI project"
-    Terraform           = "True"
-    project-name        = "811-Crossell"
-    project-811         = "CROSSELL"
-    entity              = "KMBL"
-    application-name    = "811_AWS_CROSS_SELL"
-    application-id      = "APP-01797"
-    vertical-tlt        = "Amlan Mandal"
-    application-owner   = "Amlan Mandal"
-    application-manager = "Imran Ansari"
-    application-rating  = "medium"
-    region              = "mumbai"
-    budget-type         = "rtb"
-    monitoring          = "yes"
-    db-engine           = "NA"
-    created-date        = "08-22-2024"
-    instance-node-type  = "NA"
-    backup              = "NA"
-    scheduler-start     = "NA"
-    scheduler-stop      = "NA"
-    resource-name       = "alb-uat-ghi-lb"
-    environment         = "uat"
-    ticket-id           = "DEVOPS-3923"
+    Name                 = "k811-bl-uat-internal-alb"
+    entity               = "KMBL"
+    application-name     = "811_AWS_CROSS_SELL"
+    application-id       = "APP-01797"
+    application-owner    = "Manish A"
+    application-manager  = "Imran Ansari"
+    vertical-tlt         = "Amlan Mandal"
+    application-rating   = "high"
+    ticket-id            = "DEVOPS-811"
+    environment          = "uat"
+    project-name         = "811-Crossell"
+    budget-type          = "rtb"
+    monitoring           = "yes"
+    db-engine            = "NA"
+    created-date         = "10-19-2023"
+    instance-node-type   = "NA"
+    backup               = "yes"
+    scheduler-start      = "NA"
+    scheduler-stop       = "NA"
+    end-date             = "NA"
+    created-by-terraform = "yes"
+    terraform-version    = "1.4.6"
+    resource-name        = "alb-crossell-uat-loadblancer"
+    project-811          = "CROSSELL"
   }
 }
-
-################################################################################
-# The terraform_remote_state Data Source
-################################################################################
-# data "terraform_remote_state" "vpc" {
-#   backend = "s3"
-
-#   config = {
-#     bucket = "kotak811-terraform-state"
-#     key    = "kotak811/env/kotak811-uat/vpc/vpc.tfstate"
-#     region = "ap-south-1"
-#   }
-# }
-
-
 
 #################################################################
 # ALB Security Group
@@ -70,12 +43,39 @@ module "security_group" {
   source = "../../../../../../terraform-modules/sg"
 
   name        = "${local.name}-sg"
-  description = "Security group for uat GHI frontend internal ALB SG"
+  description = "Security group for UAT bl internal ALB SG"
   vpc_id      = "vpc-01616bcc8ded37bd1"
 
-  ingress_cidr_blocks = ["0.0.0.0/0"]
-  ingress_rules       = ["http-80-tcp", "https-443-tcp"]
-  egress_rules        = ["all-all"]
+  # ingress_cidr_blocks = ["0.0.0.0/0"]
+  # ingress_rules       = ["http-80-tcp", "https-443-tcp"]
+
+  ingress_with_cidr_blocks = [
+    {
+      from_port   = 443
+      to_port     = 443
+      protocol    = "tcp"
+      description = "DEVOPS-3786 - HTTPS"
+      cidr_blocks = "10.0.0.0/8"
+    },
+    # {
+    #   from_port   = 80
+    #   to_port     = 80
+    #   protocol    = "tcp"
+    #   description = "DEVOPS-3786 - HTTP"
+    #   cidr_blocks = "10.0.0.0/8"
+    # }
+  ]
+  # egress_rules        = ["all-all"]
+  egress_with_cidr_blocks = [
+    {
+      from_port   = -1
+      to_port     = -1
+      protocol    = "-1"
+      description = "All traffic DEVOPS-3786"
+      cidr_blocks = "0.0.0.0/0"
+    }
+  ]
+  tags = local.tags
 }
 
 
@@ -95,11 +95,12 @@ module "alb" {
   subnets                    = ["subnet-0a9428eb7c2626df5", "subnet-041dc3e2d6206564a", "subnet-038bfc59ef25653ef"]
   internal                   = true
   enable_deletion_protection = true
+  create_security_group      = false
 
   access_logs = {
-    enabled = true
+    enabled = false
     bucket  = "aws-observability-logs-a0c48470"
-    prefix  = "elasticloadbalancing"
+    prefix  = "bl-uat-internal-alb"
   }
 
   http_tcp_listeners = [
@@ -117,16 +118,11 @@ module "alb" {
 
   https_listeners = [
     {
-      port            = 443
-      protocol        = "HTTPS"
-      ssl_policy      = "ELBSecurityPolicy-TLS-1-2-2017-01"
-      certificate_arn = "arn:aws:acm:ap-south-1:483584640083:certificate/69098a9f-323f-45ec-9d37-641b428e0d37"
-      action_type     = "fixed-response"
-      fixed_response = {
-        content_type = "text/plain"
-        message_body = "Fixed message"
-        status_code  = "200"
-      }
+      port               = 443
+      protocol           = "HTTPS"
+      ssl_policy         = "ELBSecurityPolicy-TLS13-1-2-Res-2021-06"
+      certificate_arn    = ["arn:aws:acm:ap-south-1:483584640083:certificate/f2a94009-46d0-436c-9ead-f0455368e5b8", "arn:aws:acm:ap-south-1:483584640083:certificate/49068cc4-ea92-498b-9288-1333c817719b"]
+      target_group_index = 0
     }
   ]
   https_listener_rules = [
@@ -135,11 +131,10 @@ module "alb" {
       priority             = 1
       actions = [{
         type               = "forward"
-        target_group_index = 0
+        target_group_index = 1
       }]
-
       conditions = [{
-        host_headers  = ["ghi.uat.kotak811.com", "ghi.uat.kotak811.bank.in"],
+        host_headers  = ["agent.uat.kotak811.com", "agent.uat.kotak811.bank.in"],
         path_patterns = ["/*"]
       }]
     },
@@ -148,58 +143,115 @@ module "alb" {
       priority             = 2
       actions = [{
         type               = "forward"
-        target_group_index = 1
+        target_group_index = 2
       }]
-
       conditions = [{
-        host_headers  = ["insurance-internal.uat.kotak811.com"],
-        path_patterns = ["/api/internal/insurance/*"]
+        host_headers  = ["passbook.uat.kotak811.com","passbook.uat.kotak811.bank.in" ]
       }]
     },
+    {
+      https_listener_index = 0
+      priority             = 3
+      actions = [{
+        type               = "forward"
+        target_group_index = 3
+      }]
+      conditions = [{
+        host_headers  = ["passbook.uat.kotak811.com","passbook.uat.kotak811.bank.in" ]
+      }]
+    },
+    {
+      https_listener_index = 0
+      priority             = 4
+      actions = [{
+        type               = "forward"
+        target_group_index = 3
+      }]
+      conditions = [{
+        host_headers  = ["passbook-internal.uat.kotak811.com"]
+      }]
+    }
   ]
+
   target_groups = [
     {
-      name                 = "uat-ghi-frontend-tg"
+      name                 = "${local.name}-tg"
       backend_protocol     = "HTTP"
-      backend_port         = 30721
+      backend_port         = 30715
       target_type          = "instance"
       deregistration_delay = 300
       health_check = {
         enabled             = true
-        interval            = 30
-        path                = "/"
-        port                = "traffic-port"
-        healthy_threshold   = 5
-        unhealthy_threshold = 2
-        timeout             = 10
-        protocol            = "HTTPS"
+        interval            = 10
+        path                = "/healthz/ready"
+        port                = "30003"
+        healthy_threshold   = 3
+        unhealthy_threshold = 3
+        timeout             = 6
+        protocol            = "HTTP"
         matcher             = "200-399"
       }
       tags = local.tags
     },
     {
-      name                 = "uat-ghi-backend-internal-tg"
+      name                 = "uat-agent-assisted-portal"
       backend_protocol     = "HTTP"
-      backend_port         = 30722
+      backend_port         = 30717
       target_type          = "instance"
       deregistration_delay = 300
       health_check = {
         enabled             = true
-        interval            = 30
-        path                = "/"
+        interval            = 6
+        path                = "/health/"
         port                = "traffic-port"
         healthy_threshold   = 5
         unhealthy_threshold = 2
-        timeout             = 10
-        protocol            = "HTTPS"
-        matcher             = "200-399"
+        timeout             = 5
+        protocol            = "HTTP"
+        matcher             = "200"
+      }
+      tags = local.tags
+    },
+    {
+      name                 = "passbook-uat-alb-tg"
+      backend_protocol     = "HTTP"
+      backend_port         = 30712
+      target_type          = "instance"
+      deregistration_delay = 300
+      health_check = {
+        enabled             = true
+        interval            = 6
+        path                = "/health/"
+        port                = "traffic-port"
+        healthy_threshold   = 5
+        unhealthy_threshold = 2
+        timeout             = 5
+        protocol            = "HTTP"
+        matcher             = "200"
+      }
+      tags = local.tags
+    },
+    {
+      name                 = "passbook-uat-backend-alb-tg"
+      backend_protocol     = "HTTP"
+      backend_port         = 30723
+      target_type          = "instance"
+      deregistration_delay = 300
+      health_check = {
+        enabled             = true
+        interval            = 6
+        path                = "/health/"
+        port                = "traffic-port"
+        healthy_threshold   = 5
+        unhealthy_threshold = 2
+        timeout             = 5
+        protocol            = "HTTP"
+        matcher             = "200"
       }
       tags = local.tags
     }
   ]
-
   tags = local.tags
-
 }
 
 
@@ -210,13 +262,25 @@ terraform {
   backend "s3" {
     #Replace this with your bucket name!
     bucket = "kotak811-terraform-state"
-    key    = "kotak811/env/kotak811-uat/crossell-project/ghi/alb/k811-ghi-uat-frontend-alb/alb.tfstate"
+    key    = "kotak811/env/kotak811-uat/businessloan/internal-alb/alb.tfstate"
     region = "ap-south-1"
     #Replace this with your DynamoDB table name!
     dynamodb_table = "tf-up-and-run-locks"
     encrypt        = true
   }
 }
+below error
 
+Planning failed. Terraform encountered an error while generating this plan.
 
-I just append host_headers  = ["ghi.uat.kotak811.com", "ghi.uat.kotak811.bank.in"],  just aded "ghi.uat.kotak811.bank.in"
+╷
+│ Error: Incorrect attribute value type
+│ 
+│   on ../../../../../../terraform-modules/alb/main.tf line 713, in resource "aws_lb_listener" "frontend_https":
+│  713:   certificate_arn = var.https_listeners[count.index]["certificate_arn"]
+│     ├────────────────
+│     │ count.index is 0
+│     │ var.https_listeners is tuple with 1 element
+│ 
+│ Inappropriate value for attribute "certificate_arn": string required.
+╵
