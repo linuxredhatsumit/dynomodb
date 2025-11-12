@@ -1,6 +1,7 @@
-https://acqui-uat.kotprovider "aws" {
+provider "aws" {
   region = local.region
 }
+
 
 locals {
   domain_name = "terraform-aws-modules.modules.tf"
