@@ -1,87 +1,161 @@
-1. TECHNICAL GOALS
-Improve Deployment Automation
+. TECHNICAL GOALS — SUCCESS CRITERIA TABLE
+Success Criteria / Metrics
 
-Built extensive automation across deployments by creating fully automated pipelines for DynamoDB operations including table creation, schema evolution, GSI updates, capacity mode switching, auto-scaling configurations, and CNR updates — reducing manual effort by 90% and improving provisioning time from hours to minutes.
+95% deployment automation across all environments
 
-Automated service onboarding and Coralogix observability workflows (log routing, dashboards, alerts, version upgrades), reducing onboarding time from 2 hours to under 10 minutes and ensuring faster, more predictable deployments.
+99.9% uptime for critical services
 
-Will continue improving automation coverage to help the team achieve 95% automated deployments and further reduce manual intervention across release processes.
+20% reduction in MTTR
 
-Enhance System Reliability
+80% of infra managed via IaC
 
-Supported zero-downtime releases during on-call, ensuring smooth deployment of multiple production changes without customer impact.
+Zero high-severity post-release issues
 
-Strengthened system reliability by resolving high-severity production issues such as memory leaks, key rotations, and emergency hotfixes.
+Below Expectation
 
-Implemented log optimization and structured logging via Coralogix pipelines, contributing to a more proactive monitoring approach.
+Deployments still require high manual intervention
 
-Will continue improving alerting, observability, and infra consistency to maintain 99.9% uptime for critical services.
+Frequent release rollbacks or downtime
 
-Optimize Incident Response
+Slow incident resolution and repeated recurring issues
 
-Significantly improved operational efficiency during incidents by automating multiple parts of DB updates and observability routing, reducing dependency on manual interventions.
+Infra changes not version controlled
 
-Led or supported emergency fixes during on-call windows, ensuring minimal downtime.
+Meets Expectation
 
-Will continue driving faster recovery during incidents by enhancing runbooks, improving debugging visibility, and contributing to a 20% reduction in MTTR.
+Majority of deployment flows automated
 
-Infrastructure as Code (IaC) Adoption
+Stable releases with minimal issues
 
-Standardized onboarding templates and automated infra creation workflows for new services, enabling predictable and consistent deployments.
+MTTR maintained within acceptable limits
 
-Ensured version-controlled changes through infrastructure pipelines and consistent deployment patterns.
+IaC used for most infra components
 
-Will continue expanding IaC adoption across more components to help the team reach 80% coverage using Terraform/Helm.
+Exceeds Expectation
 
-2. SECURITY & COMPLIANCE GOALS
-Strengthen Security Posture
+Fully automated deployment pipelines across all services
 
-Performed periodic IAM and SES key rotations across prod and non-prod, eliminating static credentials and improving platform security.
+Zero-downtime releases consistently delivered
 
-Ensured all certificates, CloudFront/ALB configurations, and domain updates were done with proper SSL/TLS enforcement during the banking domain migration.
+MTTR reduced significantly using automation/runbooks
 
-Will continue improving TLS enforcement, enhancing certificate rotation workflows, and contributing toward quarterly vulnerability scans and remediation.
+Infra onboarding becomes self-serve and template-based
 
-Compliance Readiness
+Proactive monitoring prevents incidents before user impact
 
-Ensured audit-friendly processes during domain migration, infra updates, and automated pipelines.
+✅ 2. SECURITY & COMPLIANCE GOALS — SUCCESS CRITERIA TABLE
+Success Criteria / Metrics
 
-Maintained structured documentation around migration steps, deployments, and infra changes to improve audit readiness.
+100% TLS enforcement
 
-Will continue supporting RBAC improvements and creating audit-ready documentation for all production-impacting changes.
+No expired certificates
 
-3. PERFORMANCE & SCALABILITY GOALS
-Optimize Resource Utilization
+All key rotations performed on schedule
 
-Reduced CloudWatch logging cost by 60%+ through structured logging, noise reduction, and Coralogix optimization.
+Zero audit deviations
 
-Automated API Gateway logging disablement pipeline, cutting unnecessary cost associated with debug logs on high-traffic paths.
+RBAC applied across critical systems
 
-Optimized DB provisioning workflows via dynamic scaling logic, improving both performance and cost efficiency.
+Below Expectation
 
-Will continue contributing to AWS cost reduction efforts with dynamic provisioning and performance benchmarking.
+Delayed key rotations or improper secret management
 
-Capacity Planning
+Missing TLS configurations
 
-Ensured infra readiness and scaling alignment during onboarding of new workflows and services.
+Audit issues repeatedly flagged
 
-Standardized observability and infra requirements to ensure smooth scaling as new features/services are introduced.
+No RBAC structure in place
 
-Will continue contributing to capacity forecasting and preparing scaling strategies for upcoming business workloads.
+Meets Expectation
 
-4. COLLABORATION & PROCESS GOALS
-Improve Communication
+Keys rotated on time
 
-Ensured all deployment changes were communicated clearly with stakeholders during on-call and production releases.
+TLS enabled across primary systems
 
-Documented critical modifications (domain migration steps, infra onboarding patterns, logging standards) to improve team understanding and reduce knowledge gaps.
+Audit documentation maintained
 
-Will continue leading knowledge-sharing discussions and cross-team updates to improve visibility and alignment.
+RBAC used for most platforms
 
-RACI Matrix Implementation
+Exceeds Expectation
 
-Ensured clear ownership during migration tasks, deployments, and on-call activities by coordinating with development, observability, and infra teams.
+Automation of key rotation and certificate renewals
 
-Standardized onboarding and logging processes that help define responsibilities across teams.
+Full TLS enforcement across DB, API, and infra layers
 
-Will continue supporting better RACI alignment for major initiatives like CloudAcqui, Cloudflare optimization, and onboarding automation.
+Audit-ready documentation maintained continuously
+
+Role-based access fully standardized with clear governance
+
+✅ 3. PERFORMANCE & SCALABILITY GOALS — SUCCESS CRITERIA TABLE
+Success Criteria / Metrics
+
+15% AWS cost reduction
+
+Performance benchmark reports created
+
+Scaling strategy prepared for 6 months
+
+Log volume optimized and structured
+
+Below Expectation
+
+High cost leaks due to unnecessary logs or overprovisioning
+
+No benchmarking data
+
+Reactive scaling causing performance dips
+
+Meets Expectation
+
+Cost optimizations implemented
+
+Baseline performance metrics available
+
+Scaling aligned for current workloads
+
+Exceeds Expectation
+
+Cost reduced significantly with measurable improvements
+
+Automated scaling + benchmarking integrated into pipelines
+
+Heavy workloads tuned for high performance
+
+Logging optimized (noise reduction + structured logs)
+
+✅ 4. COLLABORATION & PROCESS GOALS — SUCCESS CRITERIA TABLE
+Success Criteria / Metrics
+
+All changes documented
+
+Quarterly knowledge-sharing sessions
+
+RACI followed for all major projects
+
+Smooth cross-team coordination during releases
+
+Below Expectation
+
+Poor communication of changes
+
+Stakeholders not informed during releases
+
+No documentation or ownership mapping
+
+Meets Expectation
+
+Changes documented and communicated
+
+Regular knowledge sharing
+
+RACI defined for major projects
+
+Exceeds Expectation
+
+Clear communication repeatedly praised by teams
+
+High-quality documentation used as a reference by others
+
+RACI maturity improved across squads
+
+On-call and release activities handled smoothly with zero confusionarding automation.
