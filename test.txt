@@ -1,161 +1,50 @@
-. TECHNICAL GOALS — SUCCESS CRITERIA TABLE
-Success Criteria / Metrics
-
-95% deployment automation across all environments
-
-99.9% uptime for critical services
-
-20% reduction in MTTR
-
-80% of infra managed via IaC
-
-Zero high-severity post-release issues
-
+TECHNICAL GOALS
 Below Expectation
 
-Deployments still require high manual intervention
-
-Frequent release rollbacks or downtime
-
-Slow incident resolution and repeated recurring issues
-
-Infra changes not version controlled
+“Delivers infra/services late, with gaps, manual steps, and depends heavily on others.”
 
 Meets Expectation
 
-Majority of deployment flows automated
-
-Stable releases with minimal issues
-
-MTTR maintained within acceptable limits
-
-IaC used for most infra components
+“Delivers infra/services on time with good quality and uses standard automation.”
 
 Exceeds Expectation
 
-Fully automated deployment pipelines across all services
-
-Zero-downtime releases consistently delivered
-
-MTTR reduced significantly using automation/runbooks
-
-Infra onboarding becomes self-serve and template-based
-
-Proactive monitoring prevents incidents before user impact
-
-✅ 2. SECURITY & COMPLIANCE GOALS — SUCCESS CRITERIA TABLE
-Success Criteria / Metrics
-
-100% TLS enforcement
-
-No expired certificates
-
-All key rotations performed on schedule
-
-Zero audit deviations
-
-RBAC applied across critical systems
-
+“Proactively improves infra, fully automates flows, and delivers high-quality solutions early.”
+SECURITY & COMPLIANCE GOALS
 Below Expectation
 
-Delayed key rotations or improper secret management
-
-Missing TLS configurations
-
-Audit issues repeatedly flagged
-
-No RBAC structure in place
+“Misses security checks, slow in fixing issues, and lacks compliance awareness.”
 
 Meets Expectation
 
-Keys rotated on time
-
-TLS enabled across primary systems
-
-Audit documentation maintained
-
-RBAC used for most platforms
+“Follows security guidelines and closes vulnerabilities within expected timelines.”
 
 Exceeds Expectation
 
-Automation of key rotation and certificate renewals
+“Strengthens security posture, automates checks, and reduces vulnerabilities proactively
 
-Full TLS enforcement across DB, API, and infra layers
-
-Audit-ready documentation maintained continuously
-
-Role-based access fully standardized with clear governance
-
-✅ 3. PERFORMANCE & SCALABILITY GOALS — SUCCESS CRITERIA TABLE
-Success Criteria / Metrics
-
-15% AWS cost reduction
-
-Performance benchmark reports created
-
-Scaling strategy prepared for 6 months
-
-Log volume optimized and structured
-
+PERFORMANCE & STABILITY GOALS
 Below Expectation
 
-High cost leaks due to unnecessary logs or overprovisioning
-
-No benchmarking data
-
-Reactive scaling causing performance dips
+“Frequent issues, limited monitoring, and slow recovery during incidents.”
 
 Meets Expectation
 
-Cost optimizations implemented
-
-Baseline performance metrics available
-
-Scaling aligned for current workloads
+“Keeps systems stable, improves monitoring, and resolves incidents efficiently.”
 
 Exceeds Expectation
 
-Cost reduced significantly with measurable improvements
+“Optimizes performance, reduces incidents, and improves system reliability end-to-end.”
 
-Automated scaling + benchmarking integrated into pipelines
-
-Heavy workloads tuned for high performance
-
-Logging optimized (noise reduction + structured logs)
-
-✅ 4. COLLABORATION & PROCESS GOALS — SUCCESS CRITERIA TABLE
-Success Criteria / Metrics
-
-All changes documented
-
-Quarterly knowledge-sharing sessions
-
-RACI followed for all major projects
-
-Smooth cross-team coordination during releases
-
+COLLABORATION & PROCESS GOALS
 Below Expectation
 
-Poor communication of changes
-
-Stakeholders not informed during releases
-
-No documentation or ownership mapping
+“Communicates late, documentation missing, and onboarding processes stay manual.”
 
 Meets Expectation
 
-Changes documented and communicated
-
-Regular knowledge sharing
-
-RACI defined for major projects
+“Works well with teams, documents clearly, and supports smooth onboarding.”
 
 Exceeds Expectation
 
-Clear communication repeatedly praised by teams
-
-High-quality documentation used as a reference by others
-
-RACI maturity improved across squads
-
-On-call and release activities handled smoothly with zero confusionarding automation.
+“Improves cross-team workflows, automates onboarding, and drives process enhancements.”
