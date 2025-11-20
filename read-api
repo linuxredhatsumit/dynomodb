@@ -1,53 +1,23 @@
-apiVersion: networking.istio.io/v1alpha3
-kind: VirtualService
-metadata:
-  name: {{ .Chart.Name }} 
-  namespace: {{ .Values.namespace }}
-spec:
-  gateways:
-  - {{ .Values.gateways.gateway }} 
-  hosts:
-  - {{ .Values.gateways.host | quote }}
-  http:
-  - match:
-    - uri:
-        prefix: {{ .Values.gateways.prefix }}/docs
-    route:
-    - destination:
-        host: {{ .Values.service.name }}
-        port:
-          number: {{ .Values.gateways.internalPort }}
-      weight: {{ .Values.gateways.weightvalue }}
-  - match:
-    - uri:
-        prefix: {{ .Values.gateways.prefix }}/redoc
-    route:
-    - destination:
-        host: {{ .Values.service.name }}
-        port:
-          number: {{ .Values.gateways.internalPort }}
-      weight: {{ .Values.gateways.weightvalue }}
-  - {{- if .Values.cors.allowOrigins }}
-    corsPolicy:
-      allowOrigins:
-      {{- range .Values.cors.allowOrigins }}
-      - exact: {{ . | quote }}
-      {{- end }}
-    {{- end }}
-    match:
-    - uri:
-        prefix: {{ .Values.gateways.prefix }}
-    route:
-    - destination:
-        host: {{ .Values.service.name }}
-        port:
-          number: {{ .Values.gateways.internalPort }}
-      weight: {{ .Values.gateways.weightvalue }}
-      headers:
-        response: 
-          add:
-            Content-Security-Policy: "default-src 'none';  script-src 'none';  connect-src 'self';  img-src 'self';  style-src 'self'; base-uri 'self';form-action 'self'"
-            Cache-Control: "no-cache, no-store, must-revalidate, max-age=0, post-check=0, pre-check=0"
-            Access-Control-Allow-Headers: "traceparent, tracestate"
-            Access-Control-Allow-Origin: {{ .Values.acao }}
-            AllowedOrigins: kotak811.com
+Improve Deployment Automation & Service Onboarding
+
+Designed and implemented fully automated DynamoDB pipelines for table creation, GSI management, capacity mode switching, and auto-scaling policies, reducing provisioning time from hours to <10 minutes across all environments.
+Built reusable end-to-end onboarding pipelines for new microservices and EKS clusters (ECR promotion, Helm packaging, VirtualService, secret injection, cross-account deployment), enabling zero-touch onboarding of 20+ services including Motor-Insurance, VerifyPlus, and Re-KYC.
+Standardized cluster and gateway onboarding via pipeline templates, eliminating manual console operations and ensuring consistent, auditable deployments.
+
+Lead Domain Migration to bank.in
+
+Spearheaded complete migration of kotak811.com to kotak811.bank.in for 20+ public-facing services, orchestrating SAN certificate creation/import, ACM updates, CloudFront/ALB certificate replacement, CORS changes, CNAME cutover, and header updates with zero customer impact and full regulatory compliance.
+
+Enhance System Reliability & Production Delivery
+
+Executed 100+ zero-downtime production deployments (CMR/ECMR) for critical services (Auth & User, Transaction, Reward-Journey, IIP, Acqui, BRE, Charging, Nudge, VerifyPlus, etc.) while serving as primary DevOps on-call engineer.
+Resolved multiple emergency incidents including memory leak fixes, AWS key switch-overs, and hotfixes, minimizing downtime and maintaining 99.99%+ service availability.
+
+Strengthen Security & Compliance
+
+Led periodic IAM access key and SES key rotation/switch-over across prod and non-prod environments, eliminating static credentials and reducing attack surface.
+Managed full SSL/TLS certificate lifecycle (creation, renewal, ACM import, CloudFront/ALB binding) for 15+ domains and proactively deactivated legacy keys following least-privilege principles.
+
+Optimize Observability & Cost Efficiency
+
+Drove logging optimization across high-volume services (Auth & User, Transaction, Reward-Journey, Nudge), removing unnecessary warnings and implementing structured parsing, reducing log volume by 60%+ and significantly lowering CloudWatch costs.
