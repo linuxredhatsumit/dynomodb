@@ -1615,12 +1615,13 @@ Document Upload
 
 Profile & Consent
 
-Impact: Consistently ensured high-quality releases, quick issue detection, and zero rollback failures.
+Impact: Consistently ensured high-quality releases, quick issue detection, and zero rollback failures
+2. DynamoDB Operational Automation – Major Efficiency Improvement
 
-🔥 2. DynamoDB Operational Automation – Major Efficiency Improvement
 I delivered significant improvements in how DynamoDB operations are performed.
 
 Before My Involvement
+
 Everything was manual
 
 Developers had to perform updates
@@ -1628,6 +1629,7 @@ Developers had to perform updates
 Higher risk and slower deployments
 
 After My Contribution
+
 Automated CNR updates
 
 Automated DynamoDB field corrections
@@ -1640,10 +1642,12 @@ Faster, consistent, error-free updates during releases
 
 Impact: Saved developer time, reduced production risk, and ensured stable release operations.
 
-🔥 3. Coralogix Observability – Transformed Manual Process into Full Automation
+3. Coralogix Observability – Transformed Manual Process into Full Automation
+
 This is one of my strongest achievements.
 
 Earlier State
+
 Manual onboarding
 
 Manual dashboards & alert setup
@@ -1651,6 +1655,7 @@ Manual dashboards & alert setup
 Inconsistent log routing
 
 After My Work
+
 Fully automated onboarding via pipeline
 
 Automatic log routing
@@ -1663,7 +1668,8 @@ Faster debugging, better SRE visibility
 
 Impact: Improved monitoring quality and standardised observability for all new services.
 
-🔥 4. Infra Onboarding for New Services
+4. Infra Onboarding for New Services
+
 Played a key role in infra readiness for:
 
 Transactions Infra
@@ -1680,7 +1686,8 @@ Deploy readiness validations
 
 Impact: Ensured smooth environment readiness before go-live.
 
-🔥 5. Domain Migration – Major Project Support
+5. Domain Migration – Major Project Support
+
 Contributed significantly to the migration:
 kotak811.com / kotak811a.com → kotak811bank.in
 
@@ -1700,8 +1707,8 @@ Redirects & validation
 
 Impact: Smooth transition across multiple apps and services without disruption.
 
-🎯 SECTION 2: GOALS FOR NEXT CYCLE
-🌱 1. Onboarding New Acqui Services
+1. Onboarding New Acqui Services
+
 Plan to take strong ownership of onboarding new Acqui services covering:
 
 DNS
@@ -1716,20 +1723,8 @@ Infra & DB checks
 
 Goal: Make onboarding fast, standardised, and predictable.
 
-🌱 2. Drive AWS Cost Optimisation
-Focus on:
+3. More Automation in Onboarding & Deployment
 
-DynamoDB cost tuning
-
-Log ingestion optimisation (Coralogix)
-
-CloudFront/S3 cost improvements
-
-Infra right-sizing
-
-Goal: Reduce unnecessary cloud spend while improving performance.
-
-🌱 3. More Automation in Onboarding & Deployment
 Bring automation into:
 
 Service onboarding
@@ -1742,7 +1737,8 @@ DynamoDB ops
 
 Goal: Reduce onboarding time from hours to minutes.
 
-🌱 4. Increase Contribution in Cloudflare
+4. Increase Contribution in Cloudflare
+
 Work more on:
 
 WAF
@@ -1756,27 +1752,3 @@ Domain cutovers
 Edge performance
 
 Goal: Strengthen edge security & reliability.
-
-🌱 5. Improve Platform Reliability
-Plan to:
-
-Enhance CMR quality
-
-Improve rollback plans
-
-Strengthen monitoring & alerts
-
-Reduce production issues
-
-🌱 6. Grow as a Cloud Engineer
-Focus areas:
-
-EKS
-
-DynamoDB
-
-CloudFront
-
-Observability best practices
-
-CI/CD enhancements
