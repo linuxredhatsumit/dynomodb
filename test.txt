@@ -1,177 +1,87 @@
-echnical Goals
+1. TECHNICAL GOALS
 Improve Deployment Automation
 
-Achieve 95% automated deployments across all environments.
+Built extensive automation across deployments by creating fully automated pipelines for DynamoDB operations including table creation, schema evolution, GSI updates, capacity mode switching, auto-scaling configurations, and CNR updates — reducing manual effort by 90% and improving provisioning time from hours to minutes.
 
-Reduce manual intervention in release processes.
+Automated service onboarding and Coralogix observability workflows (log routing, dashboards, alerts, version upgrades), reducing onboarding time from 2 hours to under 10 minutes and ensuring faster, more predictable deployments.
+
+Will continue improving automation coverage to help the team achieve 95% automated deployments and further reduce manual intervention across release processes.
 
 Enhance System Reliability
 
-Maintain 99.9% uptime for critical services.
+Supported zero-downtime releases during on-call, ensuring smooth deployment of multiple production changes without customer impact.
 
-Implement proactive monitoring and alerting for all production systems.
+Strengthened system reliability by resolving high-severity production issues such as memory leaks, key rotations, and emergency hotfixes.
+
+Implemented log optimization and structured logging via Coralogix pipelines, contributing to a more proactive monitoring approach.
+
+Will continue improving alerting, observability, and infra consistency to maintain 99.9% uptime for critical services.
 
 Optimize Incident Response
 
-Reduce MTTR (Mean Time to Recovery) by 20%.
+Significantly improved operational efficiency during incidents by automating multiple parts of DB updates and observability routing, reducing dependency on manual interventions.
 
-Conduct monthly incident reviews and implement at least 2 preventive measures per quarter.
+Led or supported emergency fixes during on-call windows, ensuring minimal downtime.
+
+Will continue driving faster recovery during incidents by enhancing runbooks, improving debugging visibility, and contributing to a 20% reduction in MTTR.
 
 Infrastructure as Code (IaC) Adoption
 
-Migrate 80% of infrastructure to IaC tools (Terraform, Ansible, etc.).
+Standardized onboarding templates and automated infra creation workflows for new services, enabling predictable and consistent deployments.
 
-Ensure version-controlled infrastructure changes.
+Ensured version-controlled changes through infrastructure pipelines and consistent deployment patterns.
 
-✅ Security & Compliance Goals
+Will continue expanding IaC adoption across more components to help the team reach 80% coverage using Terraform/Helm.
+
+2. SECURITY & COMPLIANCE GOALS
 Strengthen Security Posture
 
-Enforce SSL/TLS across all DB and application connections.
+Performed periodic IAM and SES key rotations across prod and non-prod, eliminating static credentials and improving platform security.
 
-Complete quarterly vulnerability scans and remediation.
+Ensured all certificates, CloudFront/ALB configurations, and domain updates were done with proper SSL/TLS enforcement during the banking domain migration.
+
+Will continue improving TLS enforcement, enhancing certificate rotation workflows, and contributing toward quarterly vulnerability scans and remediation.
 
 Compliance Readiness
 
-Maintain audit-ready documentation for all deployments and changes.
+Ensured audit-friendly processes during domain migration, infra updates, and automated pipelines.
 
-Implement role-based access control for all critical systems.
+Maintained structured documentation around migration steps, deployments, and infra changes to improve audit readiness.
 
-✅ Performance & Scalability Goals
+Will continue supporting RBAC improvements and creating audit-ready documentation for all production-impacting changes.
+
+3. PERFORMANCE & SCALABILITY GOALS
 Optimize Resource Utilization
 
-Reduce cloud costs by 15% through right-sizing and auto-scaling.
+Reduced CloudWatch logging cost by 60%+ through structured logging, noise reduction, and Coralogix optimization.
 
-Implement performance benchmarking for critical services.
+Automated API Gateway logging disablement pipeline, cutting unnecessary cost associated with debug logs on high-traffic paths.
+
+Optimized DB provisioning workflows via dynamic scaling logic, improving both performance and cost efficiency.
+
+Will continue contributing to AWS cost reduction efforts with dynamic provisioning and performance benchmarking.
 
 Capacity Planning
 
-Forecast resource needs for next 6 months and prepare scaling strategy.
+Ensured infra readiness and scaling alignment during onboarding of new workflows and services.
 
-✅ Collaboration & Process Goals
+Standardized observability and infra requirements to ensure smooth scaling as new features/services are introduced.
+
+Will continue contributing to capacity forecasting and preparing scaling strategies for upcoming business workloads.
+
+4. COLLABORATION & PROCESS GOALS
 Improve Communication
 
-Document all major changes and share with stakeholders before implementation.
+Ensured all deployment changes were communicated clearly with stakeholders during on-call and production releases.
 
-Conduct quarterly knowledge-sharing sessions with development teams.
+Documented critical modifications (domain migration steps, infra onboarding patterns, logging standards) to improve team understanding and reduce knowledge gaps.
+
+Will continue leading knowledge-sharing discussions and cross-team updates to improve visibility and alignment.
 
 RACI Matrix Implementation
 
-Define clear roles and responsibilities for all major projects (e.g., CloudAcqui).
+Ensured clear ownership during migration tasks, deployments, and on-call activities by coordinating with development, observability, and infra teams.
 
-Ensure 100% adherence to RACI in project governance.
+Standardized onboarding and logging processes that help define responsibilities across teams.
 
-
-
-above is my manger given the bullet points, can u check if below part can be added as per above suggestion
-
-1. Deployment Automation & Service Onboarding
- 
-Designed and implemented fully automated DynamoDB pipelines for table creation, GSI updates, capacity mode switching (Provisioned ↔ On-Demand), and auto-scaling policies, reducing provisioning time.
- 
-Onboarded services including Motor-Insurance, VerifyPlus, Re-KYC, FinBridge, and DDLM.
- 
- 
-Automated Coralogix integration pipelines for observability, leveraging dependency-based orchestration for version updates and alert setup.
- 
- 
-2. Domain Migration
- 
-Migration of kotak811.com → kotak811.bank.in for, managing SAN certificate creation/import, ACM updates, CloudFront/ALB certificate replacement, CORS changes, CNAME cutover, header updates, and Cloudflare configuration with zero customer impact and full regulatory compliance.
- 
- 
-3. Reliability & Production Delivery
- 
-Executed 100+ zero-downtime production deployments (CMR/ECMR) for critical services (Auth & User, Transaction, Reward-Journey, IIP, Acqui, BRE, Charging, Nudge, VerifyPlus).
-
-Resolved emergency incidents (memory leaks, AWS key switch-overs, hotfixes), maintaining 99.99%+ service availability.
- 
- 
-4. Security & Compliance
- 
-Led periodic IAM and SES key rotation across prod/non-prod environments, eliminating static credentials and reducing attack surface.
- 
- 
-5. Observability & Cost Optimization
- 
-Optimized logging across high-volume services (Auth & User, Transaction, Reward-Journey, Nudge), removing unnecessary warnings and implementing structured parsing, reducing log volume by 60%+ and lowering CloudWatch costs.
- 
-Automated API Gateway logging disablement pipeline, significantly reducing operational costs.
- 
-1. Coralogix Observability Automation
-Earlier State: Manual onboarding, inconsistent log routing, delayed debugging
-After My Contribution:
-Automated:
-Service onboarding via CI/CD pipelines
-Log routing, dashboard creation, and alert setup
-orchestration for version updates
-Impact:
-Reduced onboarding time from 2 hours to <10 minutes
-Standardized observability across 100% of new services
-2- Production Deployments (CMRs & ECMRs)
-Deployments across all major services, including:
-KYC Transaction Service
-KYC DDLm
-Verify-Plus (KYC Verification)
-KYC Product IIT Release
-CC Application Service
-CC Management Service
-Transactions Service
-DDLM Service
-Payment Layer Services
-Notification Layer Services
-Auth & User Service
-Reward-Journey Service
-IIP Service
-Acqui Service
-BRE Service
-Charging Service
-Nudge Service
-Motor-Insurance Service
-FinBridge Service
-Re-KYC Service
-3. DynamoDB Operational Automation
-Before: Manual DB updates, high risk of human error, slow provisioning
-After My Contribution:
-Automated:
-Table creation & schema evolution
-GSI updates & capacity mode switching (Provisioned ↔ On-Demand)
-Auto-scaling policies
-CNR updates & field corrections
-Integrated cost optimization logic for dynamic provisioning
-Impact:
-Reduced manual intervention by 90%
-Improved provisioning speed from hours to minutes
-4. Infra Onboarding for New Services
-Delivered infra readiness for:
-Transactions Infra
-DDLM Infra
-Observability Integration (Coralogix)
-5. Domain Migration
-Led migration from kotak811.com / kotak811a.com → kotak811bank.in:
-Managed CloudFront configuration, DNS routing, SSL certificates, CORS updates, redirects, and validation
-Worked on Cloudflare for WAF and traffic control
-6. Reliability & Incident Management
-Resolved critical incidents:
-Worked on compliance  to fix the findings. 
-7. Security & Compliance
-Led periodic IAM and SES key rotation across prod/non-prod environments
-Eliminated static credentials, reducing attack surface and improving compliance posture.
-8. Observability & Cost Optimization
-Optimized logging across high-volume services:
-Removed unnecessary warnings and implemented structured parsing (Coralogix)
-Automated API Gateway logging disablement pipeline, further reducing costs.
-9- Deployment Automation & Service Onboarding
-Expand automation for DynamoDB ops, observability routing, and service onboarding
-Goal: Reduce onboarding time from hours to minutes
-10- Cloudflare Enhancements
-Work on WAF, redirect rules, traffic control, edge performance
-Goal: Strengthen edge security & reliability
-11-  New Acqui Services
-Standardize onboarding with charts and pipelines
-12- Continuous Infra & Observability Improvements
-Ensure predictable, fast, and secure deployments
- 
- alos one more suggestion we got
-Point 9 , 3 can be part of automation 
-2,6 can be part of single goal
-1,12, 8 can be part of single goal, Observability and Stability
+Will continue supporting better RACI alignment for major initiatives like CloudAcqui, Cloudflare optimization, and onboarding automation.
