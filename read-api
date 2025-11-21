@@ -1,61 +1,64 @@
 import subprocess
 from datetime import datetime
 
-def get_hpa_data(context):
-    try:
-        result = subprocess.check_output(
-            f"kubectl --context={context} get hpa -A -o jsonpath='{{range .items[*]}}{{.metadata.namespace}},{{.metadata.name}},{{.spec.minReplicas}},{{.spec.maxReplicas}}{{\"\\n\"}}{{end}}'",
-            shell=True
-        ).decode("utf-8")
-        return result.strip().split("\n")
-    except subprocess.CalledProcessError:
-        print(f"Failed to get HPA data for context: {context}")
-        return []
+def get_hpa_data():
+    result = subprocess.check_output(
+        "kubectl get hpa -A -o jsonpath='{range .items[*]}{.metadata.namespace},{.metadata.name},{.spec.minReplicas},{.spec.maxReplicas}{\"\\n\"}{end}'",
+        shell=True
+    ).decode("utf-8")
+    return result.strip().split("\n")
 
-def calculate_scaled_value(original, percentage):
-    return max(1, int(original * (percentage / 100.0)))
+def scale_value(value, percent):
+    return int(value * percent / 100)
 
-def process_cluster(source_context, target_context, percentage):
+def process(hpa_data, percent, cluster_label):
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    output_file = f"{target_context}_hpa_{timestamp}.txt"
+    file_name = f"{cluster_label}_hpa_{timestamp}.txt"
 
-    source_data = get_hpa_data(source_context)
-    target_data = get_hpa_data(target_context)
-
-    target_dict = {}
-    for line in target_data:
-        parts = line.split(",")
-        if len(parts) == 4:
-            target_dict[(parts[0], parts[1])] = (int(parts[2]), int(parts[3]))
-
-    with open(output_file, "w") as f:
-        for line in source_data:
+    with open(file_name, "w") as f:
+        for line in hpa_data:
             parts = line.split(",")
             if len(parts) != 4:
                 continue
 
-            ns, name, smin, smax = parts[0], parts[1], int(parts[2]), int(parts[3])
+            ns, name, cur_min, cur_max = parts[0], parts[1], int(parts[2]), int(parts[3])
 
-            new_min = calculate_scaled_value(smin, percentage)
-            new_max = calculate_scaled_value(smax, percentage)
+            # RULE 1: Services already below 4 → Do NOT modify
+            if cur_min < 4:
+                new_min = cur_min
+                new_max = cur_max
+                comment = "SKIPPED (<4 current)"
+            else:
+                # RULE 2: Calculate scaling
+                new_min = scale_value(cur_min, percent)
+                new_max = scale_value(cur_max, percent)
 
-            f.write(f"{ns},{name},Min:{new_min},Max:{new_max}\n")
+                # RULE 3: If result drops below 4 → keep minimum 4
+                if new_min < 4:
+                    new_min = 4
+                    comment = "FORCED_MIN_4"
+                else:
+                    comment = "SCALED"
 
-    print(f"Output saved: {output_file}")
-    return output_file
+            f.write(f"{ns:<15} {name:<45} Min:{new_min:<4} Max:{new_max:<4}  [{comment}]\n")
+
+    print(f"✔ Output generated: {file_name}")
 
 
 if __name__ == "__main__":
-    prod_context = "kprod"
-    blue_context = "kblue"
-    green_context = "kgreen"
+    print("\n⚠ Ensure kubectl context = BLUE/PROD cluster before running\n")
 
-    percentage = float(input("Enter percentage to scale (ex: 70 for 70%): "))
+    blue_percent = float(input("Enter % for Blue cluster (ex: 90): ").strip())
+    green_percent = 100 - blue_percent
 
-    print("\nProcessing for BLUE cluster...")
-    process_cluster(prod_context, blue_context, percentage)
+    print(f"\n➡ Blue = {blue_percent}% | Green = {green_percent}%\n")
 
-    print("\nProcessing for GREEN cluster...")
-    process_cluster(prod_context, green_context, percentage)
+    hpa_list = get_hpa_data()
 
-    print("\n🎯 Done! No changes made to Kubernetes. Only files generated.")
+    print("Generating Blue output file…")
+    process(hpa_list, blue_percent, "blue")
+
+    print("\nGenerating Green output file…")
+    process(hpa_list, green_percent, "green")
+
+    print("\n🎯 Completed — ONLY files generated, nothing changed in Kubernetes\n")
