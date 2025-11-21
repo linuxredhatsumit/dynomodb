@@ -1,84 +1,86 @@
 import subprocess
-import pandas as pd
 from datetime import datetime
 import math
 
-MIN_THRESHOLD = 4  # Minimum replica safeguard
+MIN_THRESHOLD = 4
 
 
-def run_kubectl():
+def get_hpa_data():
     result = subprocess.run(
-        ["kubectl", "get", "hpa", "-A",
-         "-o", "custom-columns=NS:.metadata.namespace,NAME:.metadata.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas"],
+        ["kubectl", "get", "hpa", "-A", "-o",
+         "custom-columns=NS:.metadata.namespace,NAME:.metadata.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas"],
         stdout=subprocess.PIPE, text=True
     )
-    lines = result.stdout.strip().split("\n")
-    data = []
-    for line in lines[1:]:
-        ns, name, min_r, max_r = line.split()
-        data.append([ns, name, int(min_r), int(max_r)])
-    return pd.DataFrame(data, columns=["Namespace", "Service", "CurrentMin", "CurrentMax"])
+    lines = result.stdout.strip().split("\n")[1:]
+    hpa_list = []
+    for line in lines:
+        parts = line.split()
+        if len(parts) == 4:
+            ns, name, min_r, max_r = parts
+            hpa_list.append({
+                "Namespace": ns,
+                "Service": name,
+                "CurrentMin": int(min_r),
+                "CurrentMax": int(max_r)
+            })
+    return hpa_list
 
 
-def calculate_split(df, blue_percent, green_percent):
-    blue_df = df.copy()
-    green_df = df.copy()
+def calculate(new_percent_blue, new_percent_green, hpa_list):
+    blue_data = []
+    green_data = []
 
-    for idx, row in df.iterrows():
-        cmin = row["CurrentMin"]
-        cmax = row["CurrentMax"]
+    for row in hpa_list:
+        cm = row["CurrentMin"]
+        cx = row["CurrentMax"]
 
-        if cmin < MIN_THRESHOLD:
-            new_blue_min = cmin
-            new_green_min = cmin
+        # MIN calculation
+        if cm < MIN_THRESHOLD:
+            blue_min = cm
+            green_min = cm
         else:
-            calc_blue = math.floor(cmin * blue_percent / 100)
-            calc_green = math.ceil(cmin * green_percent / 100)
+            blue_min = max(math.floor(cm * new_percent_blue / 100), MIN_THRESHOLD)
+            green_min = max(math.ceil(cm * new_percent_green / 100), MIN_THRESHOLD)
 
-            new_blue_min = max(calc_blue, MIN_THRESHOLD)
-            new_green_min = max(calc_green, MIN_THRESHOLD)
-
-        if cmax < MIN_THRESHOLD:
-            new_blue_max = cmax
-            new_green_max = cmax
+        # MAX calculation
+        if cx < MIN_THRESHOLD:
+            blue_max = cx
+            green_max = cx
         else:
-            calc_blue_max = math.floor(cmax * blue_percent / 100)
-            calc_green_max = math.ceil(cmax * green_percent / 100)
+            blue_max = max(math.floor(cx * new_percent_blue / 100), blue_min)
+            green_max = max(math.ceil(cx * new_percent_green / 100), green_min)
 
-            new_blue_max = max(calc_blue_max, new_blue_min)
-            new_green_max = max(calc_green_max, new_green_min)
+        base = f"{row['Namespace']:20} {row['Service']:40}"
+        blue_data.append(f"{base} Min:{blue_min:<3} Max:{blue_max:<3}")
+        green_data.append(f"{base} Min:{green_min:<3} Max:{green_max:<3}")
 
-        blue_df.at[idx, "NewMin"] = new_blue_min
-        blue_df.at[idx, "NewMax"] = new_blue_max
-        green_df.at[idx, "NewMin"] = new_green_min
-        green_df.at[idx, "NewMax"] = new_green_max
-
-    return blue_df, green_df
+    return blue_data, green_data
 
 
-def save_files(blue_df, green_df):
-    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
-    blue_file = f"blue_hpa_{ts}.txt"
-    green_file = f"green_hpa_{ts}.txt"
-
-    blue_df[["Namespace", "Service", "NewMin", "NewMax"]].to_string(blue_file, index=False)
-    green_df[["Namespace", "Service", "NewMin", "NewMax"]].to_string(green_file, index=False)
-
-    print(f"\n📌 Files generated:")
-    print(f"   ✔ {blue_file}")
-    print(f"   ✔ {green_file}")
-    print("\nYou can open using:")
-    print(f"cat {blue_file}")
-    print(f"cat {green_file}\n")
+def save_file(filename, lines):
+    with open(filename, "w") as f:
+        for line in lines:
+            f.write(line + "\n")
 
 
 if __name__ == "__main__":
-    df = run_kubectl()
+    percent_blue = int(input("Enter % traffic for BLUE: "))
+    percent_green = 100 - percent_blue
 
-    blue_percent = int(input("Enter % traffic for BLUE cluster: "))
-    green_percent = 100 - blue_percent
+    hpa_list = get_hpa_data()
+    blue_out, green_out = calculate(percent_blue, percent_green, hpa_list)
 
-    blue_df, green_df = calculate_split(df, blue_percent, green_percent)
-    save_files(blue_df, green_df)
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    blue_file = f"blue_hpa_{timestamp}.txt"
+    green_file = f"green_hpa_{timestamp}.txt"
 
-    print("🎯 Completed successfully — No changes applied to Kubernetes\n")
+    save_file(blue_file, blue_out)
+    save_file(green_file, green_out)
+
+    print("\nFiles created successfully:")
+    print(f"  📄 {blue_file}")
+    print(f"  📄 {green_file}\n")
+    print("To view files:")
+    print(f"cat {blue_file}")
+    print(f"cat {green_file}\n")
+    print("✔ No change applied to Kubernetes\n")
