@@ -1,8 +1,54 @@
-app_user@ip-10-59-81-252:~$ kubectl get hpa -A | grep notifi
-prod               k811-notifications-hpa                           Deployment/k811-notifications                        cpu: 14%/75%, memory: 17%/75%               50        50        50         2y166d
-app_user@ip-10-59-81-252:~$ cat green_hpa_20251121_180739.txt | grep notifi
-prod            k811-notifications-hpa                        Min:4    Max:2     [FORCED_MIN_4]
-app_user@ip-10-59-81-252:~$ cat blue_hpa_20251121_180739.txt | grep notif
-prod            k811-notifications-hpa                        Min:47   Max:47    [SCALED]
-prod            k811-payment-notify-hpa                       Min:2    Max:11    [SKIPPED (<4 current)]
-app_user@ip-10-59-81-252:~$ 
+#!/bin/bash
+set -euo pipefail
+
+GREEN_FILE="green_hpa_$(date '+%Y%m%d_%H%M%S').txt"
+BLUE_FILE="blue_hpa_$(date '+%Y%m%d_%H%M%S').txt"
+
+GREEN_CONTEXT="green"
+BLUE_CONTEXT="blue"
+
+# Switch context
+set_context() {
+    kubectl config use-context "$1" >/dev/null
+}
+
+echo "Gathering GREEN HPA state..."
+set_context "$GREEN_CONTEXT"
+kubectl get hpa -A --no-headers > "$GREEN_FILE"
+
+echo "Gathering BLUE HPA state..."
+set_context "$BLUE_CONTEXT"
+kubectl get hpa -A --no-headers > "$BLUE_FILE"
+
+echo "Comparing and Updating BLUE to ensure parity..."
+
+while read -r ns name _ _ min max _; do
+    forced=""
+    
+    if [[ "$min" -lt 4 ]]; then
+        # Tag HPAs that may use forced scaling rule
+        forced="[SKIPPED (<4 current)]"
+        echo "$ns $name Min:$min Max:$max $forced"
+        continue
+    fi
+
+    # Ensure Max >= Min (Forced minimum logic)
+    if [[ "$max" -lt "$min" ]]; then
+        forced="[FORCED_MIN_$min]"
+        max="$min"
+    fi
+
+    # Sync to blue
+    set_context "$BLUE_CONTEXT"
+    echo "Patching $name in $ns to Min=$min Max=$max $forced"
+    
+    kubectl patch hpa "$name" -n "$ns" \
+        --type merge \
+        -p "{\"spec\": {\"minReplicas\": $min, \"maxReplicas\": $max}}"
+
+    echo "$ns $name Min:$min Max:$max $forced"
+    
+done < <(awk '$4!~/n/a/' "$GREEN_FILE")
+
+echo "---------------------------------"
+echo "HPA sync completed successfully!"
