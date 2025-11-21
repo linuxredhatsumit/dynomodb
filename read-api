@@ -1,71 +1,62 @@
-NAME    MIN     MAX
-k811-aadhaar-seeding-hpa        2       2
-k811-accounts-transactions-hpa  2       2
-k811-active-money-hpa   2       2
-k811-admin-hpa  2       2
-k811-app-ms-codepush-server-hpa 2       2
-k811-apy-hpa    2       2
-k811-auth-hpa   2       7
-k811-bank-transfer-hpa  2       2
-k811-billpay-biller-hpa 2       2
-k811-billpay-callback-hpa       2       2
-k811-billpay-management-hpa     2       2
-k811-billpay-payment-status-hpa 2       2
-k811-cbi-hpa    1       1
-k811-cc-applications-hpa        2       2
-k811-cc-consumer-hpa    2       2
-k811-cc-management-hpa  2       2
-k811-cc-streams-hpa     2       2
-k811-cfl-autopay-core-hpa       2       2
-k811-cfl-autopay-worker-execution-hpa   2       2
-k811-cfl-autopay-worker-fund-transfer-hpa       2       2
-k811-cfl-autopay-worker-pdn-hpa 2       2
-k811-cfl-autopay-worker-refund-hpa      2       2
-k811-cheque-book-hpa    2       2
-k811-content-catalog-hpa        2       2
-k811-core-banking-hpa   2       2
-k811-crud-vendor-integration-hpa        2       2
-k811-customer-data-hpa  2       2
-k811-data-products-hpa  2       2
-k811-dc-charging-consumer-hpa   2       2
-k811-dc-consumer-hpa    2       2
-k811-ddlm-hpa   2       2
-k811-debit-cards-hpa    2       2
-k811-dtd-consumer-hpa   2       3
-k811-experiments-hpa    2       3
-k811-finbridge-connector-hpa    2       2
-k811-fixed-deposit-hpa  2       2
-k811-frm-hpa    2       2
-k811-funds-hpa  2       3
-k811-gam-consumer-hpa   2       3
-k811-geo-location-hpa   1       2
-k811-gst-hpa    2       2
-k811-insurance-platform-hpa     2       2
-k811-k-mobility-hpa     2       2
-k811-ksec-hpa   2       2
-k811-kyc-hpa    2       2
-k811-leads-hpa  2       2
-k811-mb-user-migr-hpa   2       3
-k811-mbapp-bff-hpa      2       2
-k811-miscellaneous-hpa  2       2
-k811-motor-insurance-hpa        2       2
-k811-mutual-funds-hpa   2       2
-k811-mutual-funds-primary-hpa   2       2
-k811-notifications-hpa  2       3
-k811-nudge-hpa  2       3
-k811-offers-hpa 2       2
-k811-otp-hpa    2       2
-k811-partner-rewards-hpa        2       2
-k811-payment-hold-hpa   2       2
-k811-payment-notify-hpa 2       2
-k811-payment-refund-hpa 2       2
-k811-payment-status-hpa 2       2
-k811-payout-hpa 2       2
-k811-pl-management-hpa  2       2
-k811-pminsure-hpa       2       2
-k811-product-catalog-hpa        2       2
-k811-product-constants-hpa      2       2
-k811-referrals-hpa      2       2
-k811-rewards-engine-event-consumer-hpa  2       2
-k811-rewards-journey-hpa        2       3
+import subprocess
+import argparse
 
+def update_hpa(file_path, namespace, delimiter=None):
+    """
+    Update HPA min/max replicas for services based on a text file.
+    
+    Assumes file format:
+    NAME <delimiter> MIN <delimiter> MAX
+    """
+    with open(file_path, "r") as f:
+        lines = f.readlines()
+
+    if not lines:
+        print("File is empty!")
+        return
+
+    # Read header and determine indices
+    header = lines[0].strip().split(delimiter) if delimiter else lines[0].strip().split()
+    try:
+        name_idx = header.index("NAME")
+        min_idx = header.index("MIN")
+        max_idx = header.index("MAX")
+    except ValueError:
+        # If header not present, assume first=NAME, second=MIN, third=MAX
+        print("Header not found, assuming first=NAME, second=MIN, third=MAX")
+        name_idx = 0
+        min_idx = 1
+        max_idx = 2
+
+    # Loop through each service
+    for line in lines[1:]:
+        if not line.strip():
+            continue
+        cols = line.strip().split(delimiter) if delimiter else line.strip().split()
+        service_name = cols[name_idx]
+        min_replicas = int(cols[min_idx])
+        max_replicas = int(cols[max_idx])
+
+        print(f"Updating {service_name} → Min: {min_replicas}, Max: {max_replicas}")
+
+        # Patch HPA using kubectl
+        patch_cmd = [
+            "kubectl", "patch", "hpa", service_name,
+            "-n", namespace,
+            "--type=json",
+            f'-p=[{{"op":"replace","path":"/spec/minReplicas","value":{min_replicas}}},'
+            f'{{"op":"replace","path":"/spec/maxReplicas","value":{max_replicas}}}]'
+        ]
+        try:
+            subprocess.run(patch_cmd, check=True)
+        except subprocess.CalledProcessError as e:
+            print(f"Failed to update {service_name}: {e}")
+
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser(description="Update Kubernetes HPA from text file")
+    parser.add_argument("--file", required=True, help="Path to text file")
+    parser.add_argument("--namespace", required=True, help="Kubernetes namespace")
+    parser.add_argument("--delimiter", required=False, help="Delimiter in file (e.g., ',' for CSV, '\\t' for tab)")
+
+    args = parser.parse_args()
+    update_hpa(args.file, args.namespace, args.delimiter)
