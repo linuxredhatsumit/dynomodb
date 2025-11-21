@@ -1,64 +1,8 @@
-import subprocess
-from datetime import datetime
-
-def get_hpa_data():
-    result = subprocess.check_output(
-        "kubectl get hpa -A -o jsonpath='{range .items[*]}{.metadata.namespace},{.metadata.name},{.spec.minReplicas},{.spec.maxReplicas}{\"\\n\"}{end}'",
-        shell=True
-    ).decode("utf-8")
-    return result.strip().split("\n")
-
-def scale_value(value, percent):
-    return int(value * percent / 100)
-
-def process(hpa_data, percent, cluster_label):
-    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    file_name = f"{cluster_label}_hpa_{timestamp}.txt"
-
-    with open(file_name, "w") as f:
-        for line in hpa_data:
-            parts = line.split(",")
-            if len(parts) != 4:
-                continue
-
-            ns, name, cur_min, cur_max = parts[0], parts[1], int(parts[2]), int(parts[3])
-
-            # RULE 1: Services already below 4 → Do NOT modify
-            if cur_min < 4:
-                new_min = cur_min
-                new_max = cur_max
-                comment = "SKIPPED (<4 current)"
-            else:
-                # RULE 2: Calculate scaling
-                new_min = scale_value(cur_min, percent)
-                new_max = scale_value(cur_max, percent)
-
-                # RULE 3: If result drops below 4 → keep minimum 4
-                if new_min < 4:
-                    new_min = 4
-                    comment = "FORCED_MIN_4"
-                else:
-                    comment = "SCALED"
-
-            f.write(f"{ns:<15} {name:<45} Min:{new_min:<4} Max:{new_max:<4}  [{comment}]\n")
-
-    print(f"✔ Output generated: {file_name}")
-
-
-if __name__ == "__main__":
-    print("\n⚠ Ensure kubectl context = BLUE/PROD cluster before running\n")
-
-    blue_percent = float(input("Enter % for Blue cluster (ex: 90): ").strip())
-    green_percent = 100 - blue_percent
-
-    print(f"\n➡ Blue = {blue_percent}% | Green = {green_percent}%\n")
-
-    hpa_list = get_hpa_data()
-
-    print("Generating Blue output file…")
-    process(hpa_list, blue_percent, "blue")
-
-    print("\nGenerating Green output file…")
-    process(hpa_list, green_percent, "green")
-
-    print("\n🎯 Completed — ONLY files generated, nothing changed in Kubernetes\n")
+app_user@ip-10-59-81-252:~$ kubectl get hpa -A | grep notifi
+prod               k811-notifications-hpa                           Deployment/k811-notifications                        cpu: 14%/75%, memory: 17%/75%               50        50        50         2y166d
+app_user@ip-10-59-81-252:~$ cat green_hpa_20251121_180739.txt | grep notifi
+prod            k811-notifications-hpa                        Min:4    Max:2     [FORCED_MIN_4]
+app_user@ip-10-59-81-252:~$ cat blue_hpa_20251121_180739.txt | grep notif
+prod            k811-notifications-hpa                        Min:47   Max:47    [SCALED]
+prod            k811-payment-notify-hpa                       Min:2    Max:11    [SKIPPED (<4 current)]
+app_user@ip-10-59-81-252:~$ 
