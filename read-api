@@ -1,1 +1,84 @@
-agar 4 se km aye aur us serivce ka min pehle se hi 4 se kam h like 1,2, or 3, then dont make it 4,, it is greater than 4 and after calculation use kam aa rha h then keep 4 as minimum
+import subprocess
+import pandas as pd
+from datetime import datetime
+import math
+
+MIN_THRESHOLD = 4  # Minimum replica safeguard
+
+
+def run_kubectl():
+    result = subprocess.run(
+        ["kubectl", "get", "hpa", "-A",
+         "-o", "custom-columns=NS:.metadata.namespace,NAME:.metadata.name,MIN:.spec.minReplicas,MAX:.spec.maxReplicas"],
+        stdout=subprocess.PIPE, text=True
+    )
+    lines = result.stdout.strip().split("\n")
+    data = []
+    for line in lines[1:]:
+        ns, name, min_r, max_r = line.split()
+        data.append([ns, name, int(min_r), int(max_r)])
+    return pd.DataFrame(data, columns=["Namespace", "Service", "CurrentMin", "CurrentMax"])
+
+
+def calculate_split(df, blue_percent, green_percent):
+    blue_df = df.copy()
+    green_df = df.copy()
+
+    for idx, row in df.iterrows():
+        cmin = row["CurrentMin"]
+        cmax = row["CurrentMax"]
+
+        if cmin < MIN_THRESHOLD:
+            new_blue_min = cmin
+            new_green_min = cmin
+        else:
+            calc_blue = math.floor(cmin * blue_percent / 100)
+            calc_green = math.ceil(cmin * green_percent / 100)
+
+            new_blue_min = max(calc_blue, MIN_THRESHOLD)
+            new_green_min = max(calc_green, MIN_THRESHOLD)
+
+        if cmax < MIN_THRESHOLD:
+            new_blue_max = cmax
+            new_green_max = cmax
+        else:
+            calc_blue_max = math.floor(cmax * blue_percent / 100)
+            calc_green_max = math.ceil(cmax * green_percent / 100)
+
+            new_blue_max = max(calc_blue_max, new_blue_min)
+            new_green_max = max(calc_green_max, new_green_min)
+
+        blue_df.at[idx, "NewMin"] = new_blue_min
+        blue_df.at[idx, "NewMax"] = new_blue_max
+        green_df.at[idx, "NewMin"] = new_green_min
+        green_df.at[idx, "NewMax"] = new_green_max
+
+    return blue_df, green_df
+
+
+def save_files(blue_df, green_df):
+    ts = datetime.now().strftime("%Y%m%d_%H%M%S")
+    blue_file = f"blue_hpa_{ts}.txt"
+    green_file = f"green_hpa_{ts}.txt"
+
+    blue_df[["Namespace", "Service", "NewMin", "NewMax"]].to_string(blue_file, index=False)
+    green_df[["Namespace", "Service", "NewMin", "NewMax"]].to_string(green_file, index=False)
+
+    print(f"\n📌 Files generated:")
+    print(f"   ✔ {blue_file}")
+    print(f"   ✔ {green_file}")
+    print("\nYou can open using:")
+    print(f"cat {blue_file}")
+    print(f"cat {green_file}\n")
+
+
+if __name__ == "__main__":
+    df = run_kubectl()
+
+    blue_percent = int(input("Enter % traffic for BLUE cluster: "))
+    green_percent = 100 - blue_percent
+
+    blue_df, green_df = calculate_split(df, blue_percent, green_percent)
+    save_files(blue_df, green_df)
+
+    print("🎯 Completed successfully — No changes applied to Kubernetes\n")
