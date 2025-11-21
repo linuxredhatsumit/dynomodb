@@ -40,16 +40,63 @@ k811-frm-hpa	5	24	2	2	2	3	2	4.8	2	10	3	12
 k811-funds-hpa	20	50	2	3	2	5	4	10	8	20	10	25
 k811-gam-consumer-hpa	30	46	2	3	3	5	6	9.2	12	19	15	23
 k811-geo-location-hpa	1	4	1	2	1	2	1	2	1	2	1	2
+k811-gst-hpa	2	11	2	2	2	2	2	3	2	5	2	6
+k811-insurance-platform-hpa	10	15	2	2	2	2	2	3	4	6	5	8
+k811-k-mobility-hpa	2	20	2	2	2	2	2	4	2	8	2	10
+k811-ksec-hpa	2	11	2	2	2	2	2	3	2	5	2	6
+k811-kyc-hpa	2	20	2	2	2	2	2	4	2	8	2	10
+k811-leads-hpa	2	11	2	2	2	2	2	3	2	5	2	6
+k811-mb-user-migr-hpa	12	47	2	3	2	5	3	10	5	19	6	24
+k811-mbapp-bff-hpa	5	39	2	2	2	4	2	8	2	16	3	20
+k811-miscellaneous-hpa	13	21	2	2	2	3	3	4	6	9	7	11
+k811-motor-insurance-hpa	2	5	2	2	2	2	2	2	2	2	2	3
+k811-mutual-funds-hpa	2	11	2	2	2	2	2	3	2	5	2	6
+k811-mutual-funds-primary-hpa	9	39	2	2	2	4	2	8	4	16	5	20
+k811-notifications-hpa	50	50	2	3	5	5	10	10	20	20	25	25
+k811-nudge-hpa	20	50	2	3	2	5	4	10	8	20	10	25
+k811-offers-hpa	5	40	2	2	2	4	2	8	2	16	3	20
+k811-otp-hpa	2	11	2	2	2	2	2	3	2	5	2	6
+k811-partner-rewards-hpa	2	10	2	2	2	2	2	2	2	4	2	5
+k811-payment-hold-hpa	2	11	2	2	2	2	2	3	2	5	2	6
+k811-payment-notify-hpa	2	11	2	2	2	2	2	3	2	5	2	6
+k811-payment-refund-hpa	2	11	2	2	2	2	2	3	2	5	2	6
+k811-payment-status-hpa	10	40	2	2	5	4	2	8	4	16	5	20
+k811-payout-hpa	2	10	2	2	2	2	2	2	2	4	2	5
+k811-pl-management-hpa	2	10	2	2	2	2	2	2	2	4	2	5
+k811-pminsure-hpa	2	10	2	2	2	2	2	2	2	4	2	5
+k811-product-catalog-hpa	2	10	2	2	2	2	2	2	2	4	2	5
+k811-product-constants-hpa	2	10	2	2	2	2	2	2	2	4	2	5
+k811-referrals-hpa	2	12	2	2	2	2	2	3	2	5	2	6
+k811-rewards-engine-event-consumer-hpa	1	8	2	2	1	8	2	2	2	4	2	4
+k811-rewards-journey-hpa	15	50	2	3	2	5	3	10	6	20	8	25
+k811-rewards-user-segmentation-hpa	5	20	2	2	2	2	2	4	2	8	3	10
+k811-send-push-hpa	2	10	2	2	2	2	2	2	2	4	2	5
+k811-send-sms-hpa	2	10	2	2	2	2	2	2	2	4	2	5
+k811-service-requests-hpa	2	15	2	2	2	2	2	3	2	6	2	8
+k811-super-user-hpa	2	20	2	2	2	2	2	4	2	8	2	10
+k811-switch-over-hpa	2	10	2	2	2	2	2	2	2	4	2	5
+k811-token-mandate-instructions-hpa	2	10	2	2	2	2	2	2	2	4	2	5
+k811-transactions-hpa	5	40	2	2	2	4	2	8	2	16	3	20
+k811-transfer-funds-hpa	2	10	2	2	2	2	2	2	2	4	2	5
+k811-unfreeze-diy-hpa	2	2	2	2	2	2	2	2	2	2	2	2
+k811-upi-facade-hpa	20	35	2	2	2	4	4	7	8	14	10	18
+k811-upi-payments-hpa	40	50	2	3	4	5	8	10	16	20	20	25
+k811-upi-payments-juspay-hpa	2	10	2	2	2	2	2	2	2	4	2	5
+k811-upi-payments-juspay-processor-hpa	2	10	2	2	2	2	2	2	2	4	2	5
+k811-upi-processor-hpa	20	30	2	2	2	3	4	6	8	12	10	15
+k811-uscc-applications-hpa	2	10	2	2	2	2	2	2	2	4	2	5
+k811-user-callback-hpa	2	10	2	2	2	2	2	2	2	4	2	5
+k811-users-hpa	10	125	2	7	2	13	2	25	4	50	5	63
+k811-verify-number-hpa	5	20	2	2	2	2	2	4	2	8	3	10
+k811-verify-plus-amplify-hpa	2	10	2	2	2	2	2	2	2	4	2	5
+k811-verify-plus-hpa	2	10	2	2	2	2	2	2	2	4	2	5
+k811-webauth-hpa	2	30	2	2	2	3	2	6	2	12	2	15
+k811-webhooks-hpa	2	10	2	2	2	2	2	2	2	4	2	5
 
 
 
-##############
+########################
 
-
-
-
-
-								
 	Current Blue HPA		20% traffic Diversion to Green Cluster		40% traffic Diversion to Green Cluster		50% traffic Diversion to Green Cluster	
 NAME	MINPODS	MAXPODS	Blue Cluster Min	Blue Cluster Max	Blue Cluster Min	Blue Cluster Max	Blue Cluster Min	Blue Cluster Max
 k811-aadhaar-seeding-hpa	2	10	2	8	2	6	2	5
@@ -100,3 +147,47 @@ k811-kyc-hpa	2	20	2	16	2	12	2	10
 k811-leads-hpa	2	11	2	9	2	7	2	6
 k811-mb-user-migr-hpa	12	47	10	38	10	29	6	24
 k811-mbapp-bff-hpa	5	39	2	32	4	24	3	20
+k811-miscellaneous-hpa	13	21	11	17	10	13	7	11
+k811-motor-insurance-hpa	2	5	2	4	2	3	2	3
+k811-mutual-funds-hpa	2	11	2	9	2	7	2	6
+k811-mutual-funds-primary-hpa	9	39	7	32	7	24	5	20
+k811-notifications-hpa	50	50	10	40	28	30	25	25
+k811-nudge-hpa	20	50	18	40	15	30	10	25
+k811-offers-hpa	5	40	4	32	4	24	3	20
+k811-otp-hpa	2	11	2	9	2	7	2	6
+k811-partner-rewards-hpa	2	10	2	8	2	6	2	5
+k811-payment-hold-hpa	2	11	2	9	2	7	2	6
+k811-payment-notify-hpa	2	11	2	9	2	7	2	6
+k811-payment-refund-hpa	2	11	2	9	2	7	2	6
+k811-payment-status-hpa	10	40	8	32	6	24	5	20
+k811-payout-hpa	2	10	2	8	2	6	2	5
+k811-pl-management-hpa	2	10	2	8	2	6	2	5
+k811-pminsure-hpa	2	10	2	8	2	6	2	5
+k811-product-catalog-hpa	2	10	2	8	2	6	2	5
+k811-product-constants-hpa	2	10	2	8	2	6	2	5
+k811-referrals-hpa	2	12	2	10	2	8	2	6
+k811-rewards-engine-event-consumer-hpa	1	8	1	7	1	5	1	4
+k811-rewards-journey-hpa	15	50	13	40	10	30	8	25
+k811-rewards-user-segmentation-hpa	5	20	4	16	4	12	3	10
+k811-send-push-hpa	2	10	2	8	2	6	2	5
+k811-send-sms-hpa	2	10	2	8	2	6	2	5
+k811-service-requests-hpa	2	15	2	12	2	9	2	8
+k811-super-user-hpa	2	20	2	16	2	12	2	10
+k811-switch-over-hpa	2	10	2	8	2	6	2	5
+k811-token-mandate-instructions-hpa	2	10	2	8	2	6	2	5
+k811-transactions-hpa	5	40	4	32	2	24	3	20
+k811-transfer-funds-hpa	2	10	2	8	2	6	2	5
+k811-unfreeze-diy-hpa	2	2	2	2	2	2	2	2
+k811-upi-facade-hpa	20	35	18	28	15	21	10	18
+k811-upi-payments-hpa	40	50	38	40	30	30	20	25
+k811-upi-payments-juspay-hpa	2	10	2	8	2	6	2	5
+k811-upi-payments-juspay-processor-hpa	2	10	2	8	2	6	2	5
+k811-upi-processor-hpa	20	30	18	24	15	18	10	15
+k811-uscc-applications-hpa	2	10	2	8	2	6	2	5
+k811-user-callback-hpa	2	10	2	8	2	6	2	5
+k811-users-hpa	10	125	8	100	6	75	5	63
+k811-verify-number-hpa	5	20	4	16	4	12	3	10
+k811-verify-plus-amplify-hpa	2	10	2	8	2	6	2	5
+k811-verify-plus-hpa	2	10	2	8	2	6	2	5
+k811-webauth-hpa	2	30	2	24	2	18	2	15
+k811-webhooks-hpa	2	10	2	8	2	6	2	5
