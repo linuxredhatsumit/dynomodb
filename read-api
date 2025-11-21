@@ -1,7 +1,102 @@
-app_user@ip-10-59-81-252:~$ kprod get hpa -A | grep notifi
-prod               k811-notifications-hpa                           Deployment/k811-notifications                        cpu: 13%/75%, memory: 17%/75%               50        50        50         2y166d
-app_user@ip-10-59-81-252:~$ cat blue_hpa_20251121_173321.txt | grep notifi
-prod                 k811-notifications-hpa                   Min:1   Max:1  
-app_user@ip-10-59-81-252:~$ cat green_hpa_20251121_173321.txt | grep notifi
-prod                 k811-notifications-hpa                   Min:1   Max:1  
-app_user@ip-10-59-81-252:~$ 
+#!/usr/bin/env python3
+
+import subprocess
+import json
+import math
+from datetime import datetime
+
+# Business rule threshold
+MIN_THRESHOLD = 4
+
+
+def get_hpa_data():
+    """Fetch HPA min/max from Kubernetes via JSON format."""
+
+    result = subprocess.run(
+        ["kubectl", "get", "hpa", "-A", "-o", "json"],
+        stdout=subprocess.PIPE, text=True
+    )
+
+    data = json.loads(result.stdout)
+    hpa_list = []
+
+    for item in data.get("items", []):
+        ns = item["metadata"]["namespace"]
+        name = item["metadata"]["name"]
+        min_r = item["spec"].get("minReplicas", 0)
+        max_r = item["spec"].get("maxReplicas", min_r)
+
+        hpa_list.append({
+            "Namespace": ns,
+            "Service": name,
+            "CurrentMin": int(min_r),
+            "CurrentMax": int(max_r)
+        })
+
+    return hpa_list
+
+
+def calculate(new_percent_blue, new_percent_green, hpa_list):
+    """Calculate Blue/Green HPA expected values."""
+
+    blue_data = []
+    green_data = []
+
+    for row in hpa_list:
+        current_min = row["CurrentMin"]
+        current_max = row["CurrentMax"]
+
+        # MIN calculation
+        if current_min < MIN_THRESHOLD:
+            blue_min = current_min
+            green_min = current_min
+        else:
+            blue_min = max(math.floor(current_min * new_percent_blue / 100), MIN_THRESHOLD)
+            green_min = max(math.ceil(current_min * new_percent_green / 100), MIN_THRESHOLD)
+
+        # MAX calculation
+        if current_max < MIN_THRESHOLD:
+            blue_max = current_max
+            green_max = current_max
+        else:
+            blue_max = max(math.floor(current_max * new_percent_blue / 100), blue_min)
+            green_max = max(math.ceil(current_max * new_percent_green / 100), green_min)
+
+        base = f"{row['Namespace']:20} {row['Service']:40}"
+        blue_data.append(f"{base} Min:{blue_min:<3} Max:{blue_max:<3}")
+        green_data.append(f"{base} Min:{green_min:<3} Max:{green_max:<3}")
+
+    return blue_data, green_data
+
+
+def save_file(filename, lines):
+    """Save formatted lines to a file."""
+
+    with open(filename, "w") as f:
+        for line in lines:
+            f.write(line + "\n")
+
+
+if __name__ == "__main__":
+    percent_blue = int(input("Enter % traffic for BLUE: "))
+    percent_green = 100 - percent_blue
+
+    print(f"\nSplitting HPA replicas: BLUE {percent_blue}% | GREEN {percent_green}%\n")
+
+    hpa_list = get_hpa_data()
+    blue_out, green_out = calculate(percent_blue, percent_green, hpa_list)
+
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    blue_file = f"blue_hpa_{timestamp}.txt"
+    green_file = f"green_hpa_{timestamp}.txt"
+
+    save_file(blue_file, blue_out)
+    save_file(green_file, green_out)
+
+    print("✔ Output files generated successfully:\n")
+    print(f"  📄 {blue_file}")
+    print(f"  📄 {green_file}\n")
+    print("To view in terminal:")
+    print(f"cat {blue_file}")
+    print(f"cat {green_file}\n")
+    print("⚠ This script does not modify Kubernetes — Safe to run 👍")
