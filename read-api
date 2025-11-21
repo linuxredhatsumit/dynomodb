@@ -1,54 +1,69 @@
-#!/bin/bash
-set -euo pipefail
+import subprocess
+from datetime import datetime
 
-GREEN_FILE="green_hpa_$(date '+%Y%m%d_%H%M%S').txt"
-BLUE_FILE="blue_hpa_$(date '+%Y%m%d_%H%M%S').txt"
+def get_hpa_data():
+    result = subprocess.check_output(
+        "kubectl get hpa -A -o jsonpath='{range .items[*]}{.metadata.namespace},{.metadata.name},{.spec.minReplicas},{.spec.maxReplicas}{\"\\n\"}{end}'",
+        shell=True
+    ).decode("utf-8")
+    return result.strip().split("\n")
 
-GREEN_CONTEXT="green"
-BLUE_CONTEXT="blue"
+def scale_value(value, percent):
+    return int(value * percent / 100)
 
-# Switch context
-set_context() {
-    kubectl config use-context "$1" >/dev/null
-}
+def process(hpa_data, percent, cluster_label):
+    timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
+    file_name = f"{cluster_label}_hpa_{timestamp}.txt"
 
-echo "Gathering GREEN HPA state..."
-set_context "$GREEN_CONTEXT"
-kubectl get hpa -A --no-headers > "$GREEN_FILE"
+    with open(file_name, "w") as f:
+        for line in hpa_data:
+            parts = line.split(",")
+            if len(parts) != 4:
+                continue
 
-echo "Gathering BLUE HPA state..."
-set_context "$BLUE_CONTEXT"
-kubectl get hpa -A --no-headers > "$BLUE_FILE"
+            ns, name, cur_min, cur_max = parts[0], parts[1], int(parts[2]), int(parts[3])
 
-echo "Comparing and Updating BLUE to ensure parity..."
+            # RULE 1: Services already below 4 → Do NOT modify
+            if cur_min < 4:
+                new_min = cur_min
+                new_max = cur_max
+                comment = "SKIPPED (<4 current)"
+            else:
+                # RULE 2: Calculate scaling
+                new_min = scale_value(cur_min, percent)
+                new_max = scale_value(cur_max, percent)
+                comment = "SCALED"
 
-while read -r ns name _ _ min max _; do
-    forced=""
-    
-    if [[ "$min" -lt 4 ]]; then
-        # Tag HPAs that may use forced scaling rule
-        forced="[SKIPPED (<4 current)]"
-        echo "$ns $name Min:$min Max:$max $forced"
-        continue
-    fi
+                # RULE 3: If result drops below 4 → keep minimum 4
+                if new_min < 4:
+                    new_min = 4
+                    comment = "FORCED_MIN_4"
 
-    # Ensure Max >= Min (Forced minimum logic)
-    if [[ "$max" -lt "$min" ]]; then
-        forced="[FORCED_MIN_$min]"
-        max="$min"
-    fi
+                # RULE 4: Ensure Max >= Min
+                if new_max < new_min:
+                    new_max = new_min
+                    if comment == "SCALED":
+                        comment = "FORCED_MAX_UPDATED"
 
-    # Sync to blue
-    set_context "$BLUE_CONTEXT"
-    echo "Patching $name in $ns to Min=$min Max=$max $forced"
-    
-    kubectl patch hpa "$name" -n "$ns" \
-        --type merge \
-        -p "{\"spec\": {\"minReplicas\": $min, \"maxReplicas\": $max}}"
+            f.write(f"{ns:<15} {name:<45} Min:{new_min:<4} Max:{new_max:<4}  [{comment}]\n")
 
-    echo "$ns $name Min:$min Max:$max $forced"
-    
-done < <(awk '$4!~/n/a/' "$GREEN_FILE")
+    print(f"✔ Output generated: {file_name}")
 
-echo "---------------------------------"
-echo "HPA sync completed successfully!"
+
+if __name__ == "__main__":
+    print("\n⚠ Ensure kubectl context = BLUE/PROD cluster before running\n")
+
+    blue_percent = float(input("Enter % for Blue cluster (ex: 90): ").strip())
+    green_percent = 100 - blue_percent
+
+    print(f"\n➡ Blue = {blue_percent}% | Green = {green_percent}%\n")
+
+    hpa_list = get_hpa_data()
+
+    print("Generating Blue output file…")
+    process(hpa_list, blue_percent, "blue")
+
+    print("\nGenerating Green output file…")
+    process(hpa_list, green_percent, "green")
+
+    print("\n🎯 Completed — ONLY files generated, nothing changed in Kubernetes\n")
