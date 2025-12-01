@@ -1,206 +1,32 @@
-app_user@ip-10-59-81-252:~$ kubectl get ingress -n acqui --kubeconfig /home/app_user/.kube/prod-cluster | grep man
-ironman                        kong        www.kotak811.com,www.kotak811.com,www.kotak811.com + 1 more...         a1b887e51fc594f419da52fd801de56c-e69312e3196d480e.elb.ap-south-1.amazonaws.com   80, 443   304d
-ironman-tailscale              tailscale   *                                                                      acqui.tail4dde4.ts.net                                                           80, 443   304d
-mantis                         kong        www.kotak811.com,www.kotak811.bank.in                                  a1b887e51fc594f419da52fd801de56c-e69312e3196d480e.elb.ap-south-1.amazonaws.com   80, 443   240d
-mantis-fe                      kong        www.kotak811.bank.in                                                   a1b887e51fc594f419da52fd801de56c-e69312e3196d480e.elb.ap-south-1.amazonaws.com   80, 443   240d
-mantis-fe-kotak811-com         kong        www.kotak811.com                                                                                                                                        80, 443   135m
-mantis-internal                kong        acqui.kotak811.int                                                     a1b887e51fc594f419da52fd801de56c-e69312e3196d480e.elb.ap-south-1.amazonaws.com   80, 443   363d
-
-
-below are the kong ingress 
-
-
-pool:
-  name: $(poolName)
-trigger: none
-resources:
-  repositories:
-  - repository: source-repo
-    type: git
-    name: "Kotak 811 - Prelogin/mantis"
-    ref: ${{parameters.sourceBranch}}
-    trigger:
-      branches:
-        include:
-        - develop
-      paths:
-        include: 
-        - frontend
-    
-parameters:
-  - name: repository
-    default: "Kotak 811 - Prelogin/mantis"
-  - name: poolName
-    default: 811Pool
-  - name: serviceName
-    type: string
-    default: mantis-fe-kotak811-com
-  - name: sourceBranch
-    default: develop
-  - name: accountId
-    type: object
-    default: 
-      prod: 718378052708
-      nonProd: 483584640083
-  - name: ecrRegion
-    default: ap-south-1
-  - name: ecrPrefix
-    default: cloudacqui
-  - name: roleArn
-    type: object
-    default:
-      nonProd: arn:aws:iam::483584640083:role/EKS_Setup_Role
-      prod: arn:aws:iam::718378052708:role/EKS-Setup-Role-Kotak811
-  - name: appConfig
-    type: object
-    default: 
-      nonProd:
-        enabled: true
-        applicationId: gcihmn3
-        environmentId: 2avwqfo
-        configurationProfileId: fvsmxrt
-      onbuat:
-        enabled: true
-        applicationId: 2xrhn8h
-        environmentId: lhb11c8
-        configurationProfileId: fvsmxrt
-      prod:
-        applicationId: 4aluyu1
-        environmentId: 0l1zp19
-        configurationProfileId: ws2kdnq
-variables:
-  repository: ${{parameters.repository}}
-  POOL_NAME: ${{parameters.poolName}}
-  poolName: ${{parameters.poolName}}
-
-stages:
-- ${{ if ne(parameters['sourceBranch'], 'main')}}:
-  - stage: build_push_uat
-    displayName: Build and Push on UAT
-    jobs:
-    - template: ../templates/buildAndPush.tpl
-      parameters:
-        imageRepository: ${{parameters.accountId.nonProd}}.dkr.ecr.${{parameters.ecrRegion}}.amazonaws.com/${{parameters.ecrPrefix}}/${{parameters.serviceName}}
-        roleArn: ${{parameters.roleArn.nonProd}}
-        buildContext: "frontend"
-        dockerfilePath: "frontend/Dockerfile"
-        appConfig: ${{ parameters.appConfig.nonProd }}
-        buildArgs: "--no-cache"
-        environment: "uat"
-
-  # - stage: build_push_onb_uat
-  #   displayName: Build and Push on ONB UAT
-  #   dependsOn: []
-  #   jobs:
-  #   - template: ../templates/buildAndPush.tpl
-  #     parameters:
-  #       imageRepository: ${{parameters.accountId.nonProd}}.dkr.ecr.${{parameters.ecrRegion}}.amazonaws.com/${{parameters.ecrPrefix}}/${{parameters.serviceName}}
-  #       buildContext: "frontend"
-  #       dockerfilePath: "frontend/Dockerfile"
-  #       appConfig: ${{ parameters.appConfig.onbuat }}
-  #       buildArgs: "--no-cache"
-  #       environment: "uatonb"
-      
-  - stage: deploy_uat
-    displayName: Deploy to Acqui UAT
-    dependsOn:
-    - build_push_uat
-    jobs:
-    - template: ../templates/helm-deploy.tpl
-      parameters:
-        imageRepository: ${{parameters.accountId.nonProd}}.dkr.ecr.${{parameters.ecrRegion}}.amazonaws.com/${{parameters.ecrPrefix}}/${{parameters.serviceName}}
-        imageKey: "containers[0].image"
-        kubernetesServiceConnection: staging-acqui-166522979534
-        namespace: acqui
-        valuesFile: "helm-values/mantis/frontend/values-uat-kotak811-com.yaml"
-        environment: "uat"
-        service: ${{parameters.serviceName}}
-        chartPath: "component-chart"
-
-  # - stage: deploy_onb_uat
-  #   displayName: Deploy to ONB UAT
-  #   dependsOn:
-  #   - build_push_onb_uat
-  #   jobs:
-  #   - template: ../templates/helm-deploy.tpl
-  #     parameters:
-  #       imageRepository: ${{parameters.accountId.nonProd}}.dkr.ecr.${{parameters.ecrRegion}}.amazonaws.com/${{parameters.ecrPrefix}}/${{parameters.serviceName}}
-  #       imageKey: "containers[0].image"
-  #       kubernetesServiceConnection: onb-eks-prelogin-uat
-  #       namespace: prelogin-uat
-  #       valuesFile: "helm-values/mantis/frontend/values-onb-uat.yaml"
-  #       environment: "uatonb"
-  #       service: ${{parameters.serviceName}}
-  #       chartPath: "component-chart"
-
-
-- ${{ if eq(parameters['sourceBranch'], 'main')}}:
-  - stage: build_push_prod
-    displayName: Build and Push on Prod
-    jobs:
-    - template: ../templates/buildAndPush.tpl
-      parameters:
-        imageRepository: ${{parameters.accountId.prod}}.dkr.ecr.${{parameters.ecrRegion}}.amazonaws.com/${{parameters.ecrPrefix}}/${{parameters.serviceName}}
-        roleArn: ${{parameters.roleArn.prod}}
-        buildContext: "frontend"
-        dockerfilePath: "frontend/Dockerfile"
-        appConfig: ${{ parameters.appConfig.prod }}
-        buildArgs: "--no-cache"
-        environment: "production"
-        
-      
-  - stage: deploy_prod
-    displayName: Deploy to Acqui Prod
-    pool:
-      name: k811-prod
-      demands:
-        - Agent.Name -equals Linux-Agent3
-    jobs:
-    - template: ../templates/helm-deploy.tpl
-      parameters:
-        imageRepository: ${{parameters.accountId.prod}}.dkr.ecr.${{parameters.ecrRegion}}.amazonaws.com/${{parameters.ecrPrefix}}/${{parameters.serviceName}}
-        imageKey: "containers[0].image"
-        kubernetesServiceConnection: production-acqui-1665146767490
-        namespace: acqui
-        valuesFile: "helm-values/mantis/frontend/values-prod-kotak811-com.yaml"
-        environment: "production"
-        service: ${{parameters.serviceName}}
-        chartPath: "component-chart"
-
-helm-values/mantis/frontend/values-prod-kotak811-com.yaml"
-
-containers:
-- name: app
-  image: #{registryUrl}#
-  imagePullPolicy: Always
-  env:
-  - name: NODE_ENV
-    value: "production"
-  resources:
-    requests:
-      cpu: 0.2
-      memory: 256Mi
-    limits:
-      cpu: 1
-      memory: 2048Mi
-service:
-  ports:
-   - port: 3000
-rollingUpdate:
-  enabled: true
-replicas: 1
-ingress:
-  tls: acqui-prod
-  ingressClassName: kong
-  rules:
-  - path: /freeze
-    pathType: ImplementationSpecific
-    host: www.kotak811.com
-  annotations:
-    kubernetes.io/ingress.class: kong
-
-autoScaling:
-  horizontal:
-    maxReplicas: 10
-    averageRelativeCPU: 80
-
+app_user@ip-10-59-81-252:~$ kubectl describe ingress mantis-fe-kotak811-com -n acqui --kubeconfig /home/app_user/.kube/prod-cluster 
+Name:             mantis-fe-kotak811-com
+Labels:           app.kubernetes.io/managed-by=Helm
+                  app.kubernetes.io/name=mantis-fe-kotak811-com
+Namespace:        acqui
+Address:          
+Default backend:  default-http-backend:80 (<error: endpoints "default-http-backend" not found>)
+TLS:
+  acqui-prod terminates www.kotak811.com
+Rules:
+  Host              Path  Backends
+  ----              ----  --------
+  www.kotak811.com  
+                    /freeze   mantis-fe-kotak811-com:3000 (10.1.253.63:3000)
+Annotations:        acme.cert-manager.io/http01-ingress-class: nginx
+                    cert-manager.io/cluster-issuer: lets-encrypt-http-issuer
+                    certmanager.k8s.io/cluster-issuer: lets-encrypt-http-issuer
+                    certmanager.k8s.io/http01-ingress-class: nginx
+                    helm.sh/chart: component-chart-0.0.0
+                    kubernetes.io/ingress.class: kong
+                    meta.helm.sh/release-name: mantis-fe-kotak811-com
+                    meta.helm.sh/release-namespace: acqui
+Events:
+  Type     Reason                              Age                      From         Message
+  ----     ------                              ----                     ----         -------
+  Warning  KongConfigurationTranslationFailed  3m46s (x3101 over 158m)  kong-client  Failed to fetch the secret (acqui/acqui-prod)
+  Warning  KongConfigurationTranslationFailed  3m46s (x3101 over 158m)  kong-client  Failed to fetch the secret (acqui/acqui-prod)
+  Warning  KongConfigurationTranslationFailed  3m46s (x3101 over 158m)  kong-client  Failed to fetch the secret (acqui/acqui-prod)
+  Warning  KongConfigurationTranslationFailed  3m46s (x3101 over 158m)  kong-client  Failed to fetch the secret (acqui/acqui-prod)
+  Warning  KongConfigurationTranslationFailed  3m46s (x3101 over 158m)  kong-client  Failed to fetch the secret (acqui/acqui-prod)
+  Warning  KongConfigurationTranslationFailed  3m46s (x3101 over 158m)  kong-client  Failed to fetch the secret (acqui/acqui-prod)
+  Warning  KongConfigurationTranslationFailed  3m46s (x3101 over 158m)  kong-client  Failed to fetch the secret (acqui/acqui-prod)
