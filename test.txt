@@ -1,50 +1,206 @@
-TECHNICAL GOALS
-Below Expectation
+app_user@ip-10-59-81-252:~$ kubectl get ingress -n acqui --kubeconfig /home/app_user/.kube/prod-cluster | grep man
+ironman                        kong        www.kotak811.com,www.kotak811.com,www.kotak811.com + 1 more...         a1b887e51fc594f419da52fd801de56c-e69312e3196d480e.elb.ap-south-1.amazonaws.com   80, 443   304d
+ironman-tailscale              tailscale   *                                                                      acqui.tail4dde4.ts.net                                                           80, 443   304d
+mantis                         kong        www.kotak811.com,www.kotak811.bank.in                                  a1b887e51fc594f419da52fd801de56c-e69312e3196d480e.elb.ap-south-1.amazonaws.com   80, 443   240d
+mantis-fe                      kong        www.kotak811.bank.in                                                   a1b887e51fc594f419da52fd801de56c-e69312e3196d480e.elb.ap-south-1.amazonaws.com   80, 443   240d
+mantis-fe-kotak811-com         kong        www.kotak811.com                                                                                                                                        80, 443   135m
+mantis-internal                kong        acqui.kotak811.int                                                     a1b887e51fc594f419da52fd801de56c-e69312e3196d480e.elb.ap-south-1.amazonaws.com   80, 443   363d
 
-“Delivers infra/services late, with gaps, manual steps, and depends heavily on others.”
 
-Meets Expectation
+below are the kong ingress 
 
-“Delivers infra/services on time with good quality and uses standard automation.”
 
-Exceeds Expectation
+pool:
+  name: $(poolName)
+trigger: none
+resources:
+  repositories:
+  - repository: source-repo
+    type: git
+    name: "Kotak 811 - Prelogin/mantis"
+    ref: ${{parameters.sourceBranch}}
+    trigger:
+      branches:
+        include:
+        - develop
+      paths:
+        include: 
+        - frontend
+    
+parameters:
+  - name: repository
+    default: "Kotak 811 - Prelogin/mantis"
+  - name: poolName
+    default: 811Pool
+  - name: serviceName
+    type: string
+    default: mantis-fe-kotak811-com
+  - name: sourceBranch
+    default: develop
+  - name: accountId
+    type: object
+    default: 
+      prod: 718378052708
+      nonProd: 483584640083
+  - name: ecrRegion
+    default: ap-south-1
+  - name: ecrPrefix
+    default: cloudacqui
+  - name: roleArn
+    type: object
+    default:
+      nonProd: arn:aws:iam::483584640083:role/EKS_Setup_Role
+      prod: arn:aws:iam::718378052708:role/EKS-Setup-Role-Kotak811
+  - name: appConfig
+    type: object
+    default: 
+      nonProd:
+        enabled: true
+        applicationId: gcihmn3
+        environmentId: 2avwqfo
+        configurationProfileId: fvsmxrt
+      onbuat:
+        enabled: true
+        applicationId: 2xrhn8h
+        environmentId: lhb11c8
+        configurationProfileId: fvsmxrt
+      prod:
+        applicationId: 4aluyu1
+        environmentId: 0l1zp19
+        configurationProfileId: ws2kdnq
+variables:
+  repository: ${{parameters.repository}}
+  POOL_NAME: ${{parameters.poolName}}
+  poolName: ${{parameters.poolName}}
 
-“Proactively improves infra, fully automates flows, and delivers high-quality solutions early.”
-SECURITY & COMPLIANCE GOALS
-Below Expectation
+stages:
+- ${{ if ne(parameters['sourceBranch'], 'main')}}:
+  - stage: build_push_uat
+    displayName: Build and Push on UAT
+    jobs:
+    - template: ../templates/buildAndPush.tpl
+      parameters:
+        imageRepository: ${{parameters.accountId.nonProd}}.dkr.ecr.${{parameters.ecrRegion}}.amazonaws.com/${{parameters.ecrPrefix}}/${{parameters.serviceName}}
+        roleArn: ${{parameters.roleArn.nonProd}}
+        buildContext: "frontend"
+        dockerfilePath: "frontend/Dockerfile"
+        appConfig: ${{ parameters.appConfig.nonProd }}
+        buildArgs: "--no-cache"
+        environment: "uat"
 
-“Misses security checks, slow in fixing issues, and lacks compliance awareness.”
+  # - stage: build_push_onb_uat
+  #   displayName: Build and Push on ONB UAT
+  #   dependsOn: []
+  #   jobs:
+  #   - template: ../templates/buildAndPush.tpl
+  #     parameters:
+  #       imageRepository: ${{parameters.accountId.nonProd}}.dkr.ecr.${{parameters.ecrRegion}}.amazonaws.com/${{parameters.ecrPrefix}}/${{parameters.serviceName}}
+  #       buildContext: "frontend"
+  #       dockerfilePath: "frontend/Dockerfile"
+  #       appConfig: ${{ parameters.appConfig.onbuat }}
+  #       buildArgs: "--no-cache"
+  #       environment: "uatonb"
+      
+  - stage: deploy_uat
+    displayName: Deploy to Acqui UAT
+    dependsOn:
+    - build_push_uat
+    jobs:
+    - template: ../templates/helm-deploy.tpl
+      parameters:
+        imageRepository: ${{parameters.accountId.nonProd}}.dkr.ecr.${{parameters.ecrRegion}}.amazonaws.com/${{parameters.ecrPrefix}}/${{parameters.serviceName}}
+        imageKey: "containers[0].image"
+        kubernetesServiceConnection: staging-acqui-166522979534
+        namespace: acqui
+        valuesFile: "helm-values/mantis/frontend/values-uat-kotak811-com.yaml"
+        environment: "uat"
+        service: ${{parameters.serviceName}}
+        chartPath: "component-chart"
 
-Meets Expectation
+  # - stage: deploy_onb_uat
+  #   displayName: Deploy to ONB UAT
+  #   dependsOn:
+  #   - build_push_onb_uat
+  #   jobs:
+  #   - template: ../templates/helm-deploy.tpl
+  #     parameters:
+  #       imageRepository: ${{parameters.accountId.nonProd}}.dkr.ecr.${{parameters.ecrRegion}}.amazonaws.com/${{parameters.ecrPrefix}}/${{parameters.serviceName}}
+  #       imageKey: "containers[0].image"
+  #       kubernetesServiceConnection: onb-eks-prelogin-uat
+  #       namespace: prelogin-uat
+  #       valuesFile: "helm-values/mantis/frontend/values-onb-uat.yaml"
+  #       environment: "uatonb"
+  #       service: ${{parameters.serviceName}}
+  #       chartPath: "component-chart"
 
-“Follows security guidelines and closes vulnerabilities within expected timelines.”
 
-Exceeds Expectation
+- ${{ if eq(parameters['sourceBranch'], 'main')}}:
+  - stage: build_push_prod
+    displayName: Build and Push on Prod
+    jobs:
+    - template: ../templates/buildAndPush.tpl
+      parameters:
+        imageRepository: ${{parameters.accountId.prod}}.dkr.ecr.${{parameters.ecrRegion}}.amazonaws.com/${{parameters.ecrPrefix}}/${{parameters.serviceName}}
+        roleArn: ${{parameters.roleArn.prod}}
+        buildContext: "frontend"
+        dockerfilePath: "frontend/Dockerfile"
+        appConfig: ${{ parameters.appConfig.prod }}
+        buildArgs: "--no-cache"
+        environment: "production"
+        
+      
+  - stage: deploy_prod
+    displayName: Deploy to Acqui Prod
+    pool:
+      name: k811-prod
+      demands:
+        - Agent.Name -equals Linux-Agent3
+    jobs:
+    - template: ../templates/helm-deploy.tpl
+      parameters:
+        imageRepository: ${{parameters.accountId.prod}}.dkr.ecr.${{parameters.ecrRegion}}.amazonaws.com/${{parameters.ecrPrefix}}/${{parameters.serviceName}}
+        imageKey: "containers[0].image"
+        kubernetesServiceConnection: production-acqui-1665146767490
+        namespace: acqui
+        valuesFile: "helm-values/mantis/frontend/values-prod-kotak811-com.yaml"
+        environment: "production"
+        service: ${{parameters.serviceName}}
+        chartPath: "component-chart"
 
-“Strengthens security posture, automates checks, and reduces vulnerabilities proactively
+helm-values/mantis/frontend/values-prod-kotak811-com.yaml"
 
-PERFORMANCE & STABILITY GOALS
-Below Expectation
+containers:
+- name: app
+  image: #{registryUrl}#
+  imagePullPolicy: Always
+  env:
+  - name: NODE_ENV
+    value: "production"
+  resources:
+    requests:
+      cpu: 0.2
+      memory: 256Mi
+    limits:
+      cpu: 1
+      memory: 2048Mi
+service:
+  ports:
+   - port: 3000
+rollingUpdate:
+  enabled: true
+replicas: 1
+ingress:
+  tls: acqui-prod
+  ingressClassName: kong
+  rules:
+  - path: /freeze
+    pathType: ImplementationSpecific
+    host: www.kotak811.com
+  annotations:
+    kubernetes.io/ingress.class: kong
 
-“Frequent issues, limited monitoring, and slow recovery during incidents.”
+autoScaling:
+  horizontal:
+    maxReplicas: 10
+    averageRelativeCPU: 80
 
-Meets Expectation
-
-“Keeps systems stable, improves monitoring, and resolves incidents efficiently.”
-
-Exceeds Expectation
-
-“Optimizes performance, reduces incidents, and improves system reliability end-to-end.”
-
-COLLABORATION & PROCESS GOALS
-Below Expectation
-
-“Communicates late, documentation missing, and onboarding processes stay manual.”
-
-Meets Expectation
-
-“Works well with teams, documents clearly, and supports smooth onboarding.”
-
-Exceeds Expectation
-
-“Improves cross-team workflows, automates onboarding, and drives process enhancements.”
