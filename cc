@@ -1,274 +1,129 @@
-So here is my use case , we have to set our Goal 
-Performance Section
-Ready to set your goals for this year?
-Effective goal setting helps you focus on outcomes that matter. Define clear, measurable goals aligned with your role and team priorities. Ensure each goal follows SMART principles (Specific, Measurable, Achievable, Relevant, Time-bound) and includes success criteria to track progress and impact.
+locals {
+  nonprod_dns_records = {
+    apyuat = {
+      name    = "apy.uat"
+      content = "d2audzjm5us1na.cloudfront.net"
+    }
+    iipuat = {
+      name    = "iip.uat"
+      content = "d25y2b0tdik8yh.cloudfront.net"
+    }
+    ksecuat = {
+      name    = "ksec.uat"
+      content = "d1wxlhimn6abwc.cloudfront.net"
+    }
+    loanuat = {
+      name    = "loan.uat"
+      content = "da7s4ua62utue.cloudfront.net"
+    }
+    sccuat = {
+      name    = "scc.uat"
+      content = "d2d2u5vz2zez92.cloudfront.net"
+    }
+    ghiuat = {
+      name       = "ghi.uat"
+      content    = "checkpoint-np-alb-1879576181.ap-south-1.elb.amazonaws.com"
+      owner_team = ["811-crosssell"]
+    }
+    passbookuat = {
+      name       = "passbook.uat"
+      content    = "checkpoint-np-alb-1879576181.ap-south-1.elb.amazonaws.com"
+      owner_team = ["811-crosssell"]
+    }
+    agentkuat = {
+      name       = "agent.uat"
+      content    = "checkpoint-np-alb-1879576181.ap-south-1.elb.amazonaws.com"
+      owner_team = ["811-crosssell"]
+    }
+    cckuat = {
+      name       = "cc.uat"
+      content    = "checkpoint-np-alb-1879576181.ap-south-1.elb.amazonaws.com"
+      owner_team = ["811-crosssell"]
+    }
+    blportalkuat = {
+      name       = "blportal.uat"
+      content    = "checkpoint-np-alb-1879576181.ap-south-1.elb.amazonaws.com"
+      owner_team = ["811-crosssell"]
+    }
+  }
+  prod_dns_records = {
+    www = {
+      name    = "www"
+      content = "811-checkpoint-nlb-054b5c6d3fe91b45.elb.ap-south-1.amazonaws.com"
+    }
+    iip = {
+      name    = "iip"
+      content = "d2drssdz0v01pg.cloudfront.net"
+    }
+    ksec = {
+      name    = "ksec"
+      content = "d27ljuqxuf2nw3.cloudfront.net"
+    }
+    loan = {
+      name    = "loan"
+      content = "d2u8zrp5rgaz21.cloudfront.net"
+    }
+    creditcard-on-fd = {
+      name    = "creditcard-on-fd"
+      content = "d22dyonzo4ekgl.cloudfront.net"
+    }
+    apy = {
+      name    = "apy"
+      content = "ds9enargjlzsj.cloudfront.net"
+    }
+    ghi = {
+      name    = "ghi"
+      content = "checkpoint-prod-alb-797480506.ap-south-1.elb.amazonaws.com"
+    }
+    cc = {
+      name    = "cc"
+      content = "checkpoint-prod-alb-797480506.ap-south-1.elb.amazonaws.com"
+    }
+    bl = {
+      name    = "bl"
+      content = "checkpoint-prod-alb-797480506.ap-south-1.elb.amazonaws.com"
+    }
+    sm = {
+      name    = "sm"
+      content = "d27d7qmzcxnt5n.cloudfront.net"
+    }
 
-one of my colluge has filed his goal as exaple below
-Improve Deployment Automation
- 
-Integrated Pytest-based unit tests into CI/CD workflows, enhancing application security, compliance adherence, and overall reliability.
- 
-Introduced containerized build strategy in CI/CD workflows and successfully integrated it into multiple stages (e.g., DR pipeline, unit tests), eliminating reliance on Azure node packages and improving portability.
- 
-Enhance System Reliability
- 
-Designed and deployed multi-cluster EKS architecture with weighted canary and blue-green deployments, ensuring seamless upgrades and uninterrupted service.
- 
-Implemented a PoC for global Redis datastore with Terraform-based automation, ensuring robust disaster recovery and high availability through global replication.
- 
-Optimize Incident Response
- 
-Refactored on-call reporting to include detailed Excel-based failure logs, facilitating tracking with development teams and enhancing operational visibility.
- 
-Applied the Lucky13 security patch to endpoints scc.uat.kotak811.com and creditcard-on-fd.kotak811.com to mitigate cryptographic vulnerabilities.
- 
-Responded to and closed several IT-reported incidents, improving operational reliability and reducing downtime.
- 
-Infrastructure as Code (IaC) Adoption
- 
-Implemented Terraform-based automation for Cloudflare, coupled with CI/CD workflows to streamline configuration and improve operational efficiency.
- 
-Fixed cyclic dependency issues in Terraform during AppConfig profile setup, ensuring successful execution on initial runs.
- 
-Implemented reusable Terraform modules to support simultaneous deployments in production and DR regions with a single execution process.
+    811apppurezento = {
+        name    = "811apppurezento"
+        content = "checkpoint-prod-alb-797480506.ap-south-1.elb.amazonaws.com"
+    }
+    agent = {
+      name    = "811apppurezento"
+      content = "checkpoint-prod-alb-797480506.ap-south-1.elb.amazonaws.com"
+    }
+  }
+
+}
+
+###################
+module "nonprod_dns_records" {
+  source     = "./cloudflare-modules/dns"
+  for_each   = local.nonprod_dns_records
+  name       = each.value.name
+  type       = lookup(each.value, "type", "CNAME")
+  content    = each.value.content
+  owner_team = concat(lookup(each.value, "owner_team", []), ["811-team"])
+}
+
+module "prod_dns_records" {
+  source     = "./cloudflare-modules/dns"
+  for_each   = local.prod_dns_records
+  name       = each.value.name
+  type       = lookup(each.value, "type", "CNAME")
+  content    = each.value.content
+  owner_team = concat(lookup(each.value, "owner_team", []), ["811-team"])
 
 
 
-So below is my Ticket for CMR and ECMr u can conisder as devops on call ticket
-Issue Type	Issue key	Issue id	Summary	Assignee	Assignee Id	Reporter	Reporter Id	Priority	Status	Resolution	Created	Updated	Due date
-Task	DEVOPS-10971	76677	UAT | Need Complete path and access/secret key to access Loan Lead Service S3 bucket	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Vinayak Phulari	712020:15be8057-b378-493d-985b-fba854de7725	Medium	Pending Approval		19/Nov/25 12:36 PM	20/Nov/25 10:03 AM	
-Task	DEVOPS-10909	76216	PROD migration	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Pending Approval		17/Nov/25 10:08 AM	17/Nov/25 10:23 AM	
-Task	DEVOPS-10906	76197	Migration of .com to bank.in for Acqui services	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Devesh Sharma	712020:e4ec9d45-ef0a-4951-94ad-64fccb5b4bdc	Medium	Pending Approval		16/Nov/25 1:48 AM	16/Nov/25 1:48 AM	
-Task	DEVOPS-10827	75418	PROD AWS access key decativate	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Pending Approval		11/Nov/25 1:13 PM	11/Nov/25 1:21 PM	
-Task	DEVOPS-10788	75182	DDLM Access to DynamoDB table	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Akash Saini	712020:9b5d0bc9-52a9-4310-b089-838c7a325410	Medium	Pending Approval		10/Nov/25 12:30 PM	10/Nov/25 1:18 PM	
-Task	DEVOPS-10707	74365	Request for SSL Certificate Creation	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Raj Porwal	712020:1cd8f7d1-56c1-4a52-ab28-7b37362fd3fd	Medium	Pending Approval		05/Nov/25 8:08 PM	05/Nov/25 8:14 PM	
-Task	DEVOPS-10696	74282	Please add variable HYPERVERGE_BUCKET_NAME to secret manager mantis backend in UAT	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Devesh Sharma	712020:e4ec9d45-ef0a-4951-94ad-64fccb5b4bdc	Medium	Done	Done	05/Nov/25 4:06 PM	05/Nov/25 4:11 PM	
-Task	DEVOPS-10688	74230	Need SNS publish access to Re-KYC	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Rahul Kumar	712020:ff1ae055-9ec6-469b-9df6-5a0da64a0798	Medium	In Progress		05/Nov/25 1:51 PM	07/Nov/25 2:45 PM	
-CMR(Normal)	DEVOPS-10685	74185	Switch Over AWS Keys Cycle	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Ashutosh Pandey	63ce5c235a23f7e717cd6d2a	Medium	In Progress		05/Nov/25 11:25 AM	07/Nov/25 6:39 PM	
-CMR(Normal)	DEVOPS-10671	74014	CloudFront Certificate Update & CORS Policy Configuration for Domain Migration to kotak811.bank.in	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Pending Approval		04/Nov/25 5:32 PM	04/Nov/25 6:38 PM	
-Task	DEVOPS-10665	74001	Cloudfront Web Journey Expose	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Akash Shinde	712020:4656c433-28ec-4184-801c-efeaf7a11fe1	Medium	Pending Approval		04/Nov/25 4:06 PM	04/Nov/25 4:07 PM	
-Task	DEVOPS-10658	73981	Change the CORS policy 	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Pending Approval		04/Nov/25 2:57 PM	17/Nov/25 10:23 AM	
-Task	DEVOPS-10657	73979	add bank.in domain and change the certificate - apy.uat.kotak811.bank.in	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Pending Approval		04/Nov/25 2:55 PM	04/Nov/25 2:56 PM	
-Task	DEVOPS-10656	73977	add bank.in domain and change the certificate - scc.kotak811.bank.in	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Pending Approval		04/Nov/25 2:55 PM	04/Nov/25 2:55 PM	
-Task	DEVOPS-10655	73975	add bank.in domain and change the certificate - loan.kotak811.bank.in	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Pending Approval		04/Nov/25 2:54 PM	04/Nov/25 2:54 PM	
-Task	DEVOPS-10654	73973	add bank.in domain and change the certificate - ksec.kotak811.bank.in	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Pending Approval		04/Nov/25 2:54 PM	04/Nov/25 2:54 PM	
-Task	DEVOPS-10653	73971	add bank.in domain and change the certificate -iip.kotak811.bank.in	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Pending Approval		04/Nov/25 2:53 PM	17/Nov/25 10:10 AM	
-Task	DEVOPS-10631	73848	Add the bank.in header in shared ALB endpoint	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Pending Approval		03/Nov/25 10:26 PM	17/Nov/25 10:23 AM	
-Task	DEVOPS-10630	73846	Import the certificate in ACM	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Pending Approval		03/Nov/25 10:25 PM	17/Nov/25 10:08 AM	
-Task	DEVOPS-10629	73844	CNAME record entries 	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Pending Approval		03/Nov/25 10:25 PM	17/Nov/25 10:23 AM	
-Task	DEVOPS-10628	73842	Create the SAN certifcate.	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Pending Approval		03/Nov/25 10:23 PM	03/Nov/25 10:23 PM	
-Epic	DEVOPS-10627	73840	kotak811.com domain migration to bank.in	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	To Do		03/Nov/25 10:21 PM	19/Nov/25 10:38 PM	
-CMR(Normal)	DEVOPS-10574	73409	Certificate Update for passbook-internal.kotak811.com	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Done	Done	31/Oct/25 12:54 PM	03/Nov/25 11:43 AM	
-Task	DEVOPS-10548	72851	S3 bucket Access to Admin Panel. HV faceliveness integration	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Rahul Kumar	712020:ff1ae055-9ec6-469b-9df6-5a0da64a0798	Medium	Done	Done	29/Oct/25 11:31 PM	17/Nov/25 6:47 PM	
-CMR(Normal)	DEVOPS-10476	72468	PROD | Passbook - Need to check whether Passbook was applied for 1 CRN	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Amit Sharma	712020:79b13d42-1a88-48c6-b848-f6d135858b42	Medium	Done	Done	27/Oct/25 1:55 PM	29/Oct/25 11:23 PM	
-CMR(Normal)	DEVOPS-10439	72101	811insurance.kotak811.com certificate renewal	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	To Do		24/Oct/25 12:47 PM	06/Nov/25 4:20 PM	
-CMR(Normal)	DEVOPS-10370	71617	Leads PROD deployment 	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Shashikant Mony	712020:5fdcb358-5ec3-4e36-af46-91a9ef86f0ec	Medium	Pending Approval		17/Oct/25 1:50 PM	17/Oct/25 9:42 PM	
-CMR(Normal)	DEVOPS-10369	71611	SCC Partners - LCM CUG - Need Deployments to resolve reported issues	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Ram Singh	712020:5b10867f-11f4-42df-a7dc-aef193a7b3b5	Medium	Done	Done	17/Oct/25 1:21 PM	17/Oct/25 10:36 PM	
-CMR(Normal)	DEVOPS-10363	71577	Reward-journey deployment	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Shubham Singh	712020:ca905164-e904-46b2-a654-6e991705d598	Medium	Pending Approval		17/Oct/25 11:18 AM	23/Oct/25 1:01 PM	
-CMR(Normal)	DEVOPS-10354	71521	IIP Prod Release	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Aman Kumar	712020:7a5d4fb5-e17d-4f30-b7de-e184fb4eb9f0	Medium	Done	Done	16/Oct/25 5:41 PM	17/Oct/25 10:10 AM	
-CMR(Normal)	DEVOPS-10353	71514	Biometric (Face/Fingerprint) value addition and CRNNOTAVAILABLE drop cases fix.	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Shubham Singh	712020:2733c30d-11e4-4d60-85b1-844fbcd4a931	Medium	Done	Done	16/Oct/25 4:57 PM	16/Oct/25 11:03 PM	
-CMR(Normal)	DEVOPS-10352	71506	Acqui: AccountsBiometric (Face/Fingerprint) value addition and CRNNOTAVAILABLE drop cases fix, Partner Etb eligibility check modification .	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Vaibhav Joshi	712020:1e1d4a8e-e621-4100-b168-e0f4fd32ec57	Medium	Done	Done	16/Oct/25 3:48 PM	25/Oct/25 7:21 PM	
-CMR(Normal)	DEVOPS-10350	71477	BRE PROD Deployment 2.7.6	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Rishabh Rathore	712020:677b89ea-ba57-4239-b436-31d294a512a6	Medium	Done	Done	16/Oct/25 3:01 PM	17/Oct/25 12:27 AM	
-CMR(Normal)	DEVOPS-10343	71376	 Reward-journey deployment	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Shubham Singh	712020:ca905164-e904-46b2-a654-6e991705d598	Medium	Done	Done	16/Oct/25 12:11 PM	17/Oct/25 11:19 AM	
-CMR(Normal)	DEVOPS-10342	71359	DC-Profiler prod deployment	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Kirtish Khandar	712020:65336d15-ddba-43d5-8b57-f800143d56a8	Medium	Done	Done	16/Oct/25 12:04 PM	16/Oct/25 11:18 PM	
-CMR(Normal)	DEVOPS-10338	71330	prod deployment - uscc-applications (CUG)	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Vatsal Lalcheta	712020:b1abbb6a-0aa4-4cfd-abc8-5f3dbd3382bc	Medium	Done	Done	16/Oct/25 11:18 AM	16/Oct/25 10:26 PM	
-Task	DEVOPS-10327	71262	yum update of the below severs	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Pending Approval		15/Oct/25 5:01 PM	16/Oct/25 12:23 PM	
-CMR(Normal)	DEVOPS-10322	71247	Added landmark to crn-details API response	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Shubham Agawane	712020:a80df1c2-530a-45a6-9972-9e0c553bf840	Medium	Done	Done	15/Oct/25 2:59 PM	15/Oct/25 11:06 PM	
-CMR(Normal)	DEVOPS-10313	71200	SCC Partners - Open sm.kotak811.com to public	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Ram Singh	712020:5b10867f-11f4-42df-a7dc-aef193a7b3b5	Medium	Pending Approval		15/Oct/25 10:23 AM	16/Oct/25 8:22 PM	
-CMR(Normal)	DEVOPS-10311	71171	Sentry warning logs fix in Transaction service	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Avinash Kumar	712020:3bafdb6f-3b81-4ca6-a661-1c8186556935	Medium	Done	Done	15/Oct/25 8:12 AM	15/Oct/25 11:01 PM	
-CMR(Normal)	DEVOPS-10310	71170	Logging Optimisation for Auth and User service	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Avinash Kumar	712020:3bafdb6f-3b81-4ca6-a661-1c8186556935	Medium	Done	Done	15/Oct/25 8:07 AM	15/Oct/25 11:02 PM	
-CMR(Normal)	DEVOPS-10299	71097	Nudge platform CUG deployment - log improvements, event parsing improvements	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Amit Vikram	63ce5c67ed33fd0707b814a5	Medium	Done	Done	14/Oct/25 4:31 PM	14/Oct/25 11:42 PM	
-CMR(Normal)	DEVOPS-10297	71094	IIP Prod Release	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Aman Kumar	712020:7a5d4fb5-e17d-4f30-b7de-e184fb4eb9f0	Medium	Done	Done	14/Oct/25 4:13 PM	14/Oct/25 11:38 PM	
-CMR(Normal)	DEVOPS-10292	71050	Trigger Pipeline Kotak811 Website Frontend	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Subramanian S	712020:89d4a697-e5a8-47dd-bbdc-30d719f9b535	Medium	Done	Done	14/Oct/25 12:53 PM	14/Oct/25 10:51 PM	
-CMR(Normal)	DEVOPS-10290	71033	We want to utilise metrics such as event_loop latency and heap utilisation in our node.js application: super-prod and sub-system: cloudacqui-super 	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Devesh Sharma	712020:e4ec9d45-ef0a-4951-94ad-64fccb5b4bdc	Medium	Done	Done	14/Oct/25 11:33 AM	15/Oct/25 10:02 PM	
-CMR(Normal)	DEVOPS-10286	71015	Charging consumer and DC-Profiler prod deployment	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Jaideep Pyne	712020:02e57369-083e-4694-8c63-696bbd57ce3a	Medium	Done	Done	14/Oct/25 10:37 AM	16/Oct/25 12:07 PM	
-CMR(Normal)	DEVOPS-10283	71003	prod deployment - cc-applications, uscc-applications, 811_lambda_indus_file_uploader_uscc, 811_lambda_event_bridge_publish_kafka	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Vatsal Lalcheta	712020:b1abbb6a-0aa4-4cfd-abc8-5f3dbd3382bc	Medium	Done	Done	14/Oct/25 8:46 AM	16/Oct/25 2:58 PM	
-CMR(Normal)	DEVOPS-10275	70953	Verify Plus Prod deployment	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Rahul Kumar	712020:ff1ae055-9ec6-469b-9df6-5a0da64a0798	Medium	Done	Done	13/Oct/25 4:04 PM	14/Oct/25 12:31 AM	
-ECMR(emergency CMR)	DEVOPS-10264	70904	Memory leak fix for Auth & User service	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Avinash Kumar	712020:3bafdb6f-3b81-4ca6-a661-1c8186556935	Medium	Done	Done	13/Oct/25 1:14 PM	14/Oct/25 12:22 AM	
-CMR(Normal)	DEVOPS-10261	70892	API run on Production for onboarding Kotak Fastag.	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Vanshika Vaishnav	712020:79e418f0-ea33-4ac0-9d92-230b1710ab6c	Medium	Done	Done	13/Oct/25 12:03 PM	14/Oct/25 12:44 PM	
-CMR(Normal)	DEVOPS-10249	70773	Rotate SES keys for Sentry	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Manish Rawat	712020:992d9be3-2f32-4ea1-b6e5-254e50690648	Medium	Done	Done	10/Oct/25 9:48 PM	08/Nov/25 12:04 AM	
-CMR(Normal)	DEVOPS-10248	70755	Nudge platform - CUG deployment, banner update	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Amit Vikram	63ce5c67ed33fd0707b814a5	Medium	Done	Done	10/Oct/25 7:30 PM	14/Nov/25 1:58 PM	
-CMR(Normal)	DEVOPS-10232	70632	Super Money prod deployment (FE)	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Vikrant Singh	712020:caf91465-9c8e-4d81-8433-30131bc9ea34	Medium	Done	Done	10/Oct/25 2:10 PM	14/Oct/25 12:24 AM	
-CMR(Normal)	DEVOPS-10223	70555	Upload assets for FD-revamp in 811 app on Prod bucket	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Biswanath Tewari	712020:cb65150b-be2d-4588-97c6-515e75ae307a	Medium	Done	Done	09/Oct/25 5:46 PM	21/Oct/25 10:45 AM	
-Task	DEVOPS-10217	70547	Trigger Pipeline Kotak811 Website Fronted	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Subramanian S	712020:89d4a697-e5a8-47dd-bbdc-30d719f9b535	Medium	Done	Done	09/Oct/25 4:39 PM	31/Oct/25 8:57 AM	
-CMR(Normal)	DEVOPS-10214	70534	update domain from upi.kotak.com to upi.kotak.bank.in	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Lokesh Chugani	712020:0ae34928-f709-41b8-a533-cab0f42f7f4f	Medium	Pending Approval		09/Oct/25 3:49 PM	09/Oct/25 6:04 PM	
-Subtask	DEVOPS-10209	70515	Prod | Create API GW for motor-insurance	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Mudit Goyal	712020:78b7a1b8-50b3-40aa-889f-fbc1e1cda27a	Medium	Done	Done	09/Oct/25 2:33 PM	24/Oct/25 10:01 PM	
-CMR(Normal)	DEVOPS-10200	70499	Reward Journey Service log diff for recon event	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Shubham Singh	712020:ca905164-e904-46b2-a654-6e991705d598	Medium	Done	Done	09/Oct/25 1:36 PM	13/Oct/25 10:29 AM	
-CMR(Normal)	DEVOPS-10170	70394	Acqui: Re-Kyc Db update optimization	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Vaibhav Joshi	712020:1e1d4a8e-e621-4100-b168-e0f4fd32ec57	Medium	Done	Done	09/Oct/25 11:26 AM	13/Oct/25 10:29 AM	
-Subtask	DEVOPS-10165	70346	Prod | Create Database for motor-insurance 	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Mudit Goyal	712020:78b7a1b8-50b3-40aa-889f-fbc1e1cda27a	Medium	Done	Done	09/Oct/25 10:10 AM	27/Oct/25 2:38 PM	
-Story	DEVOPS-10164	70344	Production | New motor_insurance Service Onboard on 811	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Mudit Goyal	712020:78b7a1b8-50b3-40aa-889f-fbc1e1cda27a	Medium	In Progress		09/Oct/25 10:03 AM	10/Nov/25 3:46 PM	
-CMR(Normal)	DEVOPS-10150	70241	IIP Prod Release	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Mudit Goyal	712020:78b7a1b8-50b3-40aa-889f-fbc1e1cda27a	Medium	Done	Done	08/Oct/25 5:31 PM	13/Oct/25 10:29 AM	
-CMR(Normal)	DEVOPS-10145	70229	Deploy ms-kyc latest image to PROD.	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sonu Gupta	712020:2c6e1b9a-0731-4cc2-a51a-455298d2db7b	Medium	Done	Done	08/Oct/25 5:03 PM	15/Oct/25 11:07 PM	
-CMR(Normal)	DEVOPS-10144	70213	Charging consumer prod deployment	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Jaideep Pyne	712020:02e57369-083e-4694-8c63-696bbd57ce3a	Medium	Done	Done	08/Oct/25 4:11 PM	14/Oct/25 10:39 AM	
-CMR(Normal)	DEVOPS-10137	70190	PROD | CFL Autofund | PDN Logic Update	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Dipayan Ray	712020:5b44a201-7be1-47c3-bbc1-6e9e7674b1dc	Medium	Done	Done	08/Oct/25 12:50 PM	13/Oct/25 10:29 AM	
-ECMR(emergency CMR)	DEVOPS-10129	70156	Switch-over Appconfig prod Deployment	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Ashit Raj	712020:1a9d739d-8114-4ada-931c-a996d355e90f	Medium	Done	Done	08/Oct/25 11:31 AM	13/Oct/25 10:29 AM	
-CMR(Normal)	DEVOPS-10124	70093	Transaction service logging optimisation	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Avinash Kumar	712020:3bafdb6f-3b81-4ca6-a661-1c8186556935	Medium	Done	Done	07/Oct/25 11:22 PM	13/Oct/25 7:56 PM	
-Task	DEVOPS-10122	70064	Header change CSP and Security Headers	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Vikrant Singh	712020:caf91465-9c8e-4d81-8433-30131bc9ea34	Medium	Done	Done	07/Oct/25 3:37 PM	13/Oct/25 10:29 AM	
-Epic	DEVOPS-10116	69995	prod-Rotate Access Keys for IAM Users	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	To Do		06/Oct/25 10:02 PM	13/Oct/25 1:39 PM	
-Epic	DEVOPS-10115	69994	non-prod-Rotate Access Keys for IAM Users	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	To Do		06/Oct/25 9:49 PM	07/Oct/25 7:04 PM	
-Task	DEVOPS-10113	69991	DEV & UAT api key for Verifyplus	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Kripa Jha	712020:5821bedd-2d63-4988-8aa1-830fb53fe880	Medium	Done	Done	06/Oct/25 7:53 PM	13/Oct/25 10:29 AM	
-CMR(Normal)	DEVOPS-10082	69886	prod deployment - cc-applications, cc-management	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Vatsal Lalcheta	712020:b1abbb6a-0aa4-4cfd-abc8-5f3dbd3382bc	Medium	Done	Done	06/Oct/25 5:17 PM	14/Oct/25 8:57 AM	
-CMR(Normal)	DEVOPS-10079	69876	Leads Prod deployement	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Kripa Jha	712020:5821bedd-2d63-4988-8aa1-830fb53fe880	Medium	Done	Done	06/Oct/25 4:15 PM	08/Oct/25 10:17 PM	
-CMR(Normal)	DEVOPS-10073	69846	Enhanced logging and fallback conditions for ROS getAcctDetails.src in case no account is found from ROS	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Devesh Sharma	712020:e4ec9d45-ef0a-4951-94ad-64fccb5b4bdc	Medium	Done	Done	06/Oct/25 2:24 PM	13/Oct/25 10:29 AM	
-Task	DEVOPS-10070	69815	Need to update secret manager variable in UAT for RCUTM(mantis) service	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Devesh Sharma	712020:e4ec9d45-ef0a-4951-94ad-64fccb5b4bdc	Medium	Done	Done	06/Oct/25 11:46 AM	13/Oct/25 10:29 AM	
-Task	DEVOPS-10028	69359	Notifications SA Access	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Ashutosh Pandey	63ce5c235a23f7e717cd6d2a	Medium	Pending Approval		30/Sep/25 4:30 PM	03/Nov/25 5:16 PM	
-Task	DEVOPS-10026	69352	[PROD] Generate Public KEY In String Sharing for Super money	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Kripa Jha	712020:5821bedd-2d63-4988-8aa1-830fb53fe880	Medium	Pending Approval		30/Sep/25 3:49 PM	30/Sep/25 5:44 PM	
-Task	DEVOPS-10017	69321	Exclude API in Istio Proxy from encryption and Decryption (Non-Prod)	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Vamshi Busi	712020:5e398985-da8c-4c8d-ab43-b8c901cac77b	Medium	Done	Done	30/Sep/25 12:50 PM	06/Oct/25 10:40 AM	
-Task	DEVOPS-9990	69115	 Request to Configure Authenticated Kafka for Re-KYC | Dev | Uat	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Rahul Kumar	712020:ff1ae055-9ec6-469b-9df6-5a0da64a0798	Medium	In Progress		29/Sep/25 2:00 PM	09/Oct/25 1:53 PM	
-Task	DEVOPS-9988	69107	S3 bucket Access to VPLUS. <> HV faceliveness integration	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Kripa Jha	712020:5821bedd-2d63-4988-8aa1-830fb53fe880	Medium	Done	Done	29/Sep/25 1:09 PM	29/Oct/25 11:33 PM	
-Task	DEVOPS-9957	68860	auth kafka username/psw msk creds for Leads service	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Kripa Jha	712020:5821bedd-2d63-4988-8aa1-830fb53fe880	Medium	In Progress		26/Sep/25 4:50 PM	09/Oct/25 1:46 PM	
-Task	DEVOPS-9900	68382	(DEV & UAT) - Schedule API Call to Send Success Payment Events	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Vamshi Busi	712020:5e398985-da8c-4c8d-ab43-b8c901cac77b	Medium	Done	Done	24/Sep/25 10:20 AM	29/Sep/25 10:12 AM	
-Subtask	DEVOPS-9878	68289	DNS mapping	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	To Do		23/Sep/25 1:45 PM	23/Sep/25 5:44 PM	
-Task	DEVOPS-9781	67596	To create label for referrals Alert in corologix on the basis of metrics for Referrals service	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Aniket Tibrewal	712020:dc47c472-e399-4ece-a8a2-8cec47dc3799	Medium	Done	Done	18/Sep/25 1:16 PM	29/Sep/25 10:12 AM	
-Task	DEVOPS-9767	67449	UAT Redis upgrade to 7.0 and monitor till 7 days then to 7.1 uat-kotak811	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Done	Done	17/Sep/25 3:29 PM	29/Sep/25 10:12 AM	
-Task	DEVOPS-9736	67093	Automatically add the runner to the agent pool azure	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Aman Singh	712020:22443dec-ca75-49ac-b700-a30eb19fd1fb	Medium	Pending Approval		15/Sep/25 6:05 PM	15/Sep/25 6:05 PM	
-Task	DEVOPS-9629	66414	Create new cognito client for NB and SF on UAT	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Aman Kumar	712020:7a5d4fb5-e17d-4f30-b7de-e184fb4eb9f0	Medium	Done	Done	11/Sep/25 11:32 AM	16/Sep/25 1:18 PM	
-Task	DEVOPS-9550	65994	Create S3 Bucket and Provide Cloudflare URL for Consent Audio Storage UAT and DEV	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Rahul Kumar	712020:ff1ae055-9ec6-469b-9df6-5a0da64a0798	Medium	In Progress		08/Sep/25 8:04 PM	29/Sep/25 12:45 PM	
-Task	DEVOPS-9549	65993	Schedule API Call to Refresh Consent Audios Once in a week	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Rahul Kumar	712020:ff1ae055-9ec6-469b-9df6-5a0da64a0798	Medium	In Progress		08/Sep/25 8:01 PM	29/Sep/25 10:12 AM	
-Task	DEVOPS-9508	65755	Upgrade to otel-integration-0.0.218 via New Pipeline in k811-crossell-uat-eks and uat-kotak811 Clusters	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Done	Done	04/Sep/25 1:58 PM	08/Sep/25 11:21 AM	
-Task	DEVOPS-9507	65754	upgrade to version otel-integration-0.0.218  coralogix in k811-eks-onb-dev cluster using pipeline	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Done	Done	04/Sep/25 1:49 PM	08/Sep/25 11:21 AM	
-Task	DEVOPS-9448	65412	PROD Amazon DocumentDB Maintenance window change to low peak hours for  onb-prod-document-db	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	In Progress		02/Sep/25 8:29 PM	29/Sep/25 11:22 AM	
-Task	DEVOPS-9447	65358	Request to Configure Authenticated Kafka for Verify-Plus | Dev | Uat	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Rahul Kumar	712020:ff1ae055-9ec6-469b-9df6-5a0da64a0798	Medium	Done	Done	02/Sep/25 5:26 PM	29/Sep/25 2:00 PM	
-Subtask	DEVOPS-9404	64855	Kafka Topic creation	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Shashikant Mony	712020:5fdcb358-5ec3-4e36-af46-91a9ef86f0ec	Medium	Done	Done	29/Aug/25 10:52 AM	11/Sep/25 8:12 PM	
-ECMR(emergency CMR)	DEVOPS-9328	64320	Thor deployment for MHA-ROS integration	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Molakalapalli Venkatakrishnasai	712020:7f2ac9f1-9244-48c3-b77e-2bc1559f43cf	Medium	Done	Done	24/Aug/25 9:22 AM	28/Aug/25 4:25 PM	
-Task	DEVOPS-9327	64319	DB advance monitoring	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Ravi Srivastav	6364ebdb59c794184bcc9e74	Medium	Done	Done	24/Aug/25 1:03 AM	25/Sep/25 11:12 AM	
-Task	DEVOPS-9326	64317	Setup alerting around MaximumUsedTransactionIDs	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Ravi Srivastav	6364ebdb59c794184bcc9e74	Medium	Done	Done	24/Aug/25 1:01 AM	25/Sep/25 11:12 AM	
-Task	DEVOPS-9324	64314	Aurora Postgres Cluster "k811-onb-prod-aurora-psql" approaching transaction wraparound.	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Done	Done	23/Aug/25 10:48 PM	25/Sep/25 11:12 AM	
-ECMR(emergency CMR)	DEVOPS-9321	64310	Thor deployment for MHA-ROS integration 	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Molakalapalli Venkatakrishnasai	712020:7f2ac9f1-9244-48c3-b77e-2bc1559f43cf	Medium	Done	Done	23/Aug/25 8:53 AM	24/Aug/25 2:36 PM	
-CMR(Normal)	DEVOPS-9320	64309	PROD | MBAPP BFF | Add on Credit Card outstanding issue fix in One view 	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Avinash Kumar	712020:3bafdb6f-3b81-4ca6-a661-1c8186556935	Medium	Done	Done	22/Aug/25 10:36 PM	28/Aug/25 10:44 AM	
-CMR(Normal)	DEVOPS-9318	64257	Prod Verify-Number removing 8-digit short codes	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Nari Rohini	712020:edb4e4bc-f7db-4889-b2da-d338a0573173	Medium	Done	Done	22/Aug/25 3:40 PM	28/Aug/25 10:44 AM	
-Task	DEVOPS-9314	64241	Renew 811onb.kotak811.com certificate	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Akash Shinde	712020:4656c433-28ec-4184-801c-efeaf7a11fe1	Medium	Pending Approval		22/Aug/25 2:41 PM	22/Aug/25 2:45 PM	
-ECMR(emergency CMR)	DEVOPS-9311	64224	Thor deployment for MHA	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sidhartha Topcharla	63db5100bf837c6893d82280	Medium	Done	Done	22/Aug/25 1:33 PM	24/Aug/25 9:36 AM	
-CMR(Normal)	DEVOPS-9310	64221	PROD | AUTH SERVICE CONFIG CHANGES FOR LOAN LEADS	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Ruchir Singh	61dfcce190cfd200717fe53d	Medium	Done	Done	22/Aug/25 1:07 PM	19/Sep/25 4:37 PM	
-CMR(Normal)	DEVOPS-9303	64082	[PROD] PLService Deployment | AppConfig Update	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Ayush Sharma	712020:e474d256-4481-4dff-9e55-27b19bd2dc4c	Medium	Done	Done	21/Aug/25 7:23 PM	21/Aug/25 11:51 PM	
-ECMR(emergency CMR)	DEVOPS-9302	64077	[PROD] CURL Execution	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Ayush Sharma	712020:e474d256-4481-4dff-9e55-27b19bd2dc4c	Medium	Done	Done	21/Aug/25 6:41 PM	21/Aug/25 6:52 PM	
-CMR(Normal)	DEVOPS-9299	64031	Loan Leads Service Productionisation	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Deepanshu Verma	712020:24bc4842-1d12-4c83-9a04-4fdbdf315aa3	Medium	Done	Done	21/Aug/25 3:12 PM	21/Aug/25 11:33 PM	
-CMR(Normal)	DEVOPS-9279	63810	prod deployment of cc-application, service request, cc-streams, uscc-application, cc-management.	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Vatsal Lalcheta	712020:b1abbb6a-0aa4-4cfd-abc8-5f3dbd3382bc	Medium	Done	Done	20/Aug/25 12:12 PM	28/Aug/25 10:50 AM	
-CMR(Normal)	DEVOPS-9275	63789	Supercashback credit narration and journey service deployment	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Shubham Singh	712020:ca905164-e904-46b2-a654-6e991705d598	Medium	Done	Done	20/Aug/25 10:24 AM	28/Aug/25 10:50 AM	
-CMR(Normal)	DEVOPS-9269	63748	rewards_user_segmentation service deployment(cron job)	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Shubham Singh	712020:ca905164-e904-46b2-a654-6e991705d598	Medium	Done	Done	19/Aug/25 5:56 PM	25/Aug/25 3:32 PM	
-Task	DEVOPS-9267	63681	AWS SES @kotak.com domain registration	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Ashutosh Pandey	63ce5c235a23f7e717cd6d2a	Medium	Done	Done	19/Aug/25 3:38 PM	25/Sep/25 11:11 AM	
-ECMR(emergency CMR)	DEVOPS-9264	63658	AadhaarSeeding appconfig update PROD	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Amit Vikram	63ce5c67ed33fd0707b814a5	Medium	Done	Done	19/Aug/25 2:49 PM	28/Aug/25 10:26 AM	
-CMR(Normal)	DEVOPS-9263	63646	Fix stuck retry issue due to downstream failure	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Aman Kumar	712020:7a5d4fb5-e17d-4f30-b7de-e184fb4eb9f0	Medium	Done	Done	19/Aug/25 2:05 PM	28/Aug/25 10:51 AM	
-CMR(Normal)	DEVOPS-9260	63642	Prod Transactions - bug fix	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Nari Rohini	712020:edb4e4bc-f7db-4889-b2da-d338a0573173	Medium	Done	Done	19/Aug/25 1:48 PM	28/Aug/25 10:51 AM	
-CMR(Normal)	DEVOPS-9257	63621	Referrals service deployment in prod	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Aniket Tibrewal	712020:dc47c472-e399-4ece-a8a2-8cec47dc3799	Medium	Done	Done	19/Aug/25 1:21 PM	10/Oct/25 3:26 PM	
-Task	DEVOPS-9255	63610	Delete files from uat s3 bucket	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Aman Kumar	712020:7a5d4fb5-e17d-4f30-b7de-e184fb4eb9f0	Medium	Done	Done	19/Aug/25 12:36 PM	19/Aug/25 1:31 PM	
-Epic	DEVOPS-9241	63558	[DEV-UAt]Coralogix CI/CD setup	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Done	Done	19/Aug/25 9:36 AM	08/Sep/25 11:21 AM	
-CMR(Normal)	DEVOPS-9233	63518	Prod deployement required for 811_app_ms_billpay_payment_status and 811_ms_billpay_callback	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Neeraj Kumar	712020:86172f15-b14a-4f4e-9dcd-1073f011ed69	Medium	Done	Done	18/Aug/25 4:20 PM	28/Aug/25 10:51 AM	
-Task	DEVOPS-9231	63515	Create ecr for config service	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Manish Rawat	712020:992d9be3-2f32-4ea1-b6e5-254e50690648	Medium	Done	Done	18/Aug/25 4:02 PM	08/Sep/25 12:12 PM	
-CMR(Normal)	DEVOPS-9219	63465	Charging s3 reader and Charging consumer prod deployment	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Ravikumar Maurya	712020:4b5885ad-2723-4603-ba1c-00b0c29b0c6e	Medium	Done	Done	18/Aug/25 11:30 AM	28/Aug/25 10:52 AM	
-Task	DEVOPS-9216	63422	Deploy api gateway on dev and uat	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Manish Rawat	712020:992d9be3-2f32-4ea1-b6e5-254e50690648	Medium	Done	Done	18/Aug/25 5:56 AM	08/Sep/25 12:12 PM	
-Task	DEVOPS-9215	63420	Create postgres database for uat for config service	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Manish Rawat	712020:992d9be3-2f32-4ea1-b6e5-254e50690648	Medium	Done	Done	18/Aug/25 5:22 AM	08/Sep/25 10:54 AM	
-CMR(Normal)	DEVOPS-9206	63339	Prod ElasticCache Maintenance window change to low peak hours for 811ONB	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Akash Shinde	712020:4656c433-28ec-4184-801c-efeaf7a11fe1	Medium	Done	Done	14/Aug/25 7:19 PM	03/Sep/25 12:17 AM	
-Task	DEVOPS-9193	63295	Need Access to Dynamo DB table for lambda	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sudhir Kumar	712020:d637c9b8-5ceb-4df0-bf15-04d3766e4f24	Medium	Done	Done	14/Aug/25 1:23 PM	28/Aug/25 10:53 AM	
-Task	DEVOPS-9168	63135	Create ServiceAccount/IAM role for the service, with permissions for ecr, appconfig for dev and uat	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Manish Rawat	712020:992d9be3-2f32-4ea1-b6e5-254e50690648	Medium	Done	Done	13/Aug/25 11:59 AM	08/Sep/25 12:12 PM	
-Task	DEVOPS-9167	63133	Create appconfig for config service for dev and uat	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Manish Rawat	712020:992d9be3-2f32-4ea1-b6e5-254e50690648	Medium	Done	Done	13/Aug/25 11:59 AM	08/Sep/25 12:12 PM	
-Task	DEVOPS-9165	63112	Create dummy azure pipeline for deploying config service on dev and uat	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Manish Rawat	712020:992d9be3-2f32-4ea1-b6e5-254e50690648	Medium	Done	Done	13/Aug/25 11:04 AM	08/Sep/25 11:01 PM	
-Task	DEVOPS-9164	63110	Create dummy helm chart for deploying config service on dev and uat	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Manish Rawat	712020:992d9be3-2f32-4ea1-b6e5-254e50690648	Medium	Done	Done	13/Aug/25 11:04 AM	08/Sep/25 11:01 PM	
-Task	DEVOPS-9163	63104	Create azure git repo for config service project	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Manish Rawat	712020:992d9be3-2f32-4ea1-b6e5-254e50690648	Medium	Done	Done	13/Aug/25 10:44 AM	13/Aug/25 5:48 PM	
-Task	DEVOPS-9162	63102	Create database on dev for config service in pgdb	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Manish Rawat	712020:992d9be3-2f32-4ea1-b6e5-254e50690648	Medium	Done	Done	13/Aug/25 10:42 AM	13/Aug/25 6:04 PM	
-Epic	DEVOPS-9161	63076	Config Service for Mobile App [Dev and UAT]	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Manish Rawat	712020:992d9be3-2f32-4ea1-b6e5-254e50690648	Medium	Done	Done	13/Aug/25 9:06 AM	15/Sep/25 11:34 AM	
-Task	DEVOPS-9154	63034	Access to CLMS service to publish on SNS Topic for notifications	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Akash Saini	712020:9b5d0bc9-52a9-4310-b089-838c7a325410	Medium	Done	Done	12/Aug/25 3:55 PM	28/Aug/25 10:53 AM	
-Task	DEVOPS-9153	63002	SM Rewards Test Stage	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Akash Saini	712020:9b5d0bc9-52a9-4310-b089-838c7a325410	Medium	Done	Done	12/Aug/25 12:40 PM	25/Sep/25 11:11 AM	
-Task	DEVOPS-9152	63000	UnFreeze DIY Test Stage	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Akash Saini	712020:9b5d0bc9-52a9-4310-b089-838c7a325410	Medium	Done	Done	12/Aug/25 12:39 PM	25/Sep/25 11:11 AM	
-Task	DEVOPS-9150	62996	Motor Insurance Test Stage	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Akash Saini	712020:9b5d0bc9-52a9-4310-b089-838c7a325410	Medium	Done	Done	12/Aug/25 12:39 PM	25/Sep/25 11:11 AM	
-Task	DEVOPS-9149	62994	Verify Plus Test Stage	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Akash Saini	712020:9b5d0bc9-52a9-4310-b089-838c7a325410	Medium	Done	Done	12/Aug/25 12:38 PM	25/Sep/25 11:11 AM	
-CMR(Normal)	DEVOPS-9134	62882	[prod]Reduce Sampling Percentage for k811-upi-payments Service in Coralogix	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Done	Done	11/Aug/25 4:18 PM	25/Sep/25 11:11 AM	
-Task	DEVOPS-9123	62773	Trace ID not appearing in Coralogix for DDLM NPROD environments | UAT	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Rahul Kumar	712020:ff1ae055-9ec6-469b-9df6-5a0da64a0798	Medium	Done	Done	11/Aug/25 11:40 AM	13/Aug/25 1:59 PM	
-Task	DEVOPS-9121	62769	fix attributes (.) (_) issue 	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Done	Done	11/Aug/25 11:16 AM	28/Aug/25 10:55 AM	
-Task	DEVOPS-9120	62765	working on Redis dasboard	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Done	Done	11/Aug/25 11:15 AM	28/Aug/25 3:21 PM	
-Task	DEVOPS-9088	62458	UAT - Fix coralogix Dashboard of Auth Service	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Ram Singh	712020:5b10867f-11f4-42df-a7dc-aef193a7b3b5	Medium	Done	Done	07/Aug/25 12:52 PM	28/Aug/25 10:55 AM	
-Task	DEVOPS-9082	62393	Grant Write/Read Access to S3 Buckets for Admin Portal in DEV and UAT	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Rahul Kumar	712020:ff1ae055-9ec6-469b-9df6-5a0da64a0798	Medium	Done	Done	07/Aug/25 10:17 AM	13/Aug/25 11:20 PM	
-Task	DEVOPS-9053	62238	non-prod - expose istio metrics in coralogix	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Pending Approval		05/Aug/25 5:52 PM	05/Aug/25 5:56 PM	
-Task	DEVOPS-9049	62226	DDLM Coralogix APM Dashboard in NON PROD	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Akash Saini	712020:9b5d0bc9-52a9-4310-b089-838c7a325410	Medium	Done	Done	05/Aug/25 4:43 PM	11/Aug/25 3:03 PM	
-Task	DEVOPS-9034	62093	NON PROD | Add replica db url in secrets	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Akash Saini	712020:9b5d0bc9-52a9-4310-b089-838c7a325410	Medium	Done	Done	04/Aug/25 10:58 PM	25/Sep/25 11:10 AM	
-Task	DEVOPS-9023	62054	NON- PROD : OTEL Traces for Services	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Ram Singh	712020:5b10867f-11f4-42df-a7dc-aef193a7b3b5	Medium	Done	Done	04/Aug/25 5:10 PM	03/Sep/25 8:50 PM	
-CMR(Normal)	DEVOPS-9016	62016	mbapp_bff service prod deployment	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Mohit Kadyan	712020:bbd434bf-5576-4ea3-ac4d-8fe28cbeb73b	Medium	Done	Done	04/Aug/25 2:26 PM	28/Aug/25 10:55 AM	
-Task	DEVOPS-8983	61811	Grant access to publish to SNS topic for notifications to motor-insurance service on Dev and UAT	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Aman Kumar	712020:7a5d4fb5-e17d-4f30-b7de-e184fb4eb9f0	Medium	Done	Done	01/Aug/25 11:58 AM	28/Aug/25 10:56 AM	
-Task	DEVOPS-8961	61634	[prod] coralogix subsystem name and OTEL_SERVICE_NAME mismatch fix	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Done	Done	31/Jul/25 11:10 AM	28/Aug/25 10:56 AM	
-Task	DEVOPS-8960	61633	[non-prod] coralogix subsystem name and OTEL_SERVICE_NAME mismatch fix	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Done	Done	31/Jul/25 10:59 AM	04/Aug/25 1:18 PM	
-CMR(Normal)	DEVOPS-8950	61567	USCC-CUG relation production deployments	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Kapil Rathore	712020:07baf224-c823-44dc-9826-fde0ffeba133	Medium	Done	Done	30/Jul/25 12:53 PM	15/Oct/25 11:22 PM	
-Task	DEVOPS-8872	61022	Create secret config for Finbridge connector to store confidential configuration(Non - prod)	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Avinash Kumar	712020:3bafdb6f-3b81-4ca6-a661-1c8186556935	Medium	Done	Done	24/Jul/25 5:20 PM	28/Aug/25 10:56 AM	
-Task	DEVOPS-8816	60442	DR validation	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Pending Approval		21/Jul/25 9:47 PM	22/Jul/25 2:14 AM	
-Task	DEVOPS-8777	60245	Enable checkMarxscan in pipeline for finbridge-connector service [uat]	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Avinash Kumar	712020:3bafdb6f-3b81-4ca6-a661-1c8186556935	Medium	Done	Done	18/Jul/25 2:27 PM	25/Sep/25 11:09 AM	
-Task	DEVOPS-8717	59865	Log tracing of CloudWatch logs of referrals service api	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Aniket Tibrewal	712020:dc47c472-e399-4ece-a8a2-8cec47dc3799	Medium	Done	Done	16/Jul/25 1:05 PM	28/Aug/25 10:57 AM	
-Task	DEVOPS-8694	59710	delete the resources in UAT env in ap-south-2	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Done	Done	15/Jul/25 12:04 PM	04/Aug/25 1:16 PM	
-Task	DEVOPS-8596	59152	Prod aurora postsgres	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Varun Sandhey	712020:d2faa10b-6531-4aa4-bc44-589c5b12851c	Medium	Done	Done	09/Jul/25 2:07 PM	19/Jul/25 2:28 PM	
-Subtask	DEVOPS-8565	58924	Day 3: Bug Fixes and remaining deployments	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sonu Gupta	712020:2c6e1b9a-0731-4cc2-a51a-455298d2db7b	Medium	Done	Done	07/Jul/25 3:42 PM	17/Sep/25 1:18 PM	
-CMR(Normal)	DEVOPS-8547	58761	Decreasing Min Capacity(WCU, RCU AND Index) from 1000 to 50 for REWARDS_SUPER_HISTORY_prod	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Shubham Singh	712020:ca905164-e904-46b2-a654-6e991705d598	Medium	Done	Done	05/Jul/25 5:59 PM	07/Jul/25 8:32 AM	
-CMR(Normal)	DEVOPS-8541	58718	Ignore extra params in API for IIP	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Aman Kumar	712020:7a5d4fb5-e17d-4f30-b7de-e184fb4eb9f0	Medium	Done	Done	04/Jul/25 6:11 PM	09/Jul/25 8:20 PM	
-CMR(Normal)	DEVOPS-8535	58666	Prod deployment of mutual-funds-primary service	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Naman Singhal	712020:cd89b2b9-ec9f-49e9-877d-78846bcfa867	Medium	Done	Done	04/Jul/25 1:58 PM	09/Jul/25 8:20 PM	
-CMR(Normal)	DEVOPS-8534	58654	Super History table entry job for super auto credit	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Shubham Singh	712020:ca905164-e904-46b2-a654-6e991705d598	Medium	Done	Done	04/Jul/25 12:57 PM	09/Jul/25 8:21 PM	
-Break-Fix-CMR(ECMR)	DEVOPS-8523	58538	Delete key from redis | Misc service	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sonu Gupta	712020:2c6e1b9a-0731-4cc2-a51a-455298d2db7b	Medium	Done	Done	03/Jul/25 6:09 PM	03/Jul/25 10:06 PM	
-CMR(Normal)	DEVOPS-8519	58492	Access of Referral_prod table in Lambda and index updation	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Aniket Tibrewal	712020:dc47c472-e399-4ece-a8a2-8cec47dc3799	Medium	Done	Done	03/Jul/25 4:20 PM	05/Sep/25 7:26 PM	
-CMR(Normal)	DEVOPS-8518	58472	Notification prod Deployment	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Ashit Raj	712020:1a9d739d-8114-4ada-931c-a996d355e90f	Medium	Done	Done	03/Jul/25 3:45 PM	04/Jul/25 12:08 PM	
-CMR(Normal)	DEVOPS-8517	58468	BRE Prod Deployment - 2.4.7	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Aadeesh Jain	712020:cb83f29b-3908-4580-80a9-f4cd0296bd12	Medium	Done	Done	03/Jul/25 3:33 PM	04/Jul/25 12:08 PM	
-CMR(Normal)	DEVOPS-8507	58410	Prod dcprofiler config for ED PRO debit card	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Kirtish Khandar	712020:65336d15-ddba-43d5-8b57-f800143d56a8	Medium	Done	Done	03/Jul/25 12:08 PM	04/Jul/25 12:07 PM	
-CMR(Normal)	DEVOPS-8486	58287	Change to improve logging data for IIP in prod	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Aman Kumar	712020:7a5d4fb5-e17d-4f30-b7de-e184fb4eb9f0	Medium	Done	Done	02/Jul/25 2:56 PM	03/Jul/25 12:25 PM	
-CMR(Normal)	DEVOPS-8485	58285	Batch processing of active money user for mismatched limits	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Pritee Gharad	712020:5c243224-f2e9-491e-91f1-0d5d04d8e1de	Medium	Done	Done	02/Jul/25 2:16 PM	25/Sep/25 11:09 AM	
-CMR(Normal)	DEVOPS-8484	58282	AppConfig Change, Cleanup Zeebe simple monitor in Prod	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Niranjan Shukla	712020:96119bc7-1937-4c76-a19a-a3ba45a56bc0	Medium	Done	Done	02/Jul/25 2:10 PM	09/Jul/25 8:20 PM	
-CMR(Normal)	DEVOPS-8471	58191	Rewards journey service deployments for log reduction	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sudhir Kumar	712020:d637c9b8-5ceb-4df0-bf15-04d3766e4f24	Medium	Done	Done	01/Jul/25 4:31 PM	03/Jul/25 12:25 PM	
-CMR(Normal)	DEVOPS-8469	58184	DDLM Prod AppConfig Update	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Akash Saini	712020:9b5d0bc9-52a9-4310-b089-838c7a325410	Medium	Done	Done	01/Jul/25 3:12 PM	03/Jul/25 12:26 PM	
-CMR(Normal)	DEVOPS-8458	58162	Rewards Prod Deployment	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Shashikant Mony	712020:5fdcb358-5ec3-4e36-af46-91a9ef86f0ec	Medium	Done	Done	01/Jul/25 2:38 PM	15/Sep/25 11:32 AM	
-CMR(Normal)	DEVOPS-8457	58161	Prod Verify-Number | App config update	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Nari Rohini	712020:edb4e4bc-f7db-4889-b2da-d338a0573173	Medium	Done	Done	01/Jul/25 2:38 PM	02/Jul/25 9:56 PM	
-CMR(Normal)	DEVOPS-8453	58145	MS-miscellaneous : log improvements	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Amit Vikram	63ce5c67ed33fd0707b814a5	Medium	Done	Done	01/Jul/25 12:57 PM	09/Jul/25 8:22 PM	
-Task	DEVOPS-8449	58132	Request for Production Data Dump – 811_onb_prod_cc_applications Database	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Mukul Anand	63db50c0c3eb74ad8e964e1e	Medium	Done	Done	01/Jul/25 12:36 PM	25/Sep/25 11:09 AM	
-CMR(Normal)	DEVOPS-8448	58131	Remove caching for accounts and improve logging in production	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Aman Kumar	712020:7a5d4fb5-e17d-4f30-b7de-e184fb4eb9f0	Medium	Done	Done	01/Jul/25 12:31 PM	04/Jul/25 12:08 PM	
-Task	DEVOPS-8442	58104	Clean simple zeebe monitor in prod	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Vakul Bansal	63fcd86681de11a1adf913fe	Medium	Done	Done	01/Jul/25 11:58 AM	09/Jul/25 8:23 PM	
-Break-Fix-CMR(ECMR)	DEVOPS-8441	58101	AppConfig change PL-service prod	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Vatsal Lalcheta	712020:b1abbb6a-0aa4-4cfd-abc8-5f3dbd3382bc	Medium	Done	Done	01/Jul/25 11:21 AM	04/Jul/25 12:09 PM	
-CMR(Normal)	DEVOPS-8439	58095	Experiments Scaling	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Ashutosh Pandey	63ce5c235a23f7e717cd6d2a	Medium	Done	Done	01/Jul/25 10:40 AM	03/Jul/25 12:25 PM	
-CMR(Normal)	DEVOPS-8432	57990	 Logs reduction and Super History fill	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Shubham Singh	712020:ca905164-e904-46b2-a654-6e991705d598	Medium	Done	Done	30/Jun/25 3:54 PM	30/Jun/25 11:24 PM	
-CMR(Normal)	DEVOPS-8431	57988	Notifications -> PROD	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Ashutosh Pandey	63ce5c235a23f7e717cd6d2a	Medium	Done	Done	30/Jun/25 3:38 PM	30/Jun/25 11:23 PM	
-CMR(Normal)	DEVOPS-8429	57981	Leads Prod deployement	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Kripa Jha	712020:5821bedd-2d63-4988-8aa1-830fb53fe880	Medium	Done	Done	30/Jun/25 3:02 PM	30/Jun/25 11:23 PM	
-CMR(Normal)	DEVOPS-8426	57972	Deploy cc-management & cc-applications latest image to PROD.	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sonu Gupta	712020:2c6e1b9a-0731-4cc2-a51a-455298d2db7b	Medium	Done	Done	30/Jun/25 2:28 PM	30/Jul/25 12:51 PM	
-CMR(Normal)	DEVOPS-8425	57969	admin portal production deployment	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Mohit Kadyan	712020:bbd434bf-5576-4ea3-ac4d-8fe28cbeb73b	Medium	Done	Done	30/Jun/25 2:19 PM	30/Jun/25 11:21 PM	
-CMR(Normal)	DEVOPS-8420	57954	AAP login issue PROD update	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Harsh Soni	712020:f579914d-c512-4105-8e58-5e69c1022b1e	Medium	Done	Done	30/Jun/25 1:12 PM	30/Jun/25 11:34 PM	
-CMR(Normal)	DEVOPS-8419	57951	PROD | CFL AutoFund | Update AppConfig of PDN and Execution Worker	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Barath S	712020:d0c54e96-25aa-44b5-8c42-2c8a7c1de837	Medium	Done	Done	30/Jun/25 1:10 PM	05/Aug/25 3:54 PM	
-ECMR(emergency CMR)	DEVOPS-8418	57942	SNS subscription change for PDF - prod	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Vatsal Lalcheta	712020:b1abbb6a-0aa4-4cfd-abc8-5f3dbd3382bc	Medium	Done	Done	30/Jun/25 12:45 PM	30/Jun/25 5:23 PM	
-CMR(Normal)	DEVOPS-8417	57910	Rewards budget deployment for first half of July 25	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Tejas Kumbhar	712020:53575d4f-c4c6-437c-9892-f027abb7a97e	Medium	Done	Done	30/Jun/25 11:57 AM	30/Jun/25 11:39 PM	
-CMR(Normal)	DEVOPS-8404	57690	Insurance -Backend appconfig update on prod	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Gauri Singhal	63ce5c68ed33fd0707b814a6	Medium	Done	Done	27/Jun/25 12:54 PM	30/Jun/25 10:40 PM	
-ECMR(emergency CMR)	DEVOPS-8392	57647	FOR BATCH JOB - Scale UserSegmentation project for batch job insertion(JUNE 2025 END)	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Shubham Singh	712020:ca905164-e904-46b2-a654-6e991705d598	Medium	Done	Done	26/Jun/25 5:38 PM	29/Jul/25 11:12 AM	
-CMR(Normal)	DEVOPS-8368	57370	Mobile OTP authentication & user onboarding journey on app. [SF+ACQUI Journey] [CUG]	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sonu Gupta	712020:2c6e1b9a-0731-4cc2-a51a-455298d2db7b	Medium	Done	Done	25/Jun/25 1:53 PM	28/Aug/25 11:00 AM	
-Task	DEVOPS-8358	57262	Need on-demand setup for Dynamo DB tables on production	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sapan Nagpal	712020:ab828e5f-e7fb-402e-8c6e-7969dadbd6ea	Medium	In Progress		24/Jun/25 4:50 PM	09/Jul/25 7:58 PM	
-Task	DEVOPS-8332	57147	Clean simple zeebe monitor in prod	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Done	Done	24/Jun/25 10:20 AM	01/Jul/25 10:05 PM	
-Task	DEVOPS-8325	57132	Respository creation for Accounts Transactions Service	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Avinash Kumar	712020:3bafdb6f-3b81-4ca6-a661-1c8186556935	Medium	Done	Done	23/Jun/25 7:10 PM	27/Jun/25 1:07 PM	
-Task	DEVOPS-8321	57120	DEV|UAT:- Postgres DB creation for OTP service	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Ashit Raj	712020:1a9d739d-8114-4ada-931c-a996d355e90f	Medium	Done	Done	23/Jun/25 5:30 PM	19/Jul/25 2:24 PM	
-Task	DEVOPS-8184	56440	DynamoDB scaling automation	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Done	Done	18/Jun/25 10:45 AM	09/Jul/25 8:21 PM	
-Task	DEVOPS-8183	56438	Execution logs for APIGW will be disabled with pipelines	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Done	Done	18/Jun/25 10:41 AM	18/Jun/25 10:43 AM	
-Task	DEVOPS-8115	55998	Enable logical replication from primary db to the Data science db for Dev and UAT	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Avinash Kumar	712020:3bafdb6f-3b81-4ca6-a661-1c8186556935	Medium	In Progress		12/Jun/25 12:45 PM	23/Jun/25 3:31 PM	
-Task	DEVOPS-8096	55849	Resource creation on uat and dev | postgres database for Data science team	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Avinash Kumar	712020:3bafdb6f-3b81-4ca6-a661-1c8186556935	Medium	Done	Done	11/Jun/25 2:16 PM	23/Jun/25 3:22 PM	
-Task	DEVOPS-8035	55494	[UAT-PROD]write pipeline to update the cronjob image tag 	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Done	Done	06/Jun/25 8:03 PM	19/Jul/25 2:23 PM	
-Task	DEVOPS-8034	55493	Write pipeline to disable the api cloudwatch and trace logs	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Done	Done	06/Jun/25 8:01 PM	18/Jun/25 10:43 AM	
-Task	DEVOPS-8001	55333	Test out topology based deployment strategy in DEV	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Aditya Raj	712020:97beff48-95f8-4377-8c1e-cde7dc9b1261	Medium	Done	Done	05/Jun/25 1:35 PM	27/Jun/25 12:27 PM	
-Task	DEVOPS-7918	54937	Referral - config addition in secrets manager	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Aniket Tibrewal	712020:dc47c472-e399-4ece-a8a2-8cec47dc3799	Medium	Done	Done	02/Jun/25 9:20 PM	03/Jun/25 2:17 PM	
-Task	DEVOPS-7884	54790	Migrate Sentry Redis to Valkey Cluster	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Manish Rawat	712020:992d9be3-2f32-4ea1-b6e5-254e50690648	Medium	Done	Done	30/May/25 11:29 PM	15/Oct/25 3:39 PM	
-Task	DEVOPS-7878	54768	Create a cron job in UAT to correct credit limit of crns for which we have incorrectly updated credit limit DAILY	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Mukul Anand	63db50c0c3eb74ad8e964e1e	Medium	Done	Done	30/May/25 5:28 PM	09/Jun/25 4:18 PM	
-Task	DEVOPS-7853	54545	Resource creation on uat | postgres database for pfm-service	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Avinash Kumar	712020:3bafdb6f-3b81-4ca6-a661-1c8186556935	Medium	Done	Done	29/May/25 3:22 PM	23/Jun/25 3:22 PM	
-Task	DEVOPS-7852	54543	Create api gateway for PFM Service on UAT	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Avinash Kumar	712020:3bafdb6f-3b81-4ca6-a661-1c8186556935	Medium	Done	Done	29/May/25 3:20 PM	23/Jun/25 3:26 PM	
-Task	DEVOPS-7851	54542	UAT Pipeline setup for PFM Service	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Avinash Kumar	712020:3bafdb6f-3b81-4ca6-a661-1c8186556935	Medium	Done	Done	29/May/25 3:18 PM	23/Jun/25 3:31 PM	
-Task	DEVOPS-7832	54490	Referral api migration to another cluster	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Aniket Tibrewal	712020:dc47c472-e399-4ece-a8a2-8cec47dc3799	Medium	Done	Done	29/May/25 12:51 PM	03/Jun/25 5:09 PM	
-Task	DEVOPS-7773	54064	[non-prod]Pipeline for Dynamodb - fetch, update and delete	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Done	Done	27/May/25 9:45 AM	13/Jun/25 11:05 AM	
-Task	DEVOPS-7741	53824	Create new secret app config for PFM service and move database credentials to secrets from appConfig	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Avinash Kumar	712020:3bafdb6f-3b81-4ca6-a661-1c8186556935	Medium	Done	Done	23/May/25 10:39 AM	23/Jun/25 3:29 PM	
-Task	DEVOPS-7693	53506	Import terraform current core infra - RDS, Redis, Cognito(with app client)  -- NonProd	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Akash Shinde	712020:4656c433-28ec-4184-801c-efeaf7a11fe1	Medium	Done	Done	20/May/25 12:18 PM	17/Sep/25 1:48 PM	
-CMR(Normal)	DEVOPS-7685	53394	FinBridge connector Prod deployment	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Monish Akram	712020:e6be23b7-b0b8-489e-a6b0-880d9de4ab82	Medium	Done	Done	19/May/25 3:02 PM	25/Sep/25 11:08 AM	
-Task	DEVOPS-7638	53147	Dynamo DB write access in UAT	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Aniket Tibrewal	712020:dc47c472-e399-4ece-a8a2-8cec47dc3799	Medium	Done	Done	15/May/25 1:24 PM	29/May/25 12:56 PM	
-Task	DEVOPS-7636	53140	Referral Service : REFERRAL_CODE_uat table data updation	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Aniket Tibrewal	712020:dc47c472-e399-4ece-a8a2-8cec47dc3799	Medium	Done	Done	15/May/25 12:58 PM	27/May/25 9:43 AM	
-Task	DEVOPS-7631	53060	upgrade uat-kotak811-rds-global from 13.12 to 14.15	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Done	Done	14/May/25 8:42 PM	17/Sep/25 1:48 PM	
-Task	DEVOPS-7613	52969	redis-uat-restored-from-backup -- delete. (Created for Backup and Restore to test for DR)	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Akash Shinde	712020:4656c433-28ec-4184-801c-efeaf7a11fe1	Medium	Done	Done	14/May/25 11:01 AM	17/Sep/25 1:48 PM	
-Task	DEVOPS-7569	52683	k811-onb-dev-redis - delete	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Done	Done	10/May/25 1:28 AM	17/Sep/25 1:49 PM	
-Task	DEVOPS-7504	52420	open a ticket with AWS and understand what is this noresource id	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Ravi Srivastav	6364ebdb59c794184bcc9e74	Medium	Done	Done	07/May/25 6:13 AM	17/Sep/25 1:49 PM	
-Task	DEVOPS-7466	52089	Kafka user creation for pfm service [Dev + UAT]	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Avinash Kumar	712020:3bafdb6f-3b81-4ca6-a661-1c8186556935	Medium	Done	Done	02/May/25 4:58 PM	23/Jun/25 3:30 PM	
-Task	DEVOPS-7457	52025	UAT API gateway creation for Charging Consumer	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Jaideep Pyne	712020:02e57369-083e-4694-8c63-696bbd57ce3a	Medium	Done	Done	02/May/25 8:54 AM	05/May/25 11:56 AM	
-Task	DEVOPS-7451	51977	[Dev]Create api gateway for dc charging consumer	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Jaideep Pyne	712020:02e57369-083e-4694-8c63-696bbd57ce3a	Medium	Done	Done	01/May/25 1:45 PM	05/May/25 11:56 AM	
-Task	DEVOPS-7428	51839	New SQS for Payment Updates	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Akshay Shenoy	712020:2d771103-5ac4-4791-bef7-2837d6f5c2eb	Medium	Done	Done	29/Apr/25 9:17 AM	05/May/25 11:56 AM	
-Task	DEVOPS-7424	51815	want to launch  postgres to test engien version 14.6	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Medium	Done	Done	28/Apr/25 4:30 PM	07/May/25 10:06 PM	
-Task	DEVOPS-7398	51690	Redis upgrade to 7.0 and monitor till 7 days then to 7.1	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Akash Shinde	712020:4656c433-28ec-4184-801c-efeaf7a11fe1	Medium	Done	Done	25/Apr/25 3:05 PM	14/May/25 8:20 PM	
-Task	DEVOPS-7395	51684	Dev RDS upgrade to 14.15 (LTS) Standard AWS support till February 2027	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Akash Shinde	712020:4656c433-28ec-4184-801c-efeaf7a11fe1	Medium	Done	Done	25/Apr/25 2:54 PM	17/Sep/25 1:49 PM	
-Task	DEVOPS-7364	51284	Authenticated Kafka Setup	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Akash Saini	712020:9b5d0bc9-52a9-4310-b089-838c7a325410	Medium	Done	Done	24/Apr/25 11:29 AM	07/May/25 10:06 PM	
-Task	DEVOPS-7354	51206	Create secrets for msk in mb_user_migr service	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Kapil Rathore	712020:07baf224-c823-44dc-9826-fde0ffeba133	Medium	Done	Done	23/Apr/25 5:37 PM	05/May/25 11:57 AM	
-Task	DEVOPS-7340	51082	CMS key and permission for DocumentDB data encryption	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Akshay Shenoy	712020:2d771103-5ac4-4791-bef7-2837d6f5c2eb	Medium	Done	Done	23/Apr/25 10:31 AM	05/May/25 11:56 AM	
-Subtask	DEVOPS-7228	50128	mbapp_bff service prod-dr deployment	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Ayush Sharma	712020:e474d256-4481-4dff-9e55-27b19bd2dc4c	Medium	Done	Done	10/Apr/25 12:08 PM	25/Apr/25 2:02 PM	
-Subtask	DEVOPS-7227	50126	super service prod-dr deployment	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sai Kadiyala	712020:730e5288-9a3b-422d-8fd9-7091cd54a971	Medium	Done	Done	10/Apr/25 11:24 AM	25/Apr/25 2:02 PM	
-Subtask	DEVOPS-7226	50125	mb-user-migr prod-dr deployment	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sai Kadiyala	712020:730e5288-9a3b-422d-8fd9-7091cd54a971	Medium	Done	Done	10/Apr/25 11:10 AM	25/Apr/25 2:03 PM	
-Task	DEVOPS-7223	50122	SCC Authorizer App Config	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sai Kadiyala	712020:730e5288-9a3b-422d-8fd9-7091cd54a971	Medium	Done	Done	10/Apr/25 6:42 AM	25/Apr/25 2:04 PM	
-Task	DEVOPS-7096	49619	Cognito Hyd Region Client Details	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Sai Kadiyala	712020:730e5288-9a3b-422d-8fd9-7091cd54a971	Medium	Done	Done	01/Apr/25 7:16 PM	10/Apr/25 10:33 AM	
-Task	DEVOPS-7002	49251	Kafka user creation for finbridge-connector service [Dev + uat]	Sumit Singh	712020:31145da8-4768-48af-996e-db2f5fe7c384	Monish Akram	712020:e6be23b7-b0b8-489e-a6b0-880d9de4ab82	Medium	Done	Done	25/Mar/25 2:37 PM	18/Jul/25 2:28 PM	
+
+   getting below error
+
+   ame    = "cc"
+module.records.route53_record_name
+Missing key/value separator: Expected an equals sign ("=") to mark the beginning of the attribute value. If you intended to given an attribute name containing periods or spaces, write the name in quotes to create a string literal.
+}
